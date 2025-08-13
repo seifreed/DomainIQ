@@ -1,0 +1,15 @@
+include README.md
+include LICENSE.md
+include CHANGELOG.md
+include pyproject.toml
+recursive-include domainiq *.py
+recursive-include tests *.py
+recursive-include docs *.md *.rst *.txt
+prune .git*
+prune .pytest_cache
+prune .mypy_cache
+prune __pycache__
+prune *.egg-info
+prune build
+prune dist
+prune .venv
