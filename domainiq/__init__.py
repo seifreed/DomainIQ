@@ -9,6 +9,7 @@ from .client import DomainIQClient
 from .exceptions import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
+    DomainIQConfigurationError,
     DomainIQError,
     DomainIQRateLimitError,
     DomainIQTimeoutError,
@@ -30,6 +31,7 @@ __all__ = [
     "DomainIQAPIError",
     "DomainIQAuthenticationError",
     "DomainIQClient",
+    "DomainIQConfigurationError",
     "DomainIQError",
     "DomainIQRateLimitError",
     "DomainIQTimeoutError",

@@ -1,7 +1,6 @@
 """Exception classes for the DomainIQ library."""
 
 
-
 class DomainIQError(Exception):
     """Base exception for all DomainIQ library errors."""
 
@@ -18,7 +17,7 @@ class DomainIQAPIError(DomainIQError):
         self,
         message: str,
         status_code: int | None = None,
-        response_data: dict | None = None
+        response_data: dict | None = None,
     ) -> None:
         super().__init__(message, response_data)
         self.status_code = status_code
@@ -35,7 +34,7 @@ class DomainIQRateLimitError(DomainIQAPIError):
         self,
         message: str,
         retry_after: int | None = None,
-        response_data: dict | None = None
+        response_data: dict | None = None,
     ) -> None:
         super().__init__(message, 429, response_data)
         self.retry_after = retry_after

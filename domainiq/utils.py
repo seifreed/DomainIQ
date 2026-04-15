@@ -169,7 +169,7 @@ def retry_on_exception(
     exceptions: Exception | tuple = Exception,
     max_retries: int = 3,
     delay: float = 1.0,
-    backoff: float = 2.0
+    backoff: float = 2.0,
 ):
     """Decorator to retry function on specified exceptions.
 
@@ -182,6 +182,7 @@ def retry_on_exception(
     Returns:
         Decorated function
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -192,18 +193,28 @@ def retry_on_exception(
                     return func(*args, **kwargs)
                 except exceptions as e:
                     if attempt == max_retries:
-                        logger.exception("Function %s failed after %s retries: %s", func.__name__, max_retries, e)
+                        logger.exception(
+                            "Function %s failed after %s retries: %s",
+                            func.__name__,
+                            max_retries,
+                            e,
+                        )
                         raise
 
                     logger.warning(
                         "Function %s failed on attempt %s, retrying in %ss: %s",
-                        func.__name__, attempt + 1, current_delay, e
+                        func.__name__,
+                        attempt + 1,
+                        current_delay,
+                        e,
                     )
                     time.sleep(current_delay)
                     current_delay *= backoff
 
             return None  # Should never reach here
+
         return wrapper
+
     return decorator
 
 
@@ -295,13 +306,11 @@ def chunk_list(lst: list[Any], chunk_size: int) -> list[list[Any]]:
         msg = "Chunk size must be positive"
         raise ValueError(msg)
 
-    return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
+    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
 
 def setup_logging(
-    level: str = "INFO",
-    format_string: str | None = None,
-    filename: str | None = None
+    level: str = "INFO", format_string: str | None = None, filename: str | None = None
 ) -> None:
     """Setup logging configuration for the library.
 
@@ -316,7 +325,7 @@ def setup_logging(
     logging_config = {
         "level": getattr(logging, level.upper()),
         "format": format_string,
-        "datefmt": "%Y-%m-%d %H:%M:%S"
+        "datefmt": "%Y-%m-%d %H:%M:%S",
     }
 
     if filename:

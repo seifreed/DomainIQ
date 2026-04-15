@@ -6,6 +6,7 @@ from typing import Any
 
 try:
     import aiohttp
+
     AIOHTTP_AVAILABLE = True
 except ImportError:
     AIOHTTP_AVAILABLE = False
@@ -66,9 +67,7 @@ class AsyncDomainIQClient:
                 "aiohttp is required for AsyncDomainIQClient. "
                 "Install it with: pip install aiohttp"
             )
-            raise DomainIQError(
-                msg
-            )
+            raise DomainIQError(msg)
 
         if config is None:
             config = Config(**kwargs)
@@ -85,14 +84,12 @@ class AsyncDomainIQClient:
             timeout = aiohttp.ClientTimeout(total=self.config.timeout)
             self._session = aiohttp.ClientSession(
                 timeout=timeout,
-                connector=aiohttp.TCPConnector(limit=100, limit_per_host=30)
+                connector=aiohttp.TCPConnector(limit=100, limit_per_host=30),
             )
         return self._session
 
     async def _make_request(
-        self,
-        params: dict[str, Any],
-        output_format: str = "json"
+        self, params: dict[str, Any], output_format: str = "json"
     ) -> dict[str, Any] | str:
         """Make an async API request to DomainIQ.
 
@@ -110,17 +107,14 @@ class AsyncDomainIQClient:
             DomainIQTimeoutError: If request times out
         """
         # Add API key and format parameters
-        request_params = {
-            "key": self.config.api_key,
-            **format_api_params(params)
-        }
+        request_params = {"key": self.config.api_key, **format_api_params(params)}
 
         if output_format == "json":
             request_params["output_mode"] = "json"
 
         logger.debug(
             "Making async API request with params: %s",
-            self._sanitize_params_for_log(request_params)
+            self._sanitize_params_for_log(request_params),
         )
 
         session = await self._get_session()
@@ -139,16 +133,12 @@ class AsyncDomainIQClient:
                     retry_after = response.headers.get("Retry-After")
                     msg = "Rate limit exceeded"
                     raise DomainIQRateLimitError(
-                        msg,
-                        retry_after=int(retry_after) if retry_after else None
+                        msg, retry_after=int(retry_after) if retry_after else None
                     )
                 if response.status >= HTTP_BAD_REQUEST:
                     text = await response.text()
                     msg = f"API request failed with status {response.status}: {text}"
-                    raise DomainIQAPIError(
-                        msg,
-                        status_code=response.status
-                    )
+                    raise DomainIQAPIError(msg, status_code=response.status)
 
                 # Return appropriate format
                 if output_format == "json":
@@ -179,7 +169,7 @@ class AsyncDomainIQClient:
         domain: str | None = None,
         ip: str | None = None,
         full: bool = False,
-        current_only: bool = False
+        current_only: bool = False,
     ) -> WhoisResult | None:
         """Perform async WHOIS lookup for a domain or IP address.
 
@@ -212,9 +202,7 @@ class AsyncDomainIQClient:
     # DNS Methods
 
     async def dns_lookup(
-        self,
-        query: str,
-        record_types: list[str | DNSRecordType] | None = None
+        self, query: str, record_types: list[str | DNSRecordType] | None = None
     ) -> DNSResult | None:
         """Perform async DNS lookup for a domain or hostname.
 
@@ -268,7 +256,7 @@ class AsyncDomainIQClient:
         no_cache: bool = False,
         raw: bool = False,
         width: int = 250,
-        height: int = 125
+        height: int = 125,
     ) -> DomainSnapshot | None:
         """Get a snapshot of a domain asynchronously.
 
@@ -287,7 +275,7 @@ class AsyncDomainIQClient:
             "service": "snapshot",
             "domain": domain,
             "width": width,
-            "height": height
+            "height": height,
         }
         if full:
             params["full"] = 1
@@ -319,9 +307,7 @@ class AsyncDomainIQClient:
         return csv_to_dict_list(csv_response)
 
     async def bulk_whois(
-        self,
-        items: list[str],
-        lookup_type: BulkWhoisType = BulkWhoisType.LIVE
+        self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE
     ) -> list[dict[str, Any]]:
         """Perform bulk WHOIS lookups asynchronously.
 
@@ -333,14 +319,9 @@ class AsyncDomainIQClient:
             List of WHOIS results as dictionaries
         """
         whois_type = (
-            lookup_type.value if isinstance(lookup_type, BulkWhoisType)
-            else lookup_type
+            lookup_type.value if isinstance(lookup_type, BulkWhoisType) else lookup_type
         )
-        params = {
-            "service": "bulk_whois",
-            "type": whois_type,
-            "domains": items
-        }
+        params = {"service": "bulk_whois", "type": whois_type, "domains": items}
 
         csv_response = await self._make_request(params, output_format="csv")
 
@@ -352,9 +333,7 @@ class AsyncDomainIQClient:
     # Concurrent Operations
 
     async def concurrent_whois_lookup(
-        self,
-        targets: list[str],
-        max_concurrent: int = 10
+        self, targets: list[str], max_concurrent: int = 10
     ) -> list[WhoisResult | None]:
         """Perform multiple WHOIS lookups concurrently.
 
@@ -385,7 +364,7 @@ class AsyncDomainIQClient:
         self,
         domains: list[str],
         record_types: list[str | DNSRecordType] | None = None,
-        max_concurrent: int = 10
+        max_concurrent: int = 10,
     ) -> list[DNSResult | None]:
         """Perform multiple DNS lookups concurrently.
 
@@ -435,14 +414,16 @@ class AsyncDomainIQClient:
         self,
         search_type: str | ReverseSearchType,
         search_term: str,
-        match: MatchType = MatchType.CONTAINS
+        match: MatchType = MatchType.CONTAINS,
     ) -> dict[str, Any] | None:
         """Perform async reverse search by email, name, or organization."""
         params = {
             "service": "reverse_search",
-            "type": search_type.value if isinstance(search_type, ReverseSearchType) else search_type,
+            "type": search_type.value
+            if isinstance(search_type, ReverseSearchType)
+            else search_type,
             "search": search_term,
-            "match": match.value if isinstance(match, MatchType) else match
+            "match": match.value if isinstance(match, MatchType) else match,
         }
 
         return await self._make_request(params)

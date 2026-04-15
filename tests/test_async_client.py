@@ -311,6 +311,7 @@ class TestAsyncDomainIQClientIntegration:
 
 
 @pytest.mark.skipif(not AIOHTTP_AVAILABLE, reason="aiohttp not available")
+@pytest.mark.asyncio
 async def test_async_performance_comparison():
     """Compare performance between sync and async clients (requires both to work)."""
     try:

@@ -19,7 +19,7 @@ class Config:
         timeout: int = 30,
         max_retries: int = 3,
         retry_delay: int = 1,
-        config_file_path: str | None = None
+        config_file_path: str | None = None,
     ) -> None:
         """Initialize configuration.
 
@@ -80,10 +80,14 @@ class Config:
                 with open(self.config_file_path) as f:
                     file_api_key = f.read().strip()
                 if file_api_key:
-                    logger.debug("Using API key from config file: %s", self.config_file_path)
+                    logger.debug(
+                        "Using API key from config file: %s", self.config_file_path
+                    )
                     return file_api_key
             except OSError as e:
-                logger.warning("Could not read config file %s: %s", self.config_file_path, e)
+                logger.warning(
+                    "Could not read config file %s: %s", self.config_file_path, e
+                )
 
         # 4. Interactive prompt (only in interactive environments)
         if self._is_interactive():
@@ -105,9 +109,7 @@ class Config:
             "3. ~/.domainiq config file\n"
             "4. Interactive prompt (when available)"
         )
-        raise DomainIQConfigurationError(
-            msg
-        )
+        raise DomainIQConfigurationError(msg)
 
     def _save_api_key(self, api_key: str) -> None:
         """Save API key to config file.
@@ -133,7 +135,9 @@ class Config:
             logger.debug("API key saved to config file: %s", self.config_file_path)
 
         except OSError as e:
-            logger.warning("Could not save API key to config file %s: %s", self.config_file_path, e)
+            logger.warning(
+                "Could not save API key to config file %s: %s", self.config_file_path, e
+            )
 
     @staticmethod
     def _is_interactive() -> bool:

@@ -62,7 +62,7 @@ class DomainIQClient:
             total=config.max_retries,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["HEAD", "GET", "OPTIONS"],
-            backoff_factor=config.retry_delay
+            backoff_factor=config.retry_delay,
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
@@ -71,9 +71,7 @@ class DomainIQClient:
         logger.debug("Initialized DomainIQ client with config: %s", config)
 
     def _make_request(
-        self,
-        params: dict[str, Any],
-        output_format: str = "json"
+        self, params: dict[str, Any], output_format: str = "json"
     ) -> dict[str, Any] | str:
         """Make an API request to DomainIQ.
 
@@ -91,21 +89,19 @@ class DomainIQClient:
             DomainIQTimeoutError: If request times out
         """
         # Add API key and format parameters
-        request_params = {
-            "key": self.config.api_key,
-            **format_api_params(params)
-        }
+        request_params = {"key": self.config.api_key, **format_api_params(params)}
 
         if output_format == "json":
             request_params["output_mode"] = "json"
 
-        logger.debug("Making API request with params: %s", self._sanitize_params_for_log(request_params))
+        logger.debug(
+            "Making API request with params: %s",
+            self._sanitize_params_for_log(request_params),
+        )
 
         try:
             response = self.session.get(
-                self.config.base_url,
-                params=request_params,
-                timeout=self.config.timeout
+                self.config.base_url, params=request_params, timeout=self.config.timeout
             )
 
             logger.debug("API response status: %s", response.status_code)
@@ -118,15 +114,11 @@ class DomainIQClient:
                 retry_after = response.headers.get("Retry-After")
                 msg = "Rate limit exceeded"
                 raise DomainIQRateLimitError(
-                    msg,
-                    retry_after=int(retry_after) if retry_after else None
+                    msg, retry_after=int(retry_after) if retry_after else None
                 )
             if response.status_code >= HTTP_BAD_REQUEST:
                 msg = f"API request failed with status {response.status_code}: {response.text}"
-                raise DomainIQAPIError(
-                    msg,
-                    status_code=response.status_code
-                )
+                raise DomainIQAPIError(msg, status_code=response.status_code)
 
             response.raise_for_status()
 
@@ -161,7 +153,7 @@ class DomainIQClient:
         domain: str | None = None,
         ip: str | None = None,
         full: bool = False,
-        current_only: bool = False
+        current_only: bool = False,
     ) -> WhoisResult | None:
         """Perform WHOIS lookup for a domain or IP address.
 
@@ -194,9 +186,7 @@ class DomainIQClient:
     # DNS Methods
 
     def dns_lookup(
-        self,
-        query: str,
-        record_types: list[str | DNSRecordType] | None = None
+        self, query: str, record_types: list[str | DNSRecordType] | None = None
     ) -> DNSResult | None:
         """Perform DNS lookup for a domain or hostname.
 
@@ -250,7 +240,7 @@ class DomainIQClient:
         no_cache: bool = False,
         raw: bool = False,
         width: int = 250,
-        height: int = 125
+        height: int = 125,
     ) -> DomainSnapshot | None:
         """Get a snapshot of a domain.
 
@@ -269,7 +259,7 @@ class DomainIQClient:
             "service": "snapshot",
             "domain": domain,
             "width": width,
-            "height": height
+            "height": height,
         }
         if full:
             params["full"] = 1
@@ -282,11 +272,7 @@ class DomainIQClient:
         return DomainSnapshot.from_dict(response) if response else None
 
     def domain_snapshot_history(
-        self,
-        domain: str,
-        width: int = 250,
-        height: int = 125,
-        limit: int = 10
+        self, domain: str, width: int = 250, height: int = 125, limit: int = 10
     ) -> list[DomainSnapshot]:
         """Get snapshot history for a domain.
 
@@ -304,7 +290,7 @@ class DomainIQClient:
             "domain": domain,
             "width": width,
             "height": height,
-            "limit": limit
+            "limit": limit,
         }
 
         response = self._make_request(params)
@@ -385,7 +371,7 @@ class DomainIQClient:
         keywords: list[str],
         conditions: list[str] | None = None,
         match: MatchType = MatchType.ANY,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> dict[str, Any] | None:
         """Search for domains matching keywords.
 
@@ -400,7 +386,7 @@ class DomainIQClient:
         """
         params = {
             "service": "domain_search",
-            "match": match.value if isinstance(match, MatchType) else match
+            "match": match.value if isinstance(match, MatchType) else match,
         }
 
         # Add keywords
@@ -421,7 +407,7 @@ class DomainIQClient:
         self,
         search_type: str | ReverseSearchType,
         search_term: str,
-        match: MatchType = MatchType.CONTAINS
+        match: MatchType = MatchType.CONTAINS,
     ) -> dict[str, Any] | None:
         """Perform reverse search by email, name, or organization.
 
@@ -435,9 +421,11 @@ class DomainIQClient:
         """
         params = {
             "service": "reverse_search",
-            "type": search_type.value if isinstance(search_type, ReverseSearchType) else search_type,
+            "type": search_type.value
+            if isinstance(search_type, ReverseSearchType)
+            else search_type,
             "search": search_term,
-            "match": match.value if isinstance(match, MatchType) else match
+            "match": match.value if isinstance(match, MatchType) else match,
         }
 
         return self._make_request(params)
@@ -468,10 +456,7 @@ class DomainIQClient:
         return self._make_request(params)
 
     def reverse_mx(
-        self,
-        search_type: str,
-        data: str,
-        recursive: bool = False
+        self, search_type: str, data: str, recursive: bool = False
     ) -> dict[str, Any] | None:
         """Perform reverse MX search.
 
@@ -509,9 +494,7 @@ class DomainIQClient:
         return csv_to_dict_list(csv_response)
 
     def bulk_whois(
-        self,
-        items: list[str],
-        lookup_type: BulkWhoisType = BulkWhoisType.LIVE
+        self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE
     ) -> list[dict[str, Any]]:
         """Perform bulk WHOIS lookups.
 
@@ -524,8 +507,10 @@ class DomainIQClient:
         """
         params = {
             "service": "bulk_whois",
-            "type": lookup_type.value if isinstance(lookup_type, BulkWhoisType) else lookup_type,
-            "domains": items
+            "type": lookup_type.value
+            if isinstance(lookup_type, BulkWhoisType)
+            else lookup_type,
+            "domains": items,
         }
 
         csv_response = self._make_request(params, output_format="csv")
@@ -583,10 +568,7 @@ class DomainIQClient:
         return self._make_request(params)
 
     def monitor_report_summary(
-        self,
-        report_id: int,
-        item_id: int | None = None,
-        days_range: int | None = None
+        self, report_id: int, item_id: int | None = None, days_range: int | None = None
     ) -> dict[str, Any] | None:
         """Get monitor report summary.
 
@@ -606,7 +588,9 @@ class DomainIQClient:
 
         return self._make_request(params)
 
-    def monitor_report_changes(self, report_id: int, change_id: int) -> dict[str, Any] | None:
+    def monitor_report_changes(
+        self, report_id: int, change_id: int
+    ) -> dict[str, Any] | None:
         """Get monitor report changes.
 
         Args:
@@ -620,15 +604,12 @@ class DomainIQClient:
             "service": "monitor",
             "action": "report_changes",
             "report": report_id,
-            "change": change_id
+            "change": change_id,
         }
         return self._make_request(params)
 
     def create_monitor_report(
-        self,
-        report_type: str,
-        name: str,
-        email_alert: bool = True
+        self, report_type: str, name: str, email_alert: bool = True
     ) -> dict[str, Any] | None:
         """Create a new monitor report.
 
@@ -645,16 +626,12 @@ class DomainIQClient:
             "action": "report_create",
             "type": report_type,
             "name": name,
-            "email_alert": "1" if email_alert else "0"
+            "email_alert": "1" if email_alert else "0",
         }
         return self._make_request(params)
 
     def add_monitor_item(
-        self,
-        report_id: int,
-        item_type: str,
-        items: list[str],
-        **kwargs: Any
+        self, report_id: int, item_type: str, items: list[str], **kwargs: Any
     ) -> dict[str, Any] | None:
         """Add items to a monitor report.
 
@@ -672,12 +649,14 @@ class DomainIQClient:
             "action": "report_item_add",
             "report_id": report_id,
             "type": item_type,
-            "items": items
+            "items": items,
         }
         params.update(kwargs)
         return self._make_request(params)
 
-    def enable_typos(self, report_id: int, item_id: int, strength: int = 41) -> dict[str, Any] | None:
+    def enable_typos(
+        self, report_id: int, item_id: int, strength: int = 41
+    ) -> dict[str, Any] | None:
         """Enable typo monitoring for a keyword monitor item.
 
         Args:
@@ -693,7 +672,7 @@ class DomainIQClient:
             "action": "enable_typos",
             "report_id": report_id,
             "item_id": item_id,
-            "strength": strength
+            "strength": strength,
         }
         return self._make_request(params)
 
@@ -711,11 +690,13 @@ class DomainIQClient:
             "service": "monitor",
             "action": "disable_typos",
             "report_id": report_id,
-            "item_id": item_id
+            "item_id": item_id,
         }
         return self._make_request(params)
 
-    def modify_typo_strength(self, report_id: int, item_id: int, strength: int) -> dict[str, Any] | None:
+    def modify_typo_strength(
+        self, report_id: int, item_id: int, strength: int
+    ) -> dict[str, Any] | None:
         """Modify typo monitoring strength for a keyword monitor item.
 
         Args:
@@ -731,7 +712,7 @@ class DomainIQClient:
             "action": "modify_typo_strength",
             "report_id": report_id,
             "item_id": item_id,
-            "strength": strength
+            "strength": strength,
         }
         return self._make_request(params)
 
@@ -747,7 +728,7 @@ class DomainIQClient:
         params = {
             "service": "monitor",
             "action": "report_item_delete",
-            "item_id": item_id
+            "item_id": item_id,
         }
         return self._make_request(params)
 
@@ -763,7 +744,7 @@ class DomainIQClient:
         params = {
             "service": "monitor",
             "action": "report_delete",
-            "report_id": report_id
+            "report_id": report_id,
         }
         return self._make_request(params)
 
