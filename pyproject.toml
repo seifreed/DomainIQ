@@ -33,7 +33,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Internet :: Name Service (DNS)",
     "Topic :: Security",
@@ -257,10 +256,14 @@ convention = "google"
     "ANN",    # Missing annotations in tests
     "PLR2004", # Magic value used in comparison
     "S311",   # Standard pseudo-random generators
+    "SLF001", # Private member access (acceptable in tests)
 ]
 "examples/**/*.py" = [
     "T201",   # Print found (acceptable in examples)
     "D",      # Missing docstrings in examples
+]
+"domainiq/cli.py" = [
+    "T201",   # print() found (intentional for CLI tool)
 ]
 
 # MyPy configuration with strict settings

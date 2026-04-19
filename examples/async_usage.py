@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Asynchronous usage examples for the DomainIQ library.
 
@@ -55,24 +54,27 @@ async def concurrent_operations_examples() -> None:
         "python.org",
         "microsoft.com",
         "apple.com",
-        "amazon.com"
+        "amazon.com",
     ]
 
     async with AsyncDomainIQClient() as client:
-
         # Example 1: Concurrent WHOIS lookups
         print(f"Performing concurrent WHOIS lookups for {len(domains)} domains...")
         start_time = time.time()
 
         whois_results = await client.concurrent_whois_lookup(
             targets=domains,
-            max_concurrent=5  # Limit concurrent requests
+            max_concurrent=5,  # Limit concurrent requests
         )
 
         elapsed = time.time() - start_time
         successful_lookups = sum(1 for result in whois_results if result is not None)
 
-        print(f"Completed {successful_lookups}/{len(domains)} WHOIS lookups in {elapsed:.2f}s")
+        msg = (
+            f"Completed {successful_lookups}/{len(domains)} "
+            f"WHOIS lookups in {elapsed:.2f}s"
+        )
+        print(msg)
 
         # Show some results
         for i, result in enumerate(whois_results[:3]):
@@ -86,18 +88,22 @@ async def concurrent_operations_examples() -> None:
         dns_results = await client.concurrent_dns_lookup(
             domains=domains,
             record_types=[DNSRecordType.A, DNSRecordType.MX],
-            max_concurrent=3
+            max_concurrent=3,
         )
 
         elapsed = time.time() - start_time
         successful_dns = sum(1 for result in dns_results if result is not None)
 
-        print(f"Completed {successful_dns}/{len(domains)} DNS lookups in {elapsed:.2f}s")
+        msg_dns = (
+            f"Completed {successful_dns}/{len(domains)} "
+            f"DNS lookups in {elapsed:.2f}s"
+        )
+        print(msg_dns)
 
         # Show some results
-        for i, result in enumerate(dns_results[:3]):
-            if result:
-                print(f"  {result.domain}: {len(result.records)} records")
+        for dns_result in dns_results[:3]:
+            if dns_result:
+                print(f"  {dns_result.domain}: {len(dns_result.records)} records")
 
 
 async def advanced_async_patterns() -> None:
@@ -106,7 +112,6 @@ async def advanced_async_patterns() -> None:
     print("-" * 30)
 
     async with AsyncDomainIQClient() as client:
-
         # Example 1: Gather multiple different operations
         print("Running multiple different operations concurrently...")
 
@@ -114,20 +119,20 @@ async def advanced_async_patterns() -> None:
             client.whois_lookup(domain="example.com"),
             client.dns_lookup("example.com"),
             client.domain_categorize(["example.com"]),
-            client.domain_report("example.com")
+            client.domain_report("example.com"),
         ]
 
         try:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             print("Results:")
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    print(f"  Task {i+1}: Failed - {result}")
+            for idx, result in enumerate(results):
+                if isinstance(result, (DomainIQError, ValueError, OSError)):
+                    print(f"  Task {idx + 1}: Failed - {result}")
                 else:
-                    print(f"  Task {i+1}: Success - {type(result).__name__}")
+                    print(f"  Task {idx + 1}: Success - {type(result).__name__}")
 
-        except Exception as e:
+        except (DomainIQError, ValueError, OSError) as e:
             print(f"Error in gather: {e}")
 
         # Example 2: Bulk operations with async
@@ -182,7 +187,7 @@ async def performance_comparison() -> None:
     async with AsyncDomainIQClient() as client:
         async_results = await client.concurrent_whois_lookup(
             targets=domains,
-            max_concurrent=4
+            max_concurrent=4,
         )
 
     async_time = time.time() - start_time
@@ -193,7 +198,8 @@ async def performance_comparison() -> None:
     # For comparison info (sync version would be much slower)
     estimated_sync_time = len(domains) * 2.0  # Estimate 2s per domain
     print(f"Estimated sync time: ~{estimated_sync_time:.1f}s")
-    print(f"Async performance improvement: ~{estimated_sync_time/async_time:.1f}x faster")
+    improvement = estimated_sync_time / async_time
+    print(f"Async performance improvement: ~{improvement:.1f}x faster")
 
 
 async def main() -> int:
@@ -214,7 +220,7 @@ async def main() -> int:
     except DomainIQError as e:
         print(f"DomainIQ Error: {e}")
         return 1
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         print(f"Unexpected error: {e}")
         return 1
 
@@ -222,12 +228,12 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    try:
-        # Check if aiohttp is available
-        import aiohttp
-        result = asyncio.run(main())
-        sys.exit(result)
-    except ImportError:
+    import importlib.util
+
+    if importlib.util.find_spec("aiohttp") is None:
         print("Error: aiohttp is required for async examples")
         print("Install it with: pip install aiohttp")
         sys.exit(1)
+
+    result = asyncio.run(main())
+    sys.exit(result)

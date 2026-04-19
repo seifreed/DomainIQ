@@ -2,95 +2,231 @@
 
 import asyncio
 import logging
-from typing import Any
+from collections.abc import Callable, Coroutine
+from types import TracebackType
+from typing import Any, Self, TypeVar, Unpack
 
-try:
-    import aiohttp
-
-    AIOHTTP_AVAILABLE = True
-except ImportError:
-    AIOHTTP_AVAILABLE = False
-    aiohttp = None
-
-from .config import Config
+from ._base_client import (
+    _BaseDomainIQClient,
+    _assert_csv_str,
+    _assert_json_dict,
+    _assert_json_dict_or_list,
+)
+from .constants import API_FORMAT_CSV, API_FORMAT_JSON, RETRY_EXHAUSTED_MSG
+from ._mixins import (
+    _AsyncBulkMixin,
+    _AsyncDNSMixin,
+    _AsyncDomainAnalysisMixin,
+    _AsyncMonitorMixin,
+    _AsyncReportMixin,
+    _AsyncSearchMixin,
+    _AsyncWhoisMixin,
+)
+from .config import Config, ConfigKwargs
 from .exceptions import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
+    DomainIQConfigurationError,
     DomainIQError,
+    DomainIQPartialResultsError,
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
-from .models import (
-    BulkWhoisType,
-    DNSRecordType,
-    DNSResult,
-    DomainCategory,
-    DomainReport,
-    DomainSnapshot,
-    MatchType,
-    MonitorReport,
-    ReverseSearchType,
-    WhoisResult,
-)
-from .utils import csv_to_dict_list, format_api_params
+from .http_transport import AiohttpTransport, AsyncResponse, AsyncTransport
+from .models import DNSRecordType, DNSResult, WhoisResult
+from .validators import is_ip_address
 
 logger = logging.getLogger(__name__)
 
-# HTTP status code constants
-HTTP_UNAUTHORIZED = 401
-HTTP_TOO_MANY_REQUESTS = 429
-HTTP_BAD_REQUEST = 400
+_T = TypeVar("_T")
+_LT = TypeVar("_LT")
 
 
-class AsyncDomainIQClient:
+class _LookupFailure:
+    """Internal sentinel: a non-critical concurrent-lookup failure.
+
+    Carries the failed target and exception for logging context.
+    Collapsed to None in public return types by _concurrent_lookup.
+    """
+
+    def __init__(self, target: str, error: Exception) -> None:
+        self.target = target
+        self.error = error
+
+    def __repr__(self) -> str:
+        return f"_LookupFailure(target={self.target!r}, error={self.error!r})"
+
+
+def _make_default_async_transport(config: "Config") -> AsyncTransport:
+    """Create default AiohttpTransport from config. ImportError → DomainIQError."""
+    try:
+        return AiohttpTransport(
+            timeout=config.timeout,
+            connector_limit=config.connector_limit,
+            connector_limit_per_host=config.connector_limit_per_host,
+        )
+    except ImportError as e:
+        msg = "aiohttp is required for AsyncDomainIQClient. Install it with: pip install aiohttp"
+        raise DomainIQError(msg) from e
+
+
+def _collect_task_results(
+    tasks: list[asyncio.Task[_T | None]],
+    expected_type: type[_T],
+) -> list[_T | None]:
+    """Collect results from a list of tasks, aligning by submission order."""
+    partials: list[_T | None] = []
+    for task in tasks:
+        if task.done() and not task.cancelled() and task.exception() is None:
+            result = task.result()
+            partials.append(result if isinstance(result, expected_type) else None)
+        else:
+            partials.append(None)
+    return partials
+
+
+def _find_critical_exception(
+    tasks: list[asyncio.Task[Any]],
+) -> BaseException | None:
+    """Return the first non-cancelled exception from done tasks, or None."""
+    for task in tasks:
+        if task.done() and not task.cancelled() and task.exception() is not None:
+            return task.exception()
+    return None
+
+
+async def _cancel_and_settle(tasks: list[asyncio.Task[Any]]) -> None:
+    """Cancel all unfinished tasks and await their termination."""
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _run_with_critical_cancel(
+    coros: list[Coroutine[Any, Any, _T | None]],
+    expected_type: type[_T],
+) -> list[_T | None]:
+    """Run lookup coroutines, cancelling in-flight ones on first exception.
+
+    Each coroutine is expected to swallow non-critical errors internally
+    (returning ``None``). Any exception that escapes is treated as critical:
+    still-pending tasks are cancelled, completed results are collected into
+    ``exc.partial_results`` (aligned by submission order, with ``None`` for
+    tasks that hadn't produced a value), and the exception is re-raised.
+
+    Returns results aligned by submission order when no task raises.
+    """
+    tasks: list[asyncio.Task[_T | None]] = [asyncio.create_task(c) for c in coros]
+
+    try:
+        # FIRST_EXCEPTION: returns as soon as any task raises, leaving the rest pending.
+        # Non-critical errors are swallowed by coroutines themselves (they return None).
+        _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    except (Exception, asyncio.CancelledError):
+        # asyncio.wait itself was cancelled from outside — clean up everything.
+        await _cancel_and_settle(tasks)
+        raise
+
+    critical = _find_critical_exception(tasks)
+    if critical is not None:
+        for task in tasks:
+            if task.done() and not task.cancelled():
+                exc = task.exception()
+                if exc is not None and exc is not critical:
+                    # Keep only the first; log extras rather than swallow.
+                    logger.warning("Additional critical exception discarded: %s", exc)
+        await _cancel_and_settle(tasks)
+        raise DomainIQPartialResultsError(
+            critical, _collect_task_results(tasks, expected_type)
+        ) from critical
+
+    return _collect_task_results(tasks, expected_type)
+
+
+class AsyncDomainIQClient(
+    _AsyncWhoisMixin, _AsyncDNSMixin, _AsyncDomainAnalysisMixin,
+    _AsyncReportMixin, _AsyncSearchMixin, _AsyncBulkMixin, _AsyncMonitorMixin,
+    _BaseDomainIQClient,
+):
     """Asynchronous client for the DomainIQ API.
 
-    This client provides async/await methods to interact with all DomainIQ API
-    endpoints with better performance for concurrent operations.
+    This client provides async/await methods to interact with all
+    DomainIQ API endpoints with better performance for concurrent
+    operations.
 
     Requires aiohttp to be installed:
         pip install aiohttp
+
+    Type annotation guidance
+    ------------------------
+    Annotate function arguments with the narrowest Protocol that covers
+    the capabilities required, not with the concrete client class::
+
+        Full surface:     domainiq.protocols.AsyncDomainIQClientProtocol
+        WHOIS only:       domainiq.protocols.AsyncWhoisProtocol
+        DNS only:         domainiq.protocols.AsyncDNSProtocol
+        Reports:          domainiq.protocols.AsyncReportProtocol
+        Search:           domainiq.protocols.AsyncSearchProtocol
+        Bulk ops:         domainiq.protocols.AsyncBulkProtocol
+        Monitoring:       domainiq.protocols.AsyncMonitorProtocol
+        Domain analysis:  domainiq.protocols.AsyncDomainAnalysisProtocol
+
+    This decouples callers from the concrete class and enables lightweight
+    test fakes that implement only the required protocol.
     """
 
-    def __init__(self, config: Config | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        config: Config | None = None,
+        transport: AsyncTransport | None = None,
+        **kwargs: Unpack[ConfigKwargs],
+    ) -> None:
         """Initialize the async DomainIQ client.
 
         Args:
             config: Configuration object. If None, will create default config.
-            **kwargs: Additional arguments passed to Config if config is None
+            transport: Async HTTP transport. Defaults to AiohttpTransport.
+            **kwargs: Additional arguments passed to Config
 
         Raises:
-            DomainIQError: If aiohttp is not available
+            DomainIQError: If aiohttp is not available and no transport is given
         """
-        if not AIOHTTP_AVAILABLE:
-            msg = (
-                "aiohttp is required for AsyncDomainIQClient. "
-                "Install it with: pip install aiohttp"
-            )
-            raise DomainIQError(msg)
+        super().__init__(config=config, **kwargs)
+        self._transport: AsyncTransport = (
+            transport if transport is not None
+            else _make_default_async_transport(self.config)
+        )
 
-        if config is None:
-            config = Config(**kwargs)
+        logger.debug(
+            "Initialized async DomainIQ client with config: %s",
+            self.config,
+        )
 
-        config.validate()
-        self.config = config
-        self._session: aiohttp.ClientSession | None = None
+    def _handle_error_status(
+        self, response: AsyncResponse, attempt: int
+    ) -> float | None:
+        """Delegate to shared error classifier. Returns retry delay or None for success."""
+        return self._classify_response(
+            response.status_code, response.text, response.headers, attempt
+        )
 
-        logger.debug("Initialized async DomainIQ client with config: %s", config)
-
-    async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create aiohttp session."""
-        if self._session is None or self._session.closed:
-            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
-            self._session = aiohttp.ClientSession(
-                timeout=timeout,
-                connector=aiohttp.TCPConnector(limit=100, limit_per_host=30),
-            )
-        return self._session
+    async def _parse_response(
+        self, response: AsyncResponse, output_format: str
+    ) -> dict[str, Any] | list[Any] | str:
+        """Parse a successful HTTP response into the expected Python type."""
+        if output_format == API_FORMAT_JSON:
+            try:
+                json_response: dict[str, Any] | list[Any] = response.json()
+            except ValueError as e:
+                msg = f"Failed to parse JSON response: {e}"
+                raise DomainIQAPIError(msg) from e
+            return json_response
+        return response.text
 
     async def _make_request(
-        self, params: dict[str, Any], output_format: str = "json"
-    ) -> dict[str, Any] | str:
+        self, params: dict[str, Any], output_format: str = API_FORMAT_JSON
+    ) -> dict[str, Any] | list[Any] | str:
         """Make an async API request to DomainIQ.
 
         Args:
@@ -106,259 +242,99 @@ class AsyncDomainIQClient:
             DomainIQRateLimitError: If rate limit is exceeded
             DomainIQTimeoutError: If request times out
         """
-        # Add API key and format parameters
-        request_params = {"key": self.config.api_key, **format_api_params(params)}
+        request_params = self._build_request_params(params, output_format)
 
-        if output_format == "json":
-            request_params["output_mode"] = "json"
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                response = await self._transport.get(
+                    self.config.base_url,
+                    params=request_params,
+                    timeout=self.config.timeout,
+                )
+            except TimeoutError as e:
+                await asyncio.sleep(self._on_timeout(e, attempt))
+                continue
+            except OSError as e:
+                await asyncio.sleep(self._on_oserror(e, attempt))
+                continue
 
-        logger.debug(
-            "Making async API request with params: %s",
-            self._sanitize_params_for_log(request_params),
+            logger.debug("API response status: %s", response.status_code)
+
+            retry_delay = self._handle_error_status(response, attempt)
+            if retry_delay is not None:
+                await asyncio.sleep(retry_delay)
+                continue
+
+            return await self._parse_response(response, output_format)
+
+        raise DomainIQAPIError(RETRY_EXHAUSTED_MSG)
+
+    async def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Make async API request expecting JSON response."""
+        return _assert_json_dict(await self._make_request(params, output_format=API_FORMAT_JSON))
+
+    async def _make_json_request_maybe_list(
+        self, params: dict[str, Any]
+    ) -> dict[str, Any] | list[Any]:
+        """Make async API request expecting JSON (dict or list)."""
+        return _assert_json_dict_or_list(
+            await self._make_request(params, output_format=API_FORMAT_JSON)
         )
 
-        session = await self._get_session()
+    async def _make_csv_request(self, params: dict[str, Any]) -> str:
+        """Make async API request expecting CSV response."""
+        return _assert_csv_str(await self._make_request(params, output_format=API_FORMAT_CSV))
 
-        try:
-            async with session.get(
-                self.config.base_url, params=request_params
-            ) as response:
-                logger.debug("API response status: %s", response.status)
-
-                # Handle different status codes
-                if response.status == HTTP_UNAUTHORIZED:
-                    msg = "Invalid API key or authentication failed"
-                    raise DomainIQAuthenticationError(msg)
-                if response.status == HTTP_TOO_MANY_REQUESTS:
-                    retry_after = response.headers.get("Retry-After")
-                    msg = "Rate limit exceeded"
-                    raise DomainIQRateLimitError(
-                        msg, retry_after=int(retry_after) if retry_after else None
-                    )
-                if response.status >= HTTP_BAD_REQUEST:
-                    text = await response.text()
-                    msg = f"API request failed with status {response.status}: {text}"
-                    raise DomainIQAPIError(msg, status_code=response.status)
-
-                # Return appropriate format
-                if output_format == "json":
-                    return await response.json()
-                return await response.text()
-
-        except asyncio.TimeoutError as e:
-            msg = f"Request timed out after {self.config.timeout}s"
-            raise DomainIQTimeoutError(msg) from e
-        except aiohttp.ClientError as e:
-            msg = f"Request failed: {e}"
-            raise DomainIQAPIError(msg) from e
-        except ValueError as e:
-            msg = f"Failed to parse JSON response: {e}"
-            raise DomainIQAPIError(msg) from e
-
-    def _sanitize_params_for_log(self, params: dict[str, str]) -> dict[str, str]:
-        """Sanitize parameters for logging (hide API key)."""
-        sanitized = params.copy()
-        if "key" in sanitized:
-            sanitized["key"] = "*" * 8
-        return sanitized
-
-    # WHOIS Methods
-
-    async def whois_lookup(
+    async def _concurrent_lookup(
         self,
-        domain: str | None = None,
-        ip: str | None = None,
-        full: bool = False,
-        current_only: bool = False,
-    ) -> WhoisResult | None:
-        """Perform async WHOIS lookup for a domain or IP address.
+        inner_fn: Callable[[str], Coroutine[Any, Any, _LT]],
+        targets: list[str],
+        max_concurrent: int,
+        label: str,
+        result_type: type[_LT],
+    ) -> list[_LT | None]:
+        """Generic concurrent lookup with semaphore and critical-error cancellation."""
+        semaphore = asyncio.Semaphore(max_concurrent)
 
-        Args:
-            domain: Domain name to lookup
-            ip: IP address to lookup
-            full: Retrieve full WHOIS record
-            current_only: Use only current WHOIS record
+        async def _bounded(target: str) -> _LT | _LookupFailure:
+            async with semaphore:
+                try:
+                    return await inner_fn(target)
+                except (
+                    DomainIQAuthenticationError,
+                    DomainIQConfigurationError,
+                    DomainIQRateLimitError,
+                ):
+                    raise
+                except (DomainIQAPIError, DomainIQTimeoutError, TimeoutError, OSError) as e:
+                    logger.warning("%s lookup failed for %s: %s", label, target, e)
+                    return _LookupFailure(target, e)
 
-        Returns:
-            WhoisResult object or None if no data
-        """
-        if not domain and not ip:
-            msg = "Either domain or ip must be provided"
-            raise ValueError(msg)
-
-        params = {"service": "whois"}
-        if domain:
-            params["domain"] = domain
-        if ip:
-            params["ip"] = ip
-        if full:
-            params["full"] = 1
-        if current_only:
-            params["current_only"] = 1
-
-        response = await self._make_request(params)
-        return WhoisResult.from_dict(response) if response else None
-
-    # DNS Methods
-
-    async def dns_lookup(
-        self, query: str, record_types: list[str | DNSRecordType] | None = None
-    ) -> DNSResult | None:
-        """Perform async DNS lookup for a domain or hostname.
-
-        Args:
-            query: Domain or hostname to query
-            record_types: List of DNS record types to retrieve
-
-        Returns:
-            DNSResult object or None if no data
-        """
-        params = {"service": "dns", "q": query}
-
-        if record_types:
-            types_str = ",".join(
-                t.value if isinstance(t, DNSRecordType) else str(t)
-                for t in record_types
-            )
-            params["types"] = types_str
-
-        response = await self._make_request(params)
-        return DNSResult.from_dict(response) if response else None
-
-    # Domain Analysis Methods
-
-    async def domain_categorize(self, domains: list[str]) -> list[DomainCategory]:
-        """Categorize domain names asynchronously.
-
-        Args:
-            domains: List of domain names to categorize
-
-        Returns:
-            List of DomainCategory objects
-        """
-        params = {"service": "categorize", "domains": domains}
-        response = await self._make_request(params)
-
-        if not response:
-            return []
-
-        # Handle both single domain and multiple domains responses
-        if isinstance(response, dict) and "domain" in response:
-            return [DomainCategory.from_dict(response)]
-        if isinstance(response, list):
-            return [DomainCategory.from_dict(item) for item in response]
-        return []
-
-    async def domain_snapshot(
-        self,
-        domain: str,
-        full: bool = False,
-        no_cache: bool = False,
-        raw: bool = False,
-        width: int = 250,
-        height: int = 125,
-    ) -> DomainSnapshot | None:
-        """Get a snapshot of a domain asynchronously.
-
-        Args:
-            domain: Domain to snapshot
-            full: Retrieve full-size image
-            no_cache: Don't use cached snapshot
-            raw: Return raw image data
-            width: Snapshot width
-            height: Snapshot height
-
-        Returns:
-            DomainSnapshot object or None if no data
-        """
-        params = {
-            "service": "snapshot",
-            "domain": domain,
-            "width": width,
-            "height": height,
-        }
-        if full:
-            params["full"] = 1
-        if no_cache:
-            params["no_cache"] = 1
-        if raw:
-            params["raw"] = 1
-
-        response = await self._make_request(params)
-        return DomainSnapshot.from_dict(response) if response else None
-
-    # Bulk Operations with Concurrency
-
-    async def bulk_dns(self, domains: list[str]) -> list[dict[str, Any]]:
-        """Perform bulk DNS lookups asynchronously.
-
-        Args:
-            domains: List of domains to lookup
-
-        Returns:
-            List of DNS results as dictionaries
-        """
-        params = {"service": "bulk_dns", "domains": domains}
-        csv_response = await self._make_request(params, output_format="csv")
-
-        if not csv_response:
-            return []
-
-        return csv_to_dict_list(csv_response)
-
-    async def bulk_whois(
-        self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE
-    ) -> list[dict[str, Any]]:
-        """Perform bulk WHOIS lookups asynchronously.
-
-        Args:
-            items: List of domains or IPs to lookup
-            lookup_type: Type of WHOIS lookup (live, registry, cached)
-
-        Returns:
-            List of WHOIS results as dictionaries
-        """
-        whois_type = (
-            lookup_type.value if isinstance(lookup_type, BulkWhoisType) else lookup_type
+        raw = await _run_with_critical_cancel(
+            [_bounded(t) for t in targets],
+            result_type,
         )
-        params = {"service": "bulk_whois", "type": whois_type, "domains": items}
-
-        csv_response = await self._make_request(params, output_format="csv")
-
-        if not csv_response:
-            return []
-
-        return csv_to_dict_list(csv_response)
-
-    # Concurrent Operations
+        return [None if isinstance(r, _LookupFailure) else r for r in raw]
 
     async def concurrent_whois_lookup(
-        self, targets: list[str], max_concurrent: int = 10
+        self,
+        targets: list[str],
+        max_concurrent: int = 10,
     ) -> list[WhoisResult | None]:
         """Perform multiple WHOIS lookups concurrently.
 
-        Args:
-            targets: List of domains or IPs to lookup
-            max_concurrent: Maximum number of concurrent requests
-
-        Returns:
-            List of WhoisResult objects (or None for failed lookups)
+        On a critical error (auth, config, rate-limit) in any lookup,
+        in-flight tasks are cancelled and the exception is re-raised with
+        a ``partial_results`` attribute holding the results (or ``None``)
+        already completed before the failure, aligned by task submission
+        order.
         """
-        semaphore = asyncio.Semaphore(max_concurrent)
+        async def _do(target: str) -> WhoisResult:
+            if is_ip_address(target):
+                return await self.whois_lookup(ip=target)
+            return await self.whois_lookup(domain=target)
 
-        async def lookup_with_semaphore(target: str) -> WhoisResult | None:
-            async with semaphore:
-                try:
-                    # Determine if it's IP or domain
-                    if target.replace(".", "").replace(":", "").isdigit():
-                        return await self.whois_lookup(ip=target)
-                    return await self.whois_lookup(domain=target)
-                except Exception as e:
-                    logger.warning("WHOIS lookup failed for %s: %s", target, e)
-                    return None
-
-        tasks = [lookup_with_semaphore(target) for target in targets]
-        return await asyncio.gather(*tasks, return_exceptions=False)
+        return await self._concurrent_lookup(_do, targets, max_concurrent, "WHOIS", WhoisResult)
 
     async def concurrent_dns_lookup(
         self,
@@ -368,91 +344,42 @@ class AsyncDomainIQClient:
     ) -> list[DNSResult | None]:
         """Perform multiple DNS lookups concurrently.
 
-        Args:
-            domains: List of domains to lookup
-            record_types: DNS record types to retrieve
-            max_concurrent: Maximum number of concurrent requests
-
-        Returns:
-            List of DNSResult objects (or None for failed lookups)
+        See ``concurrent_whois_lookup`` for the critical-error cancellation
+        and ``partial_results`` behavior.
         """
-        semaphore = asyncio.Semaphore(max_concurrent)
+        async def _do(domain: str) -> DNSResult:
+            return await self.dns_lookup(domain, record_types)
 
-        async def lookup_with_semaphore(domain: str) -> DNSResult | None:
-            async with semaphore:
-                try:
-                    return await self.dns_lookup(domain, record_types)
-                except Exception as e:
-                    logger.warning("DNS lookup failed for %s: %s", domain, e)
-                    return None
-
-        tasks = [lookup_with_semaphore(domain) for domain in domains]
-        return await asyncio.gather(*tasks, return_exceptions=False)
-
-    # Add other methods from the sync client...
-    # (For brevity, I'll include a few key ones. The full implementation would include all methods)
-
-    async def domain_report(self, domain: str) -> DomainReport | None:
-        """Get comprehensive domain report asynchronously."""
-        params = {"service": "domain_report", "domain": domain}
-        response = await self._make_request(params)
-        return DomainReport.from_dict(response) if response else None
-
-    async def monitor_list(self) -> list[MonitorReport]:
-        """Get list of active monitors asynchronously."""
-        params = {"service": "monitor", "action": "list"}
-        response = await self._make_request(params)
-
-        if not response:
-            return []
-
-        if isinstance(response, list):
-            return [MonitorReport.from_dict(item) for item in response]
-        return [MonitorReport.from_dict(response)]
-
-    async def reverse_search(
-        self,
-        search_type: str | ReverseSearchType,
-        search_term: str,
-        match: MatchType = MatchType.CONTAINS,
-    ) -> dict[str, Any] | None:
-        """Perform async reverse search by email, name, or organization."""
-        params = {
-            "service": "reverse_search",
-            "type": search_type.value
-            if isinstance(search_type, ReverseSearchType)
-            else search_type,
-            "search": search_term,
-            "match": match.value if isinstance(match, MatchType) else match,
-        }
-
-        return await self._make_request(params)
-
-    # Context Manager and Cleanup
+        return await self._concurrent_lookup(_do, domains, max_concurrent, "DNS", DNSResult)
 
     async def close(self) -> None:
-        """Close the aiohttp session."""
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """Close the HTTP transport."""
+        await self._transport.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Async context manager exit."""
         await self.close()
 
     def __del__(self) -> None:
-        """Cleanup when object is destroyed."""
-        if self._session and not self._session.closed:
-            try:
-                # Try to close the session if event loop is still running
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(self.close())
-                else:
-                    loop.run_until_complete(self.close())
-            except Exception:
-                # If we can't clean up properly, just pass
-                pass
+        """Warn if transport was not properly closed."""
+        transport = getattr(self, "_transport", None)
+        if transport is None:
+            return
+        if getattr(transport, "is_open", False):
+            import warnings
+
+            warnings.warn(
+                f"Unclosed {self.__class__.__name__}. "
+                "Use 'async with' or call 'await client.close()' explicitly.",
+                ResourceWarning,
+                stacklevel=2,
+            )
