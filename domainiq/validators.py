@@ -20,7 +20,7 @@ _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
 def _validate_label(label: str) -> bool:
     """Validate a single DNS label (handles IDN and ASCII labels)."""
     try:
-        label = label.encode("idna").decode("ascii")  # noqa: PLW2901
+        label = label.encode("idna").decode("ascii")  # intentional rebind: normalise IDN label to ASCII before length/char validation
     except (UnicodeError, UnicodeDecodeError):
         if not label.isascii():
             return (
@@ -160,10 +160,11 @@ def validate_whois_target(
     return domain, ip
 
 
-def validate_positive_int(field_name: str, value: int) -> None:
+def ensure_positive_int(field_name: str, value: int) -> int:
     if value <= 0:
         msg = f"{field_name} must be positive, got {value}"
         raise DomainIQError(msg)
+    return value
 
 
 def validate_date_string(date_str: str) -> str | None:

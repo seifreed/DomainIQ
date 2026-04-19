@@ -48,12 +48,12 @@ def try_parse_date(date_str: str | None) -> datetime | None:
     digits = stripped.lstrip("-")
     if "." in stripped or (digits.isdigit() and len(digits) >= _TIMESTAMP_MIN_DIGITS):
         try:
-            return datetime.fromtimestamp(float(stripped))  # noqa: DTZ006
+            return datetime.fromtimestamp(float(stripped))  # noqa: DTZ006 — API returns naive UTC epoch; naive datetime is the project-wide contract for parsed dates
         except (ValueError, TypeError, OSError):
             pass
     for fmt in _DATE_FORMATS:
         try:
-            return datetime.strptime(date_str, fmt)  # noqa: DTZ007
+            return datetime.strptime(date_str, fmt)  # noqa: DTZ007 — same naive-datetime contract as DTZ006; API does not supply timezone in string formats
         except ValueError:
             continue
     return None

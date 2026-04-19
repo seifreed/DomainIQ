@@ -7,7 +7,7 @@ from functools import partial
 from typing import Any
 
 from ..exceptions import DomainIQError
-from ..models import BulkWhoisType, ReverseMatchType, SnapshotOptions
+from ..models import BulkWhoisType, ReverseMatchType
 from ..protocols import (
     BulkProtocol,
     DNSProtocol,
@@ -18,10 +18,9 @@ from ..protocols import (
     SearchProtocol,
     WhoisProtocol,
 )
+from ..constants import SNAPSHOT_DEFAULT_LIMIT
 from ._handlers import (
-    _DEFAULT_SNAPSHOT_HEIGHT,
-    _DEFAULT_SNAPSHOT_LIMIT,
-    _DEFAULT_SNAPSHOT_WIDTH,
+    build_snapshot_options,
     handle_dns_lookup,
     handle_domain_search,
     handle_whois_lookup,
@@ -46,6 +45,13 @@ def _run_command(fn: Callable[[], None]) -> tuple[bool, bool]:
     except DomainIQError as e:
         print(f"Error: {e}", file=sys.stderr)
         return True, True
+
+
+def _aggregate(results: list[tuple[bool, bool]]) -> tuple[bool, bool]:
+    """Aggregate (executed, had_errors) pairs from multiple commands."""
+    if not results:
+        return False, False
+    return any(r[0] for r in results), any(r[1] for r in results)
 
 
 @_dispatcher
@@ -75,30 +81,26 @@ def _dispatch_domain_analysis(
             lambda: print_result(client.domain_categorize(args.domain_categorize))
         ))
     if args.domain_snapshot:
+        opts = build_snapshot_options(args)
         results.append(_run_command(lambda: print_result(
-            client.domain_snapshot(
-                args.domain_snapshot,
-                options=SnapshotOptions(
-                    full=args.snapshot_full,
-                    no_cache=args.no_cache,
-                    raw=args.raw,
-                    width=args.width if args.width is not None else _DEFAULT_SNAPSHOT_WIDTH,
-                    height=args.height if args.height is not None else _DEFAULT_SNAPSHOT_HEIGHT,
-                ),
-            )
+            client.domain_snapshot(args.domain_snapshot, options=opts)
         )))
     if args.domain_snapshot_history:
+        opts = build_snapshot_options(args)
         results.append(_run_command(lambda: print_result(
             client.domain_snapshot_history(
                 args.domain_snapshot_history,
-                width=args.width if args.width is not None else _DEFAULT_SNAPSHOT_WIDTH,
-                height=args.height if args.height is not None else _DEFAULT_SNAPSHOT_HEIGHT,
-                limit=args.snapshot_limit if args.snapshot_limit is not None else _DEFAULT_SNAPSHOT_LIMIT,
+                width=opts.width,
+                height=opts.height,
+                limit=args.snapshot_limit if args.snapshot_limit is not None else SNAPSHOT_DEFAULT_LIMIT,
             )
         )))
-    if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+    return _aggregate(results)
+
+
+_REPORT_COMMANDS: tuple[str, ...] = (
+    "domain_report", "name_report", "organization_report", "email_report", "ip_report"
+)
 
 
 @_dispatcher
@@ -106,22 +108,12 @@ def _dispatch_reports(
     client: ReportProtocol, args: argparse.Namespace
 ) -> tuple[bool, bool]:
     """Dispatch report commands. Returns (executed, had_errors)."""
-    results = []
-    if args.domain_report:
-        results.append(_run_command(lambda: print_result(client.domain_report(args.domain_report))))
-    if args.name_report:
-        results.append(_run_command(lambda: print_result(client.name_report(args.name_report))))
-    if args.organization_report:
-        results.append(_run_command(
-            lambda: print_result(client.organization_report(args.organization_report))
-        ))
-    if args.email_report:
-        results.append(_run_command(lambda: print_result(client.email_report(args.email_report))))
-    if args.ip_report:
-        results.append(_run_command(lambda: print_result(client.ip_report(args.ip_report))))
-    if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+    results = [
+        _run_command(lambda cmd=cmd: print_result(getattr(client, cmd)(getattr(args, cmd))))
+        for cmd in _REPORT_COMMANDS
+        if getattr(args, cmd)
+    ]
+    return _aggregate(results)
 
 
 @_dispatcher
@@ -152,9 +144,7 @@ def _dispatch_search(
                 args.reverse_mx_type, args.reverse_mx_data, recursive=args.recursive
             )
         )))
-    if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+    return _aggregate(results)
 
 
 @_dispatcher
@@ -171,9 +161,7 @@ def _dispatch_bulk(
         ))
     if args.bulk_whois_ip:
         results.append(_run_command(lambda: print_result(client.bulk_whois_ip(args.bulk_whois_ip))))
-    if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+    return _aggregate(results)
 
 
 @_dispatcher
@@ -200,9 +188,7 @@ def _dispatch_monitor(
         results.append(_run_command(lambda: print_result(
             client.monitor_report_changes(args.monitor_report_changes, args.monitor_change)
         )))
-    if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+    return _aggregate(results)
 
 
 @_dispatcher
@@ -246,9 +232,7 @@ def _dispatch_monitor_management(
         results.append(_run_command(
             lambda rep=args.delete_monitor_report: print_result(client.delete_monitor_report(rep))
         ))
-    if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+    return _aggregate(results)
 
 
 def _validate_args(args: argparse.Namespace) -> list[str]:

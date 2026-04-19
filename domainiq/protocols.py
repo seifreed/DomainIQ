@@ -19,9 +19,16 @@ from .models import (
     DomainReport,
     DomainSearchFilters,
     DomainSnapshot,
+    EmailReportResult,
     IpReportResult,
     KeywordMatchType,
+    MonitorItemType,
     MonitorReport,
+    MonitorReportType,
+    NameReportResult,
+    OrganizationReportResult,
+    ReverseIpSearchType,
+    ReverseMxSearchType,
     ReverseMatchType,
     ReverseSearchResult,
     ReverseSearchType,
@@ -78,11 +85,11 @@ class DomainAnalysisProtocol(Protocol):
 class ReportProtocol(Protocol):
     def domain_report(self, domain: str) -> DomainReport: ...
 
-    def name_report(self, name: str) -> dict[str, Any]: ...
+    def name_report(self, name: str) -> NameReportResult: ...
 
-    def organization_report(self, organization: str) -> dict[str, Any]: ...
+    def organization_report(self, organization: str) -> OrganizationReportResult: ...
 
-    def email_report(self, email: str) -> dict[str, Any]: ...
+    def email_report(self, email: str) -> EmailReportResult: ...
 
     def ip_report(self, ip: str) -> IpReportResult: ...
 
@@ -107,11 +114,11 @@ class SearchProtocol(Protocol):
 
     def reverse_dns(self, domain: str) -> ReverseSearchResult: ...
 
-    def reverse_ip(self, search_type: str, data: str) -> ReverseSearchResult: ...
+    def reverse_ip(self, search_type: ReverseIpSearchType | str, data: str) -> ReverseSearchResult: ...
 
     def reverse_mx(
         self,
-        search_type: str,
+        search_type: ReverseMxSearchType | str,
         data: str,
         recursive: bool = False,
     ) -> ReverseSearchResult: ...
@@ -148,13 +155,13 @@ class MonitorProtocol(Protocol):
     ) -> dict[str, Any]: ...
 
     def create_monitor_report(
-        self, report_type: str, name: str, email_alert: bool = True
+        self, report_type: MonitorReportType | str, name: str, email_alert: bool = True
     ) -> dict[str, Any]: ...
 
     def add_monitor_item(
         self,
         report_id: int,
-        item_type: str,
+        item_type: MonitorItemType | str,
         items: list[str],
         enabled: bool | None = None,
     ) -> dict[str, Any]: ...
@@ -222,11 +229,11 @@ class AsyncDomainAnalysisProtocol(Protocol):
 class AsyncReportProtocol(Protocol):
     async def domain_report(self, domain: str) -> DomainReport: ...
 
-    async def name_report(self, name: str) -> dict[str, Any]: ...
+    async def name_report(self, name: str) -> NameReportResult: ...
 
-    async def organization_report(self, organization: str) -> dict[str, Any]: ...
+    async def organization_report(self, organization: str) -> OrganizationReportResult: ...
 
-    async def email_report(self, email: str) -> dict[str, Any]: ...
+    async def email_report(self, email: str) -> EmailReportResult: ...
 
     async def ip_report(self, ip: str) -> IpReportResult: ...
 
@@ -251,11 +258,11 @@ class AsyncSearchProtocol(Protocol):
 
     async def reverse_dns(self, domain: str) -> ReverseSearchResult: ...
 
-    async def reverse_ip(self, search_type: str, data: str) -> ReverseSearchResult: ...
+    async def reverse_ip(self, search_type: ReverseIpSearchType | str, data: str) -> ReverseSearchResult: ...
 
     async def reverse_mx(
         self,
-        search_type: str,
+        search_type: ReverseMxSearchType | str,
         data: str,
         recursive: bool = False,
     ) -> ReverseSearchResult: ...
@@ -292,13 +299,13 @@ class AsyncMonitorProtocol(Protocol):
     ) -> dict[str, Any]: ...
 
     async def create_monitor_report(
-        self, report_type: str, name: str, email_alert: bool = True
+        self, report_type: MonitorReportType | str, name: str, email_alert: bool = True
     ) -> dict[str, Any]: ...
 
     async def add_monitor_item(
         self,
         report_id: int,
-        item_type: str,
+        item_type: MonitorItemType | str,
         items: list[str],
         enabled: bool | None = None,
     ) -> dict[str, Any]: ...

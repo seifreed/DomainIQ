@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any, TypedDict
 
 from .constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
-from .validators import validate_positive_int
+from .validators import ensure_positive_int
 
 
 class DNSRecordType(Enum):
@@ -51,6 +51,41 @@ class ReverseMatchType(Enum):
     CONTAINS = "contains"
     BEGINS = "begins"
     ENDS = "ends"
+
+
+class MonitorReportType(str, Enum):
+    """Report types supported by the DomainIQ monitor create endpoint."""
+
+    DOMAIN = "domain"
+    IP = "ip"
+    NS = "ns"
+    MX = "mx"
+
+
+class MonitorItemType(str, Enum):
+    """Item types supported by the DomainIQ monitor item-add endpoint."""
+
+    DOMAIN = "domain"
+    IP = "ip"
+    NS = "ns"
+    MX = "mx"
+
+
+class ReverseIpSearchType(str, Enum):
+    """Search modes for the reverse_ip endpoint."""
+
+    IP = "ip"
+    SUBNET = "subnet"
+    BLOCK = "block"
+    RANGE = "range"
+    DOMAIN = "domain"
+
+
+class ReverseMxSearchType(str, Enum):
+    """Search modes for the reverse_mx endpoint."""
+
+    DOMAIN = "domain"
+    IP = "ip"
 
 
 # Backwards-compatible alias
@@ -162,8 +197,8 @@ class SnapshotOptions:
     height: int = SNAPSHOT_DEFAULT_HEIGHT
 
     def __post_init__(self) -> None:
-        validate_positive_int("SnapshotOptions.width", self.width)
-        validate_positive_int("SnapshotOptions.height", self.height)
+        ensure_positive_int("SnapshotOptions.width", self.width)
+        ensure_positive_int("SnapshotOptions.height", self.height)
 
 
 class IpReportResult(TypedDict, total=False):
@@ -192,6 +227,32 @@ class ReverseSearchResult(TypedDict, total=False):
     count: int
     results: list[dict[str, Any]]
     domains: list[str]
+
+
+class NameReportResult(TypedDict, total=False):
+    """Typed response for name_report()."""
+
+    name: str
+    count: int
+    domains: list[str]
+    registrants: list[dict[str, Any]]
+
+
+class OrganizationReportResult(TypedDict, total=False):
+    """Typed response for organization_report()."""
+
+    organization: str
+    count: int
+    domains: list[str]
+
+
+class EmailReportResult(TypedDict, total=False):
+    """Typed response for email_report()."""
+
+    email: str
+    count: int
+    domains: list[str]
+    registrants: list[dict[str, Any]]
 
 
 class DomainSearchFilters(TypedDict, total=False):

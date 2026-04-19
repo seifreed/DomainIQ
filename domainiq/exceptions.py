@@ -50,7 +50,7 @@ class DomainIQRateLimitError(DomainIQAPIError):
         retry_after: int | None = None,
         response_data: dict[str, Any] | None = None,
     ) -> None:
-        super().__init__(message, response_data=response_data)
+        super().__init__(message, status_code=HTTP_TOO_MANY_REQUESTS, response_data=response_data)
         self.retry_after = retry_after
 
 

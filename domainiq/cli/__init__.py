@@ -58,8 +58,7 @@ def main() -> int:
         print(f"Invalid argument: {e}", file=sys.stderr)
         return 1
     except OSError as e:
-        # File system or network setup error (e.g. config file unreadable)
-        print(f"I/O error: {e}", file=sys.stderr)
+        print(f"{type(e).__name__}: {e}", file=sys.stderr)
         if args.debug:
             traceback.print_exc()
         return 1

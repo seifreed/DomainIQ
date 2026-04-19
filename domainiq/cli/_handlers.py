@@ -9,13 +9,20 @@ from datetime import datetime
 
 from ..constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_LIMIT, SNAPSHOT_DEFAULT_WIDTH
 from ..exceptions import DomainIQError
-from ..models import DomainSearchFilters, KeywordMatchType
+from ..models import DomainSearchFilters, KeywordMatchType, SnapshotOptions
 from ..protocols import DNSProtocol, SearchProtocol, WhoisProtocol
 from ..validators import is_ip_address, validate_date_string
 
-_DEFAULT_SNAPSHOT_WIDTH = SNAPSHOT_DEFAULT_WIDTH
-_DEFAULT_SNAPSHOT_HEIGHT = SNAPSHOT_DEFAULT_HEIGHT
-_DEFAULT_SNAPSHOT_LIMIT = SNAPSHOT_DEFAULT_LIMIT
+
+def build_snapshot_options(args: argparse.Namespace) -> SnapshotOptions:
+    """Build SnapshotOptions from parsed CLI args, applying defaults where args are absent."""
+    return SnapshotOptions(
+        full=args.snapshot_full,
+        no_cache=args.no_cache,
+        raw=args.raw,
+        width=args.width if args.width is not None else SNAPSHOT_DEFAULT_WIDTH,
+        height=args.height if args.height is not None else SNAPSHOT_DEFAULT_HEIGHT,
+    )
 
 
 def _serialize(obj: object) -> object:
@@ -71,8 +78,8 @@ def handle_dns_lookup(client: DNSProtocol, args: argparse.Namespace) -> None:
     print_result(result)
 
 
-def handle_domain_search(client: SearchProtocol, args: argparse.Namespace) -> None:
-    """Handle domain search command."""
+def _build_domain_search_filters(args: argparse.Namespace) -> DomainSearchFilters:
+    """Build domain search filters from CLI args, validating date fields."""
     filters: DomainSearchFilters = {}
 
     if args.count_only:
@@ -102,6 +109,12 @@ def handle_domain_search(client: SearchProtocol, args: argparse.Namespace) -> No
     if args.search_limit is not None:
         filters["limit"] = args.search_limit
 
+    return filters
+
+
+def handle_domain_search(client: SearchProtocol, args: argparse.Namespace) -> None:
+    """Handle domain search command."""
+    filters = _build_domain_search_filters(args)
     result = client.domain_search(
         keywords=args.domain_search,
         conditions=args.conditions,

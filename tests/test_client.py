@@ -98,7 +98,7 @@ class TestConfigUnit:
             patch.dict("os.environ", {}, clear=True),
             patch("pathlib.Path.exists", return_value=False),
             patch(
-                "domainiq.config._ApiKeyLoader._is_interactive",
+                "domainiq._key_sources._PromptKeySource._is_interactive",
                 return_value=False,
             ),
             pytest.raises(DomainIQError) as exc_info,
@@ -491,13 +491,14 @@ class TestLogicBugRegressions:
 
     # Bug 9: _is_interactive requires stdout TTY
     def test_is_interactive_requires_both_stdin_and_stdout(self):
+        from domainiq._key_sources import _PromptKeySource
         with patch("os.isatty") as mock_isatty:
             mock_isatty.side_effect = lambda fd: fd == 0  # only stdin is TTY
-            assert Config._is_interactive() is False
+            assert _PromptKeySource._is_interactive() is False
 
         with patch("os.isatty") as mock_isatty:
             mock_isatty.return_value = True
-            assert Config._is_interactive() is True
+            assert _PromptKeySource._is_interactive() is True
 
     # Bug 10: set_config_path persists pending key
     def test_set_config_path_persists_pending_interactive_key(self, tmp_path):
@@ -507,7 +508,7 @@ class TestLogicBugRegressions:
         with (
             patch.dict("os.environ", {}, clear=True),
             patch(
-                "domainiq.config._ApiKeyLoader._is_interactive",
+                "domainiq._key_sources._PromptKeySource._is_interactive",
                 return_value=True,
             ),
             patch("builtins.input", return_value="interactive_key_xyz"),

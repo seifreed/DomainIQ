@@ -6,11 +6,12 @@ from collections.abc import Callable, Mapping
 from io import StringIO
 from typing import Any, TypeVar
 
-from .exceptions import DomainIQError
+from .exceptions import DomainIQAPIError, DomainIQError
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "assert_json_dict",
     "compute_backoff",
     "csv_to_dict_list",
     "ensure_list_of_models",
@@ -19,11 +20,21 @@ __all__ = [
 ]
 
 
+def assert_json_dict(raw: dict[str, Any] | list[Any] | str) -> dict[str, Any]:
+    """Raise DomainIQAPIError if raw is not a JSON object (dict)."""
+    if isinstance(raw, dict):
+        return raw
+    msg = f"Expected JSON dict but got {type(raw).__name__}: {raw!r}"
+    raise DomainIQAPIError(msg)
+
+
 def compute_backoff(retry_delay: int, attempt: int) -> float:
+    """Exponential backoff: retry_delay * 2^attempt."""
     return float(retry_delay * (2 ** attempt))
 
 
 def parse_retry_after(headers: Mapping[str, str]) -> int | None:
+    """Parse the Retry-After header value to seconds, or None if absent/invalid."""
     value = headers.get("Retry-After")
     if value:
         try:

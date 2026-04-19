@@ -14,14 +14,15 @@ from typing import Any
 from . import params as _params
 from ._base_client import _AsyncRequestable, _SyncRequestable
 from .deserializers import parse_monitor_report
-from .models import MonitorReport
+from .models import MonitorItemType, MonitorReport, MonitorReportType
 from .utils import ensure_list_of_models
 
 
 class _MonitorMixin(_SyncRequestable):
     def monitor_list(self) -> list[MonitorReport]:
         """Get list of active monitors."""
-        return ensure_list_of_models(self._make_json_request_maybe_list(_params.build_monitor_list_params()), parse_monitor_report)
+        result = self._make_json_request_maybe_list(_params.build_monitor_list_params())
+        return ensure_list_of_models(result, parse_monitor_report)
 
     def monitor_report_items(self, report_id: int) -> dict[str, Any]:
         """Get items in a monitor report."""
@@ -35,12 +36,12 @@ class _MonitorMixin(_SyncRequestable):
         """Get monitor report changes."""
         return self._make_json_request(_params.build_monitor_report_changes_params(report_id, change_id))
 
-    def create_monitor_report(self, report_type: str, name: str, email_alert: bool = True) -> dict[str, Any]:
+    def create_monitor_report(self, report_type: MonitorReportType | str, name: str, email_alert: bool = True) -> dict[str, Any]:
         """Create a new monitor report."""
         return self._make_json_request(_params.build_create_monitor_report_params(report_type, name, email_alert))
 
     def add_monitor_item(
-        self, report_id: int, item_type: str, items: list[str], enabled: bool | None = None
+        self, report_id: int, item_type: MonitorItemType | str, items: list[str], enabled: bool | None = None
     ) -> dict[str, Any]:
         """Add items to a monitor report."""
         return self._make_json_request(
@@ -72,7 +73,9 @@ class _MonitorMixin(_SyncRequestable):
 class _AsyncMonitorMixin(_AsyncRequestable):
     async def monitor_list(self) -> list[MonitorReport]:
         """Get list of active monitors asynchronously."""
-        return ensure_list_of_models(await self._make_json_request_maybe_list(_params.build_monitor_list_params()), parse_monitor_report)
+        params = _params.build_monitor_list_params()
+        result = await self._make_json_request_maybe_list(params)
+        return ensure_list_of_models(result, parse_monitor_report)
 
     async def monitor_report_items(self, report_id: int) -> dict[str, Any]:
         """Get items in a monitor report asynchronously."""
@@ -86,12 +89,12 @@ class _AsyncMonitorMixin(_AsyncRequestable):
         """Get monitor report changes asynchronously."""
         return await self._make_json_request(_params.build_monitor_report_changes_params(report_id, change_id))
 
-    async def create_monitor_report(self, report_type: str, name: str, email_alert: bool = True) -> dict[str, Any]:
+    async def create_monitor_report(self, report_type: MonitorReportType | str, name: str, email_alert: bool = True) -> dict[str, Any]:
         """Create a new monitor report asynchronously."""
         return await self._make_json_request(_params.build_create_monitor_report_params(report_type, name, email_alert))
 
     async def add_monitor_item(
-        self, report_id: int, item_type: str, items: list[str], enabled: bool | None = None
+        self, report_id: int, item_type: MonitorItemType | str, items: list[str], enabled: bool | None = None
     ) -> dict[str, Any]:
         """Add items to a monitor report asynchronously."""
         return await self._make_json_request(

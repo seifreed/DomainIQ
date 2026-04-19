@@ -23,7 +23,7 @@ from .exceptions import (
     DomainIQTimeoutError,
 )
 from .formatters import format_api_params, sanitize_params_for_log
-from .utils import compute_backoff, parse_retry_after
+from .utils import assert_json_dict, compute_backoff, parse_retry_after
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ _RETRYABLE_STATUSES: frozenset[int] = frozenset({500, 502, 503, 504})
 
 def _compute_retry_delay(
     status_code: int,
-    response_headers: Mapping[str, str],
+    retry_after_secs: int | None,
     attempt: int,
     max_retries: int,
     retry_delay: int,
@@ -40,6 +40,7 @@ def _compute_retry_delay(
     """Pure decision: return backoff delay for retryable statuses, None otherwise.
 
     Does not log or raise — callers handle those concerns.
+    retry_after_secs is pre-computed by the caller (only meaningful for 429).
     """
     if status_code in _RETRYABLE_STATUSES:
         if attempt < max_retries:
@@ -47,7 +48,6 @@ def _compute_retry_delay(
         return None  # exhausted — caller will raise
 
     if status_code == HTTP_TOO_MANY_REQUESTS and attempt < max_retries:
-        retry_after_secs = parse_retry_after(response_headers)
         return (
             max(retry_after_secs, 1)
             if retry_after_secs is not None
@@ -57,7 +57,7 @@ def _compute_retry_delay(
     return None  # 2xx, 401, 4xx, or exhausted retries
 
 
-def _classify_response_error(
+def classify_http_response(
     status_code: int,
     response_text: str,
     response_headers: Mapping[str, str],
@@ -65,12 +65,14 @@ def _classify_response_error(
     max_retries: int,
     retry_delay: int,
 ) -> float | None:
-    """Classify HTTP error and decide action.
+    """Classify HTTP response status and decide action.
 
     Returns float delay for retry, None for success (2xx), raises for fatal errors.
     """
     if status_code in _RETRYABLE_STATUSES:
-        delay = _compute_retry_delay(status_code, response_headers, attempt, max_retries, retry_delay)
+        delay = _compute_retry_delay(
+            status_code, None, attempt, max_retries, retry_delay
+        )
         if delay is not None:
             logger.warning(
                 "Server error %s, retrying in %ss (attempt %s/%s)",
@@ -85,7 +87,9 @@ def _classify_response_error(
 
     if status_code == HTTP_TOO_MANY_REQUESTS:
         retry_after_secs = parse_retry_after(response_headers)
-        delay = _compute_retry_delay(status_code, response_headers, attempt, max_retries, retry_delay)
+        delay = _compute_retry_delay(
+            status_code, retry_after_secs, attempt, max_retries, retry_delay
+        )
         if delay is not None:
             logger.warning(
                 "Rate limited, retrying in %ss (attempt %s/%s)",
@@ -157,6 +161,7 @@ class _BaseDomainIQClient:
 
     _RETRYABLE_STATUSES: frozenset[int] = _RETRYABLE_STATUSES
 
+    # ── Construction ──────────────────────────────────────────────────────────
     def __init__(
         self,
         config: Config | None = None,
@@ -174,6 +179,7 @@ class _BaseDomainIQClient:
         config.validate()  # may persist API key to disk; see docstring
         self.config = config
 
+    # ── Error-handling adapters (thin wrappers over module-level pure fns) ───
     def _on_timeout(self, exc: TimeoutError, attempt: int) -> float:
         """Return backoff delay for a timeout, or raise DomainIQTimeoutError."""
         return _on_timeout_error(
@@ -192,11 +198,12 @@ class _BaseDomainIQClient:
         attempt: int,
     ) -> float | None:
         """Classify HTTP response status; return retry delay, None for success, or raise."""
-        return _classify_response_error(
+        return classify_http_response(
             status_code, response_text, response_headers,
             attempt, self.config.max_retries, self.config.retry_delay,
         )
 
+    # ── Request building ──────────────────────────────────────────────────────
     def _build_request_params(
         self,
         params: dict[str, Any],
@@ -218,12 +225,7 @@ class _BaseDomainIQClient:
         return request_params
 
 
-def _assert_json_dict(raw: dict[str, Any] | list[Any] | str) -> dict[str, Any]:
-    """Validate that a raw API response is a JSON dict; raise DomainIQAPIError otherwise."""
-    if isinstance(raw, dict):
-        return raw
-    msg = f"Expected JSON dict but got {type(raw).__name__}: {raw!r}"
-    raise DomainIQAPIError(msg)
+_assert_json_dict = assert_json_dict
 
 
 def _assert_json_dict_or_list(

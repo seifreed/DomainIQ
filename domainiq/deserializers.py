@@ -18,6 +18,7 @@ from .models import (
     DomainCategory,
     DomainReport,
     DomainSnapshot,
+    IpReportResult,
     MonitorItem,
     MonitorReport,
     ReverseSearchResult,
@@ -32,6 +33,7 @@ from .parsers import (
     try_parse_date,
     unwrap_api_envelope,
 )
+from .utils import assert_json_dict
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +88,11 @@ def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
     )
 
 
-def parse_dns_result(data: dict[str, Any]) -> DNSResult:
+def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     """Parse a DomainIQ API DNS response dict into a DNSResult."""
-    data = unwrap_api_envelope(data, ("results", "records", "domain"))
-    results = data.get("results") or data.get("records") or []
-    domain = data.get("domain", "")
+    inner = unwrap_api_envelope(envelope, ("results", "records", "domain"))
+    results = inner.get("results") or inner.get("records") or []
+    domain = inner.get("domain", "")
     if not domain and results and isinstance(results[0], dict):
         # Prefer SOA or NS records for domain extraction
         for rec in results:
@@ -112,20 +114,20 @@ def parse_dns_result(data: dict[str, Any]) -> DNSResult:
     return DNSResult(domain=domain, records=records)
 
 
-def parse_domain_category(data: dict[str, Any]) -> DomainCategory:
+def parse_domain_category(envelope: dict[str, Any]) -> DomainCategory:
     """Parse a DomainIQ API categorization response dict into a DomainCategory."""
-    data = unwrap_api_envelope(data, ("domain", "categories"))
+    inner = unwrap_api_envelope(envelope, ("domain", "categories"))
     return DomainCategory(
-        domain=data.get("domain", ""),
-        categories=data.get("categories", []) or [],
-        confidence_score=data.get("confidence_score"),
+        domain=inner.get("domain", ""),
+        categories=inner.get("categories", []) or [],
+        confidence_score=inner.get("confidence_score"),
     )
 
 
-def parse_domain_snapshot(data: dict[str, Any]) -> DomainSnapshot:
+def parse_domain_snapshot(envelope: dict[str, Any]) -> DomainSnapshot:
     """Parse a DomainIQ API snapshot response dict into a DomainSnapshot."""
-    data = unwrap_api_envelope(data, ("domain", "screenshot_url"))
-    raw_str = data.get("raw_data") or data.get("raw")
+    inner = unwrap_api_envelope(envelope, ("domain", "screenshot_url"))
+    raw_str = inner.get("raw_data") or inner.get("raw")
     raw_bytes: bytes | None = None
     if isinstance(raw_str, str) and raw_str:
         try:
@@ -133,31 +135,31 @@ def parse_domain_snapshot(data: dict[str, Any]) -> DomainSnapshot:
         except binascii.Error:
             logger.debug("Failed to base64-decode raw_data field: %r", raw_str[:50])
     return DomainSnapshot(
-        domain=data.get("domain", ""),
-        screenshot_url=data.get("screenshot_url"),
-        timestamp=try_parse_date(data.get("timestamp")),
-        width=data.get("width"),
-        height=data.get("height"),
+        domain=inner.get("domain", ""),
+        screenshot_url=inner.get("screenshot_url"),
+        timestamp=try_parse_date(inner.get("timestamp")),
+        width=inner.get("width"),
+        height=inner.get("height"),
         raw_data=raw_bytes,
     )
 
 
-def parse_domain_report(data: dict[str, Any]) -> DomainReport:
+def parse_domain_report(envelope: dict[str, Any]) -> DomainReport:
     """Parse a DomainIQ API domain report response dict into a DomainReport."""
-    data = unwrap_api_envelope(data, ("domain", "whois"))
+    inner = unwrap_api_envelope(envelope, ("domain", "whois"))
     return DomainReport(
-        domain=data.get("domain", ""),
-        whois_data=parse_whois_result(data["whois"]) if data.get("whois") else None,
-        dns_data=parse_dns_result(data["dns"]) if data.get("dns") else None,
-        categories=data.get("categories"),
-        related_domains=data.get("related_domains"),
-        risk_score=data.get("risk_score"),
+        domain=inner.get("domain", ""),
+        whois_data=parse_whois_result(inner["whois"]) if inner.get("whois") else None,
+        dns_data=parse_dns_result(inner["dns"]) if inner.get("dns") else None,
+        categories=inner.get("categories"),
+        related_domains=inner.get("related_domains"),
+        risk_score=inner.get("risk_score"),
     )
 
 
-def parse_monitor_report(data: dict[str, Any]) -> MonitorReport:
+def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
     """Parse a DomainIQ API monitor report response dict into a MonitorReport."""
-    data = unwrap_api_envelope(data, ("name", "items"))
+    inner = unwrap_api_envelope(envelope, ("name", "items"))
     items = [
         MonitorItem(
             id=item_data.get("id", 0),
@@ -167,14 +169,14 @@ def parse_monitor_report(data: dict[str, Any]) -> MonitorReport:
             typos_enabled=parse_bool(item_data.get("typos_enabled"), default=False),
             typo_strength=item_data.get("typo_strength"),
         )
-        for item_data in data.get("items", []) or []
+        for item_data in inner.get("items", []) or []
     ]
     return MonitorReport(
-        id=data.get("id", 0),
-        name=data.get("name", ""),
-        type=data.get("type", ""),
-        email_alerts=parse_bool(data.get("email_alerts"), default=False),
-        created_date=try_parse_date(data.get("created_date")),
+        id=inner.get("id", 0),
+        name=inner.get("name", ""),
+        type=inner.get("type", ""),
+        email_alerts=parse_bool(inner.get("email_alerts"), default=False),
+        created_date=try_parse_date(inner.get("created_date")),
         items=items,
     )
 
@@ -187,3 +189,8 @@ def parse_search_result(data: dict[str, Any]) -> SearchResult:
 def parse_reverse_search_result(data: dict[str, Any]) -> ReverseSearchResult:
     """Wrap raw API dict as ReverseSearchResult (passthrough cast, centralized for testability)."""
     return cast(ReverseSearchResult, data)
+
+
+def parse_ip_report_result(raw: dict[str, Any] | list[Any] | str) -> IpReportResult:
+    """Validate and cast a raw API response to IpReportResult."""
+    return cast(IpReportResult, assert_json_dict(raw))

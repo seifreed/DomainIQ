@@ -20,11 +20,15 @@ from .models import (
     DNSRecordType,
     DomainSearchFilters,
     KeywordMatchType,
+    MonitorItemType,
+    MonitorReportType,
+    ReverseIpSearchType,
+    ReverseMxSearchType,
     ReverseMatchType,
     ReverseSearchType,
     SnapshotOptions,
 )
-from .validators import validate_positive_int, validate_whois_target
+from .validators import ensure_positive_int, validate_whois_target
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +46,10 @@ def _validate_typo_strength(strength: int) -> None:
     if not (TYPO_STRENGTH_MIN <= strength <= TYPO_STRENGTH_MAX):
         msg = f"strength must be between {TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}"
         raise ValueError(msg)
+
+
+def _simple_service_params(service: str, key: str, value: str) -> dict[str, Any]:
+    return {"service": service, key: value}
 
 
 # -- WHOIS --
@@ -115,9 +123,9 @@ def build_domain_snapshot_history_params(
     height: int,
     limit: int,
 ) -> dict[str, Any]:
-    validate_positive_int("width", width)
-    validate_positive_int("height", height)
-    validate_positive_int("limit", limit)
+    ensure_positive_int("width", width)
+    ensure_positive_int("height", height)
+    ensure_positive_int("limit", limit)
     return {
         "service": "snapshot_history",
         "domain": domain,
@@ -131,23 +139,23 @@ def build_domain_snapshot_history_params(
 
 
 def build_domain_report_params(domain: str) -> dict[str, Any]:
-    return {"service": "domain_report", "domain": domain}
+    return _simple_service_params("domain_report", "domain", domain)
 
 
 def build_name_report_params(name: str) -> dict[str, Any]:
-    return {"service": "name_report", "name": name}
+    return _simple_service_params("name_report", "name", name)
 
 
 def build_organization_report_params(organization: str) -> dict[str, Any]:
-    return {"service": "organization_report", "organization": organization}
+    return _simple_service_params("organization_report", "organization", organization)
 
 
 def build_email_report_params(email: str) -> dict[str, Any]:
-    return {"service": "email_report", "email": email}
+    return _simple_service_params("email_report", "email", email)
 
 
 def build_ip_report_params(ip: str) -> dict[str, Any]:
-    return {"service": "ip_report", "ip": ip}
+    return _simple_service_params("ip_report", "ip", ip)
 
 
 # -- Search --
@@ -207,12 +215,12 @@ def build_reverse_dns_params(domain: str) -> dict[str, Any]:
     return {"service": "reverse_dns", "domain": domain}
 
 
-def build_reverse_ip_params(search_type: str, data: str) -> dict[str, Any]:
+def build_reverse_ip_params(search_type: ReverseIpSearchType | str, data: str) -> dict[str, Any]:
     return {"service": "reverse_ip", "type": search_type, "data": data}
 
 
 def build_reverse_mx_params(
-    search_type: str,
+    search_type: ReverseMxSearchType | str,
     data: str,
     recursive: bool,
 ) -> dict[str, Any]:
@@ -295,7 +303,7 @@ def build_monitor_report_changes_params(
 
 
 def build_create_monitor_report_params(
-    report_type: str, name: str, email_alert: bool
+    report_type: MonitorReportType | str, name: str, email_alert: bool
 ) -> dict[str, Any]:
     return {
         "service": "monitor",
@@ -308,7 +316,7 @@ def build_create_monitor_report_params(
 
 def build_add_monitor_item_params(
     report_id: int,
-    item_type: str,
+    item_type: MonitorItemType | str,
     items: list[str],
     enabled: bool | None = None,
 ) -> dict[str, Any]:
