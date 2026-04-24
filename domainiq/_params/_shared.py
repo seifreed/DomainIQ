@@ -8,9 +8,15 @@ from domainiq.exceptions import DomainIQValidationError
 
 
 def require_non_empty(name: str, items: list[Any]) -> None:
-    """Raise when a list-like request argument is empty."""
+    """Raise when a list-like request argument is empty or has empty entries."""
     if not items:
         msg = f"{name} must not be empty"
+        raise DomainIQValidationError(msg, param_name=name)
+    if any(
+        item is None or (isinstance(item, str) and not item.strip())
+        for item in items
+    ):
+        msg = f"{name} must not contain empty values"
         raise DomainIQValidationError(msg, param_name=name)
 
 

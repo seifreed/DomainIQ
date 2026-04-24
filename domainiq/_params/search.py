@@ -9,6 +9,8 @@ from domainiq.constants import API_FLAG_ENABLED, API_INDEXED_PARAM
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.utils import enum_value
 
+from ._shared import require_non_empty
+
 if TYPE_CHECKING:
     from domainiq._models import (
         DomainSearchFilters,
@@ -31,6 +33,7 @@ def _validate_conditions(keywords: list[str], conditions: list[str]) -> None:
     if len(conditions) > len(keywords):
         msg = "conditions list cannot be longer than keywords list"
         raise DomainIQValidationError(msg, param_name="conditions")
+    require_non_empty("conditions", conditions)
     if len(conditions) < len(keywords):
         logger.warning(
             "Fewer conditions (%d) than keywords (%d); "
@@ -47,9 +50,7 @@ def build_domain_search_params(
     filters: DomainSearchFilters | None,
 ) -> dict[str, Any]:
     """Build parameters for the keyword search endpoint."""
-    if not keywords:
-        msg = "keywords list cannot be empty"
-        raise DomainIQValidationError(msg, param_name="keywords")
+    require_non_empty("keywords", keywords)
     params: dict[str, Any] = {
         "service": "domain_search",
         "match": enum_value(match),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from domainiq._params.analysis import build_domain_categorize_params
 from domainiq._params.bulk import (
     build_bulk_dns_params,
     build_bulk_whois_ip_params,
@@ -64,6 +65,23 @@ class TestDnsParams:
         }
 
 
+class TestAnalysisParams:
+    def test_domain_categorize_params(self) -> None:
+        assert build_domain_categorize_params(["example.com", "example.net"]) == {
+            "service": "categorize",
+            "domains": "example.com,example.net",
+        }
+
+    @pytest.mark.parametrize("domains", [[""], ["  "], ["example.com", ""]])
+    def test_domain_categorize_rejects_empty_domain_values(
+        self, domains: list[str]
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_domain_categorize_params(domains)
+
+        assert exc_info.value.param_name == "domains"
+
+
 class TestBulkParams:
     def test_bulk_dns_params(self) -> None:
         assert build_bulk_dns_params(["example.com", "example.net"]) == {
@@ -107,5 +125,27 @@ class TestBulkParams:
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             builder([])
+
+        assert exc_info.value.param_name == param_name
+
+    @pytest.mark.parametrize(
+        ("builder", "values", "param_name"),
+        [
+            (build_bulk_dns_params, [""], "domains"),
+            (build_bulk_dns_params, ["  "], "domains"),
+            (build_bulk_dns_params, ["example.com", ""], "domains"),
+            (
+                lambda vals: build_bulk_whois_params(vals, BulkWhoisType.LIVE),
+                [""],
+                "items",
+            ),
+            (build_bulk_whois_ip_params, [""], "domains"),
+        ],
+    )
+    def test_bulk_params_reject_empty_list_values(
+        self, builder, values: list[str], param_name: str
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            builder(values)
 
         assert exc_info.value.param_name == param_name

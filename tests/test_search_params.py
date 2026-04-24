@@ -50,6 +50,26 @@ class TestDomainSearchParams:
 
         assert exc_info.value.param_name == "keywords"
 
+    @pytest.mark.parametrize("keywords", [[""], ["  "], ["brand", ""]])
+    def test_empty_keyword_values_raise_validation_error(
+        self, keywords: list[str]
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_domain_search_params(keywords, None, KeywordMatchType.ANY, None)
+
+        assert exc_info.value.param_name == "keywords"
+
+    @pytest.mark.parametrize("conditions", [[""], ["  "]])
+    def test_empty_condition_values_raise_validation_error(
+        self, conditions: list[str]
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_domain_search_params(
+                ["brand"], conditions, KeywordMatchType.ANY, None
+            )
+
+        assert exc_info.value.param_name == "conditions"
+
     def test_short_conditions_warn_and_preserve_supplied_conditions(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -115,4 +135,3 @@ class TestReverseSearchParams:
         params = build_reverse_mx_params(ReverseMxSearchType.IP, "192.0.2.1", True)
 
         assert params["recursive"] == API_FLAG_ENABLED
-
