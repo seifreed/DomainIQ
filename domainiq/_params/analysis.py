@@ -10,7 +10,7 @@ from domainiq.validators import ensure_positive_int
 from ._shared import require_non_empty
 
 if TYPE_CHECKING:
-    from domainiq.models import SnapshotOptions
+    from domainiq._models import SnapshotOptions
 
 
 def build_domain_categorize_params(domains: list[str]) -> dict[str, Any]:

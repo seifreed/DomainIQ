@@ -23,6 +23,7 @@ from ._mixins import (
     _AsyncSearchMixin,
     _AsyncWhoisMixin,
 )
+from ._models import DNSRecordType, DNSResult, WhoisResult
 from ._request_pipeline import execute_async_request
 from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
@@ -34,8 +35,7 @@ from .exceptions import (
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
-from .http_transport import AiohttpTransport, AsyncTransport
-from .models import DNSRecordType, DNSResult, WhoisResult
+from .http import AiohttpTransport, AsyncTransport
 from .validators import is_ip_address
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ from domainiq.utils import enum_value
 from ._shared import require_non_empty
 
 if TYPE_CHECKING:
-    from domainiq.models import BulkWhoisType
+    from domainiq._models import BulkWhoisType
 
 
 def build_bulk_dns_params(domains: list[str]) -> dict[str, Any]:

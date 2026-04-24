@@ -10,6 +10,7 @@ modules and deserializers.py; what remains is structural boilerplate.
 from __future__ import annotations
 
 from ._base_client import _AsyncRequestable, _SyncRequestable
+from ._models import DomainCategory, DomainSnapshot, SnapshotOptions
 from ._params.analysis import (
     build_domain_categorize_params,
     build_domain_snapshot_history_params,
@@ -21,7 +22,6 @@ from .constants import (
     SNAPSHOT_DEFAULT_WIDTH,
 )
 from .deserializers import parse_domain_category, parse_domain_snapshot
-from .models import DomainCategory, DomainSnapshot, SnapshotOptions
 from .utils import ensure_list_of_models
 
 

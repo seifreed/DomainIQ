@@ -16,7 +16,7 @@ from ._params.dns import build_dns_params
 from .deserializers import parse_dns_result
 
 if TYPE_CHECKING:
-    from .models import DNSRecordType, DNSResult
+    from ._models import DNSRecordType, DNSResult
 
 
 class _DNSMixin(_SyncRequestable):

@@ -2,7 +2,7 @@
 
 import argparse
 
-from domainiq.protocols import ReportProtocol
+from domainiq._protocols import ReportProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result

@@ -4,7 +4,7 @@ import argparse
 from collections.abc import Callable
 from functools import partial
 
-from domainiq.protocols import MonitorProtocol
+from domainiq._protocols import MonitorProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result

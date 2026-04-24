@@ -3,8 +3,8 @@
 import argparse
 from functools import partial
 
-from domainiq.models import ReverseMatchType
-from domainiq.protocols import SearchProtocol
+from domainiq._models import ReverseMatchType
+from domainiq._protocols import SearchProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._handlers import handle_domain_search

@@ -13,7 +13,7 @@ from domainiq.constants import (
 from domainiq.exceptions import DomainIQValidationError
 
 if TYPE_CHECKING:
-    from domainiq.models import MonitorItemType, MonitorReportType
+    from domainiq._models import MonitorItemType, MonitorReportType
 
 
 def _validate_typo_strength(strength: int) -> None:

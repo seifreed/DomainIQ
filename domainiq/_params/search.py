@@ -10,7 +10,7 @@ from domainiq.exceptions import DomainIQValidationError
 from domainiq.utils import enum_value
 
 if TYPE_CHECKING:
-    from domainiq.models import (
+    from domainiq._models import (
         DomainSearchFilters,
         KeywordMatchType,
         ReverseIpSearchType,

@@ -16,7 +16,7 @@ from ._params.whois import build_whois_params
 from .deserializers import parse_whois_result
 
 if TYPE_CHECKING:
-    from .models import WhoisResult
+    from ._models import WhoisResult
 
 
 class _WhoisMixin(_SyncRequestable):

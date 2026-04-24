@@ -22,7 +22,7 @@ from ._params.reports import (
 from .deserializers import parse_domain_report, parse_ip_report_result
 
 if TYPE_CHECKING:
-    from .models import (
+    from ._models import (
         DomainReport,
         EmailReportResult,
         IpReportResult,

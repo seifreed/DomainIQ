@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from domainiq.models import DNSRecordType
+from domainiq._models import DNSRecordType
 
 
 def build_dns_params(

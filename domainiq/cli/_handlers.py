@@ -2,9 +2,9 @@
 
 import argparse
 
+from domainiq._models import DomainSearchFilters, KeywordMatchType, SnapshotOptions
+from domainiq._protocols import DNSProtocol, SearchProtocol, WhoisProtocol
 from domainiq.constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
-from domainiq.models import DomainSearchFilters, KeywordMatchType, SnapshotOptions
-from domainiq.protocols import DNSProtocol, SearchProtocol, WhoisProtocol
 from domainiq.search_filters import build_search_filters
 from domainiq.validators import is_ip_address
 

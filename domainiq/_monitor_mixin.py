@@ -30,7 +30,7 @@ from .deserializers import parse_monitor_action_result, parse_monitor_report
 from .utils import ensure_list_of_models
 
 if TYPE_CHECKING:
-    from .models import (
+    from ._models import (
         MonitorActionResult,
         MonitorItemType,
         MonitorReport,

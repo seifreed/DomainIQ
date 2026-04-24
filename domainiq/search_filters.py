@@ -8,7 +8,7 @@ from .exceptions import DomainIQValidationError
 from .validators import validate_date_string
 
 if TYPE_CHECKING:
-    from .models import DomainSearchFilters
+    from ._models import DomainSearchFilters
 
 
 def _validate_date_param(value: str, param_name: str) -> str:

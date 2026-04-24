@@ -22,7 +22,7 @@ from ._mixins import (
 from ._request_pipeline import execute_sync_request
 from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
-from .http_transport import RequestsTransport, SyncTransport
+from .http import RequestsTransport, SyncTransport
 
 logger = logging.getLogger(__name__)
 

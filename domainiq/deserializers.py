@@ -12,7 +12,7 @@ import binascii
 import logging
 from typing import Any, cast
 
-from .models import (
+from ._models import (
     DNSRecord,
     DNSResult,
     DomainCategory,

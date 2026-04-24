@@ -4,18 +4,18 @@ import argparse
 import sys
 from functools import partial
 
+from domainiq._protocols import (
+    DNSProtocol,
+    DomainAnalysisProtocol,
+    DomainIQClientProtocol,
+    WhoisProtocol,
+)
 from domainiq.constants import (
     EXIT_ERROR,
     EXIT_NO_COMMAND,
     EXIT_PARTIAL,
     EXIT_SUCCESS,
     SNAPSHOT_DEFAULT_LIMIT,
-)
-from domainiq.protocols import (
-    DNSProtocol,
-    DomainAnalysisProtocol,
-    DomainIQClientProtocol,
-    WhoisProtocol,
 )
 
 from ._dispatch_bulk import _dispatch_bulk

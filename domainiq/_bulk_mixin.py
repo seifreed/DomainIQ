@@ -12,12 +12,12 @@ from __future__ import annotations
 from typing import cast
 
 from ._base_client import _AsyncRequestable, _SyncRequestable
+from ._models import BulkDNSResult, BulkWhoisResult, BulkWhoisType
 from ._params.bulk import (
     build_bulk_dns_params,
     build_bulk_whois_ip_params,
     build_bulk_whois_params,
 )
-from .models import BulkDNSResult, BulkWhoisResult, BulkWhoisType
 from .utils import csv_to_dict_list
 
 

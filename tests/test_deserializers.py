@@ -1,0 +1,132 @@
+"""Unit tests for API response deserializers."""
+
+from __future__ import annotations
+
+import base64
+
+import pytest
+
+from domainiq.deserializers import (
+    parse_domain_report,
+    parse_domain_snapshot,
+    parse_ip_report_result,
+    parse_monitor_action_result,
+    parse_monitor_report,
+    parse_reverse_search_result,
+    parse_search_result,
+)
+from domainiq.exceptions import DomainIQAPIError
+
+
+class TestDomainSnapshotDeserializer:
+    def test_decodes_valid_raw_snapshot_data(self) -> None:
+        raw = base64.b64encode(b"image-bytes").decode("ascii")
+
+        result = parse_domain_snapshot(
+            {
+                "result": {
+                    "domain": "example.com",
+                    "screenshot_url": "https://cdn.example/s.png",
+                    "raw_data": raw,
+                    "timestamp": "2024-01-01",
+                    "width": 640,
+                    "height": 480,
+                }
+            }
+        )
+
+        assert result.domain == "example.com"
+        assert result.raw_data == b"image-bytes"
+        assert result.width == 640
+
+    def test_invalid_raw_snapshot_data_is_ignored(self) -> None:
+        result = parse_domain_snapshot(
+            {"domain": "example.com", "raw": "not-valid-base64!!!"}
+        )
+
+        assert result.raw_data is None
+
+
+class TestDomainReportDeserializer:
+    def test_parses_nested_whois_dns_and_optional_fields(self) -> None:
+        result = parse_domain_report(
+            {
+                "result": {
+                    "domain": "example.com",
+                    "whois": {
+                        "domain": "example.com",
+                        "registrar": "Example Registrar",
+                        "emails": "admin@example.com",
+                    },
+                    "dns": {
+                        "domain": "example.com",
+                        "records": [
+                            {
+                                "host": "example.com",
+                                "type": "A",
+                                "ip": "192.0.2.1",
+                                "ttl": 300,
+                            }
+                        ],
+                    },
+                    "categories": ["security"],
+                    "related_domains": ["example.net"],
+                    "risk_score": 10,
+                }
+            }
+        )
+
+        assert result.domain == "example.com"
+        assert result.whois_data is not None
+        assert result.whois_data.registrant_email == ["admin@example.com"]
+        assert result.dns_data is not None
+        assert result.dns_data.records[0].value == "192.0.2.1"
+        assert result.categories == ["security"]
+
+
+class TestMonitorDeserializer:
+    def test_parses_monitor_report_with_items_and_boolean_variants(self) -> None:
+        result = parse_monitor_report(
+            {
+                "id": 42,
+                "name": "brand-watch",
+                "type": "domain",
+                "email_alerts": "yes",
+                "items": [
+                    {
+                        "id": 7,
+                        "type": "domain",
+                        "value": "example.com",
+                        "enabled": 0,
+                        "typos_enabled": "true",
+                        "typo_strength": 10,
+                    }
+                ],
+            }
+        )
+
+        assert result.id == 42
+        assert result.email_alerts is True
+        assert result.items is not None
+        assert result.items[0].enabled is False
+        assert result.items[0].typos_enabled is True
+
+    def test_passthrough_result_casts(self) -> None:
+        action = {"ok": True}
+        search = {"results": []}
+        reverse = {"matches": []}
+
+        assert parse_monitor_action_result(action) is action
+        assert parse_search_result(search) is search
+        assert parse_reverse_search_result(reverse) is reverse
+
+
+class TestIpReportDeserializer:
+    def test_accepts_json_dict(self) -> None:
+        raw = {"ip": "192.0.2.1"}
+
+        assert parse_ip_report_result(raw) is raw
+
+    def test_rejects_non_dict_response(self) -> None:
+        with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
+            parse_ip_report_result([{"ip": "192.0.2.1"}])
