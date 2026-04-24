@@ -98,11 +98,12 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     if not domain and results and isinstance(results[0], dict):
         # Prefer SOA or NS records for domain extraction
         for rec in results:
-            if rec.get("type") in ("SOA", "NS") and rec.get("host"):
-                domain = rec["host"]
+            if rec.get("type") in ("SOA", "NS"):
+                domain = rec.get("host") or rec.get("name", "")
+            if domain:
                 break
         else:
-            domain = results[0].get("host", "")
+            domain = results[0].get("host") or results[0].get("name", "")
     records = []
     for record_data in results:
         record_type = record_data.get("type", "")

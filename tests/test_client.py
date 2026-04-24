@@ -301,6 +301,37 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "AAAA"
         assert result.records[0].value == "2001:db8::1"
 
+    def test_dns_result_infers_domain_from_record_name(self):
+        data = {
+            "records": [
+                {
+                    "name": "example.com",
+                    "type": "A",
+                    "ip": "192.0.2.1",
+                }
+            ]
+        }
+        result = parse_dns_result(data)
+        assert result.domain == "example.com"
+
+    def test_dns_result_prefers_soa_record_name_for_domain(self):
+        data = {
+            "records": [
+                {
+                    "name": "example.com",
+                    "type": "SOA",
+                    "value": "ns1.example.com",
+                },
+                {
+                    "name": "www.example.com",
+                    "type": "A",
+                    "ip": "192.0.2.1",
+                },
+            ]
+        }
+        result = parse_dns_result(data)
+        assert result.domain == "example.com"
+
     def test_dns_result_maps_mx_exchange_field(self):
         data = {
             "domain": "example.com",
