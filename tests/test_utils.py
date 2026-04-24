@@ -44,7 +44,10 @@ class TestRetryAndCsvHelpers:
 
     def test_parse_retry_after(self) -> None:
         assert parse_retry_after({"Retry-After": "10"}) == 10
+        assert parse_retry_after({"retry-after": "10"}) == 10
+        assert parse_retry_after({"RETRY-AFTER": "10"}) == 10
         assert parse_retry_after({"Retry-After": "soon"}) is None
+        assert parse_retry_after({"retry-after": "soon"}) is None
         assert parse_retry_after({}) is None
 
     def test_csv_to_dict_list_parses_rows_and_empty_content(self) -> None:

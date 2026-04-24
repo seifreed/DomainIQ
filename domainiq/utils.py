@@ -49,7 +49,11 @@ def compute_backoff(retry_delay: int, attempt: int) -> float:
 
 def parse_retry_after(headers: Mapping[str, str]) -> int | None:
     """Parse the Retry-After header value to seconds, or None if absent/invalid."""
-    value = headers.get("Retry-After")
+    value = None
+    for key, header_value in headers.items():
+        if key.lower() == "retry-after":
+            value = header_value
+            break
     if value:
         try:
             return int(value)

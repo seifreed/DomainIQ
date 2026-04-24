@@ -85,6 +85,20 @@ class TestRateLimitError:
         delay = classify_http_response(429, "rate limited", _RETRY_HEADERS, 0, _POLICY)
         assert delay == 5.0
 
+    @pytest.mark.parametrize("header_name", ["retry-after", "RETRY-AFTER"])
+    def test_429_honours_retry_after_header_case_insensitively(
+        self, header_name: str
+    ) -> None:
+        delay = classify_http_response(
+            429,
+            "rate limited",
+            {header_name: "5"},
+            0,
+            _POLICY,
+        )
+
+        assert delay == 5.0
+
     def test_429_exhausted_raises_rate_limit_error(self) -> None:
         with pytest.raises(DomainIQRateLimitError):
             classify_http_response(429, "rate limited", _EMPTY_HEADERS, 3, _POLICY)
@@ -93,6 +107,15 @@ class TestRateLimitError:
         with pytest.raises(DomainIQRateLimitError) as exc_info:
             classify_http_response(429, "rate limited", _EMPTY_HEADERS, 3, _POLICY)
         assert exc_info.value.status_code == 429
+
+    @pytest.mark.parametrize("header_name", ["retry-after", "RETRY-AFTER"])
+    def test_rate_limit_error_preserves_retry_after_case_insensitively(
+        self, header_name: str
+    ) -> None:
+        with pytest.raises(DomainIQRateLimitError) as exc_info:
+            classify_http_response(429, "rate limited", {header_name: "5"}, 3, _POLICY)
+
+        assert exc_info.value.retry_after == 5
 
 
 class TestGeneric4xxErrors:

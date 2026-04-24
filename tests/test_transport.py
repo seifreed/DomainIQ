@@ -246,6 +246,19 @@ class TestRateLimitHandling:
 
         assert exc_info.value.retry_after == 5
 
+    def test_exhausted_429_uses_lowercase_retry_after_header(
+        self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
+    ) -> None:
+        for _ in range(4):
+            mock_transport.enqueue(
+                make_sync_response(429, "{}", headers={"retry-after": "5"})
+            )
+
+        with pytest.raises(DomainIQRateLimitError) as exc_info:
+            mock_client.whois_lookup(domain="example.com")
+
+        assert exc_info.value.retry_after == 5
+
     def test_429_then_200_succeeds(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
