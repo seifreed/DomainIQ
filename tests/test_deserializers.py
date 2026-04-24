@@ -7,6 +7,7 @@ import base64
 import pytest
 
 from domainiq.deserializers import (
+    parse_domain_category,
     parse_domain_report,
     parse_domain_snapshot,
     parse_ip_report_result,
@@ -90,6 +91,34 @@ class TestDomainReportDeserializer:
         assert result.dns_data is not None
         assert result.dns_data.records[0].value == "192.0.2.1"
         assert result.categories == ["security"]
+
+    def test_domain_category_splits_comma_separated_categories(self) -> None:
+        result = parse_domain_category(
+            {"domain": "example.com", "categories": "Business,Technology"}
+        )
+
+        assert result.categories == ["Business", "Technology"]
+
+    def test_domain_category_strips_and_filters_categories(self) -> None:
+        string_result = parse_domain_category(
+            {"domain": "example.com", "categories": " Business, Technology, "}
+        )
+        list_result = parse_domain_category(
+            {
+                "domain": "example.com",
+                "categories": [" Business ", "", None, "Technology"],
+            }
+        )
+
+        assert string_result.categories == ["Business", "Technology"]
+        assert list_result.categories == ["Business", "Technology"]
+
+    def test_domain_report_splits_comma_separated_categories(self) -> None:
+        result = parse_domain_report(
+            {"domain": "example.com", "categories": "Security,Malware"}
+        )
+
+        assert result.categories == ["Security", "Malware"]
 
 
 class TestMonitorDeserializer:
