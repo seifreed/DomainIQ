@@ -32,6 +32,12 @@ class TestWhoisParams:
             "ip": "192.0.2.1",
         }
 
+    def test_ipv6_lookup_is_valid_target(self) -> None:
+        assert build_whois_params(None, " 2001:db8::1 ", False, False) == {
+            "service": "whois",
+            "ip": "2001:db8::1",
+        }
+
     @pytest.mark.parametrize(
         ("domain", "ip", "param_name"),
         [
@@ -39,6 +45,10 @@ class TestWhoisParams:
             ("", None, "domain"),
             (None, " ", "ip"),
             ("example.com", "192.0.2.1", "domain"),
+            ("invalid", None, "domain"),
+            ("example..com", None, "domain"),
+            (None, "999.999.999.999", "ip"),
+            (None, "not.an.ip", "ip"),
         ],
     )
     def test_invalid_targets_raise_validation_error(

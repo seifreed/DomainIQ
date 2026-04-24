@@ -168,6 +168,12 @@ def validate_whois_target(
     if domain and ip:
         msg = "Cannot specify both domain and ip"
         raise DomainIQValidationError(msg, param_name="domain")
+    if domain and not validate_domain(domain):
+        msg = f"Invalid domain: {domain}"
+        raise DomainIQValidationError(msg, param_name="domain")
+    if ip and not is_ip_address(ip):
+        msg = f"Invalid IP address: {ip}"
+        raise DomainIQValidationError(msg, param_name="ip")
 
     return domain, ip
 
