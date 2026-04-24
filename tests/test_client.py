@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -90,6 +94,94 @@ class TestConfigUnit:
         with patch.dict("os.environ", {"DOMAINIQ_API_KEY": "env_key_123"}):
             config = Config()
             assert config.api_key == "env_key_123"
+
+    def test_config_module_import_ignores_invalid_numeric_environment(self):
+        env = os.environ | {"DOMAINIQ_MAX_RETRIES": "abc"}
+
+        completed = subprocess.run(
+            [sys.executable, "-c", "import domainiq.config"],
+            cwd=Path(__file__).resolve().parents[1],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert completed.returncode == 0, completed.stderr
+
+    @pytest.mark.parametrize(
+        "env_name",
+        [
+            "DOMAINIQ_TIMEOUT",
+            "DOMAINIQ_MAX_RETRIES",
+            "DOMAINIQ_RETRY_DELAY",
+            "DOMAINIQ_CONNECTOR_LIMIT",
+            "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST",
+        ],
+    )
+    def test_invalid_numeric_environment_values_raise_config_error(self, env_name):
+        with (
+            patch.dict("os.environ", {env_name: "abc"}, clear=True),
+            pytest.raises(DomainIQConfigurationError, match=env_name),
+        ):
+            Config(api_key="test_key")
+
+    def test_config_uses_numeric_environment_values(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "DOMAINIQ_TIMEOUT": "12.5",
+                "DOMAINIQ_MAX_RETRIES": "5",
+                "DOMAINIQ_RETRY_DELAY": "2",
+                "DOMAINIQ_CONNECTOR_LIMIT": "11",
+                "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST": "3",
+            },
+            clear=True,
+        ):
+            config = Config(api_key="test_key")
+
+        assert config.timeout == 12.5
+        assert config.max_retries == 5
+        assert config.retry_delay == 2
+        assert config.connector_limit == 11
+        assert config.connector_limit_per_host == 3
+
+    @pytest.mark.parametrize(
+        ("env_name", "kwarg", "value"),
+        [
+            ("DOMAINIQ_TIMEOUT", "timeout", 20.0),
+            ("DOMAINIQ_MAX_RETRIES", "max_retries", 6),
+            ("DOMAINIQ_RETRY_DELAY", "retry_delay", 4),
+            ("DOMAINIQ_CONNECTOR_LIMIT", "connector_limit", 9),
+            ("DOMAINIQ_CONNECTOR_LIMIT_PER_HOST", "connector_limit_per_host", 2),
+        ],
+    )
+    def test_explicit_numeric_config_values_override_invalid_environment(
+        self,
+        env_name,
+        kwarg,
+        value,
+    ):
+        with patch.dict("os.environ", {env_name: "abc"}, clear=True):
+            config = Config(api_key="test_key", **{kwarg: value})
+
+        assert getattr(config, kwarg) == value
+
+    @pytest.mark.parametrize(
+        ("kwargs", "message"),
+        [
+            ({"connector_limit": 0}, "Connector limit must be positive"),
+            (
+                {"connector_limit_per_host": -1},
+                "Connector limit per host must be positive",
+            ),
+        ],
+    )
+    def test_config_validation_invalid_connector_limits(self, kwargs, message):
+        config = Config(api_key="test_key", **kwargs)
+
+        with pytest.raises(DomainIQConfigurationError, match=message):
+            config.validate()
 
     def test_set_config_path_reloads_key_from_new_file(self, tmp_path):
         initial = tmp_path / "initial"

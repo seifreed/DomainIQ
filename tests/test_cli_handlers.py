@@ -242,13 +242,13 @@ class TestMain:
         assert config.timeout == 12
         assert config.config_file_path == config_file
 
-    def test_build_config_prompts_after_configuration_error(
+    def test_build_config_prompts_after_missing_api_key(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         args = argparse.Namespace(api_key=None, timeout=9, config_file="missing.key")
         config_factory = MagicMock(
             side_effect=[
-                DomainIQConfigurationError("missing key"),
+                DomainIQConfigurationError("No API key found"),
                 MagicMock(api_key="prompted-key"),
             ]
         )
@@ -263,6 +263,25 @@ class TestMain:
             "timeout": 9,
             "config_file": "missing.key",
         }
+
+    def test_build_config_reraises_non_key_configuration_error(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        args = argparse.Namespace(api_key=None, timeout=9, config_file="missing.key")
+        config_factory = MagicMock(
+            side_effect=DomainIQConfigurationError(
+                "Invalid DOMAINIQ_MAX_RETRIES: expected an integer"
+            )
+        )
+        prompt = MagicMock()
+        monkeypatch.setattr(cli_module, "Config", config_factory)
+        monkeypatch.setattr(cli_module, "prompt_for_api_key", prompt)
+
+        with pytest.raises(DomainIQConfigurationError, match="DOMAINIQ_MAX_RETRIES"):
+            cli_module._build_config(args)
+
+        prompt.assert_not_called()
 
     @pytest.mark.parametrize(
         ("exc", "debug", "expected_code", "expected_stderr"),
@@ -338,7 +357,7 @@ class TestMain:
             patch(
                 "domainiq.cli.Config",
                 side_effect=[
-                    DomainIQConfigurationError("missing key"),
+                    DomainIQConfigurationError("No API key found"),
                     MagicMock(api_key="prompted"),
                 ],
             ),

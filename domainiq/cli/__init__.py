@@ -25,7 +25,9 @@ def _build_config(args: argparse.Namespace) -> Config:
             timeout=args.timeout,
             config_file=args.config_file,
         )
-    except DomainIQConfigurationError:
+    except DomainIQConfigurationError as exc:
+        if "No API key found" not in str(exc):
+            raise
         api_key = prompt_for_api_key(args.config_file)
         return Config(
             api_key=api_key,

@@ -19,18 +19,32 @@ from .exceptions import DomainIQConfigurationError
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = os.getenv("DOMAINIQ_BASE_URL", "https://www.domainiq.com/api")
-_DEFAULT_TIMEOUT = float(os.getenv("DOMAINIQ_TIMEOUT", str(DEFAULT_TIMEOUT)))
-_DEFAULT_MAX_RETRIES = int(os.getenv("DOMAINIQ_MAX_RETRIES", str(DEFAULT_MAX_RETRIES)))
-_DEFAULT_RETRY_DELAY = int(os.getenv("DOMAINIQ_RETRY_DELAY", str(DEFAULT_RETRY_DELAY)))
-_DEFAULT_CONNECTOR_LIMIT = int(
-    os.getenv("DOMAINIQ_CONNECTOR_LIMIT", str(DEFAULT_CONNECTOR_LIMIT))
-)
-_DEFAULT_CONNECTOR_LIMIT_PER_HOST = int(
-    os.getenv(
-        "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST",
-        str(DEFAULT_CONNECTOR_LIMIT_PER_HOST),
-    )
-)
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float environment setting, raising a config error if invalid."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    try:
+        return float(raw_value)
+    except ValueError as exc:
+        msg = f"Invalid {name}: expected a number"
+        raise DomainIQConfigurationError(msg) from exc
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read an integer environment setting, raising a config error if invalid."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    try:
+        return int(raw_value)
+    except ValueError as exc:
+        msg = f"Invalid {name}: expected an integer"
+        raise DomainIQConfigurationError(msg) from exc
 
 
 class ConfigKwargs(TypedDict, total=False):
@@ -53,12 +67,12 @@ class Config:
         self,
         api_key: str | None = None,
         base_url: str = _DEFAULT_BASE_URL,
-        timeout: float = _DEFAULT_TIMEOUT,
-        max_retries: int = _DEFAULT_MAX_RETRIES,
-        retry_delay: int = _DEFAULT_RETRY_DELAY,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+        retry_delay: int | None = None,
         config_file: str | Path | None = None,
-        connector_limit: int = _DEFAULT_CONNECTOR_LIMIT,
-        connector_limit_per_host: int = _DEFAULT_CONNECTOR_LIMIT_PER_HOST,
+        connector_limit: int | None = None,
+        connector_limit_per_host: int | None = None,
         loader: _ApiKeyLoader | None = None,
     ) -> None:
         """Initialize configuration.
@@ -78,11 +92,34 @@ class Config:
                 key sources). If None, a default _ApiKeyLoader is created.
         """
         self.base_url = base_url
-        self.timeout = timeout
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self.connector_limit = connector_limit
-        self.connector_limit_per_host = connector_limit_per_host
+        self.timeout = (
+            _env_float("DOMAINIQ_TIMEOUT", DEFAULT_TIMEOUT)
+            if timeout is None
+            else timeout
+        )
+        self.max_retries = (
+            _env_int("DOMAINIQ_MAX_RETRIES", DEFAULT_MAX_RETRIES)
+            if max_retries is None
+            else max_retries
+        )
+        self.retry_delay = (
+            _env_int("DOMAINIQ_RETRY_DELAY", DEFAULT_RETRY_DELAY)
+            if retry_delay is None
+            else retry_delay
+        )
+        self.connector_limit = (
+            _env_int("DOMAINIQ_CONNECTOR_LIMIT", DEFAULT_CONNECTOR_LIMIT)
+            if connector_limit is None
+            else connector_limit
+        )
+        self.connector_limit_per_host = (
+            _env_int(
+                "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST",
+                DEFAULT_CONNECTOR_LIMIT_PER_HOST,
+            )
+            if connector_limit_per_host is None
+            else connector_limit_per_host
+        )
         self.config_file_path: Path = (
             Path(config_file) if config_file else Path.home() / ".domainiq"
         )
@@ -128,6 +165,14 @@ class Config:
 
         if self.retry_delay < 0:
             msg = "Retry delay cannot be negative"
+            raise DomainIQConfigurationError(msg)
+
+        if self.connector_limit <= 0:
+            msg = "Connector limit must be positive"
+            raise DomainIQConfigurationError(msg)
+
+        if self.connector_limit_per_host <= 0:
+            msg = "Connector limit per host must be positive"
             raise DomainIQConfigurationError(msg)
 
     def __repr__(self) -> str:
