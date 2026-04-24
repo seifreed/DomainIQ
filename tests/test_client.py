@@ -312,6 +312,32 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == ["ns1.example.com"]
 
+    def test_whois_nameservers_strip_and_filter_empty_values(self):
+        data = {
+            "domain": "example.com",
+            "nameservers": [
+                "",
+                " ns1.example.com ",
+                {"host": ""},
+                {"host": " ns2.example.com "},
+            ],
+        }
+        result = parse_whois_result(data)
+        assert result.nameservers == ["ns1.example.com", "ns2.example.com"]
+
+    def test_whois_nameservers_split_comma_separated_string(self):
+        data = {
+            "domain": "example.com",
+            "nameservers": "ns1.example.com, ns2.example.com",
+        }
+        result = parse_whois_result(data)
+        assert result.nameservers == ["ns1.example.com", "ns2.example.com"]
+
+    def test_whois_nameservers_whitespace_string_returns_empty_list(self):
+        data = {"domain": "example.com", "nameservers": " "}
+        result = parse_whois_result(data)
+        assert result.nameservers == []
+
     def test_validate_ipv4_rejects_signed_octets(self):
         assert not validate_ipv4("-0.0.0.0")
         assert not validate_ipv4("+1.2.3.4")

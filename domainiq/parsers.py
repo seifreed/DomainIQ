@@ -85,6 +85,15 @@ def unwrap_api_envelope(
     return data
 
 
+def _normalize_nameserver_value(ns: object) -> str | None:
+    if isinstance(ns, dict) and "host" in ns:
+        ns = ns["host"]
+    if ns is None:
+        return None
+    normalized = str(ns).strip()
+    return normalized or None
+
+
 def parse_nameservers(result: dict[str, Any]) -> list[str]:
     """Extract nameservers ordered by index, tolerating gaps in numbering."""
     ns_indexed: list[tuple[int, Any]] = []
@@ -99,7 +108,7 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
     if not nameservers:
         raw_ns = result.get("nameservers", []) or []
         if isinstance(raw_ns, str):
-            nameservers = [raw_ns] if raw_ns else []
+            nameservers = raw_ns.split(",")
         elif isinstance(raw_ns, dict):
             nameservers = [raw_ns]
         else:
@@ -107,12 +116,9 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
 
     normalized: list[str] = []
     for ns in nameservers:
-        if isinstance(ns, str):
-            normalized.append(ns)
-        elif isinstance(ns, dict) and "host" in ns:
-            normalized.append(str(ns["host"]))
-        elif ns is not None:
-            normalized.append(str(ns))
+        normalized_name = _normalize_nameserver_value(ns)
+        if normalized_name:
+            normalized.append(normalized_name)
     return normalized
 
 
