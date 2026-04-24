@@ -71,7 +71,7 @@ def parse_bool(value: object, default: bool = False) -> bool:
     if isinstance(value, int):
         return value != 0
     if isinstance(value, str):
-        return value.lower() in ("1", "true", "yes")
+        return value.strip().lower() in ("1", "true", "yes")
     return default
 
 

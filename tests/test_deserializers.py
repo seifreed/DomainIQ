@@ -16,6 +16,7 @@ from domainiq.deserializers import (
     parse_search_result,
 )
 from domainiq.exceptions import DomainIQAPIError
+from domainiq.parsers import parse_bool
 
 
 class TestDomainSnapshotDeserializer:
@@ -85,6 +86,12 @@ class TestDomainReportDeserializer:
 
 
 class TestMonitorDeserializer:
+    def test_parse_bool_strips_surrounding_whitespace(self) -> None:
+        assert parse_bool(" true ") is True
+        assert parse_bool(" yes ") is True
+        assert parse_bool(" 1 ") is True
+        assert parse_bool(" false ") is False
+
     def test_parses_monitor_report_with_items_and_boolean_variants(self) -> None:
         result = parse_monitor_report(
             {
@@ -109,6 +116,26 @@ class TestMonitorDeserializer:
         assert result.email_alerts is True
         assert result.items is not None
         assert result.items[0].enabled is False
+        assert result.items[0].typos_enabled is True
+
+    def test_parses_monitor_report_with_padded_boolean_strings(self) -> None:
+        result = parse_monitor_report(
+            {
+                "name": "brand-watch",
+                "email_alerts": " true ",
+                "items": [
+                    {
+                        "value": "example.com",
+                        "enabled": " true ",
+                        "typos_enabled": " yes ",
+                    }
+                ],
+            }
+        )
+
+        assert result.email_alerts is True
+        assert result.items is not None
+        assert result.items[0].enabled is True
         assert result.items[0].typos_enabled is True
 
     def test_passthrough_result_casts(self) -> None:
