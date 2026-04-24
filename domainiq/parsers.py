@@ -113,10 +113,13 @@ def parse_statuses(raw: object) -> list[str]:
     """Normalize status field to a list of strings."""
     status = raw or []
     if isinstance(status, str):
-        return [s.strip() for s in status.split(",")]
+        return [s for s in (part.strip() for part in status.split(",")) if s]
     if isinstance(status, list):
-        return [str(s) for s in status if s is not None]
-    return [str(status)]
+        return [
+            s for s in (str(part).strip() for part in status if part is not None) if s
+        ]
+    parsed = str(status).strip()
+    return [parsed] if parsed else []
 
 
 def parse_emails(result: dict[str, Any]) -> list[str] | None:

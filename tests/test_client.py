@@ -228,6 +228,24 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email is None
 
+    def test_whois_statuses_filter_empty_comma_entries(self):
+        data = {"domain": "example.com", "status": "active, "}
+        result = parse_whois_result(data)
+        assert result.status == ["active"]
+
+    def test_whois_statuses_strip_and_filter_list_entries(self):
+        data = {
+            "domain": "example.com",
+            "status": [" active ", " ", None, "clientHold"],
+        }
+        result = parse_whois_result(data)
+        assert result.status == ["active", "clientHold"]
+
+    def test_whois_empty_status_string_returns_empty_list(self):
+        data = {"domain": "example.com", "status": " "}
+        result = parse_whois_result(data)
+        assert result.status == []
+
     def test_whois_nameservers_tolerate_gaps(self):
         data = {
             "domain": "example.com",
