@@ -183,14 +183,14 @@ def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
 
 def parse_search_result(data: dict[str, Any]) -> SearchResult:
     """Wrap raw API dict as a SearchResult (passthrough cast, centralized for testability)."""
-    return cast(SearchResult, data)
+    return cast("SearchResult", data)
 
 
 def parse_reverse_search_result(data: dict[str, Any]) -> ReverseSearchResult:
     """Wrap raw API dict as ReverseSearchResult (passthrough cast, centralized for testability)."""
-    return cast(ReverseSearchResult, data)
+    return cast("ReverseSearchResult", data)
 
 
 def parse_ip_report_result(raw: dict[str, Any] | list[Any] | str) -> IpReportResult:
     """Validate and cast a raw API response to IpReportResult."""
-    return cast(IpReportResult, assert_json_dict(raw))
+    return cast("IpReportResult", assert_json_dict(raw))

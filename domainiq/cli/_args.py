@@ -2,6 +2,8 @@
 
 import argparse
 
+from ..models import ReverseMxSearchType
+
 
 def _positive_int(value: str) -> int:
     n = int(value)
@@ -116,7 +118,7 @@ def _add_reverse_search_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--reverse-ip-data", help="Data for reverse IP search")
     parser.add_argument(
         "--reverse-mx-type",
-        choices=["hostname", "ip", "subnet", "block", "range"],
+        choices=[e.value for e in ReverseMxSearchType],
         help="Type of reverse MX search",
     )
     parser.add_argument("--reverse-mx-data", help="Data for reverse MX search")

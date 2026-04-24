@@ -14,6 +14,9 @@ API_BOOL_FALSE = "0"
 
 RETRY_EXHAUSTED_MSG = "API request failed after all retries"
 
+# Pattern for indexed API parameters (e.g. keyword[1], condition[1])
+API_INDEXED_PARAM = "{name}[{idx}]"
+
 # Default screenshot dimensions (DomainIQ API recommendation for thumbnail display)
 SNAPSHOT_DEFAULT_WIDTH = 250
 SNAPSHOT_DEFAULT_HEIGHT = 125
@@ -25,6 +28,12 @@ TYPO_STRENGTH_MAX = 41
 
 # Number of asterisks used when masking the API key in repr/logs
 API_KEY_MASK_LENGTH = 8
+
+# CLI process exit codes
+EXIT_SUCCESS = 0
+EXIT_ERROR = 1
+EXIT_PARTIAL = 2
+EXIT_NO_COMMAND = 3
 
 # Network and timeout defaults (overridable via environment variables)
 INTERACTIVE_PROMPT_TIMEOUT: int = 30

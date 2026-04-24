@@ -1,10 +1,11 @@
-"""Configuration management for DomainIQ library."""
+"""Passive configuration object for the DomainIQ SDK."""
 
 import logging
 import os
 from pathlib import Path
 from typing import TypedDict
 
+from ._key_sources import _ApiKeyLoader
 from .constants import (
     API_KEY_MASK_LENGTH,
     DEFAULT_CONNECTOR_LIMIT,
@@ -14,11 +15,8 @@ from .constants import (
     DEFAULT_TIMEOUT,
 )
 from .exceptions import DomainIQConfigurationError
-from ._key_sources import _ApiKeyLoader, KeySource
 
 logger = logging.getLogger(__name__)
-
-_DEFAULT_CONFIG_PATH = Path.home() / ".domainiq"
 
 _DEFAULT_BASE_URL = os.getenv(
     "DOMAINIQ_BASE_URL", "https://www.domainiq.com/api"
@@ -55,7 +53,7 @@ class ConfigKwargs(TypedDict, total=False):
 
 
 class Config:
-    """Configuration class for DomainIQ client."""
+    """Configuration object for DomainIQ clients."""
 
     def __init__(
         self,
@@ -90,9 +88,11 @@ class Config:
         self.connector_limit = connector_limit
         self.connector_limit_per_host = connector_limit_per_host
         self.config_file_path: Path = (
-            Path(config_file) if config_file else _DEFAULT_CONFIG_PATH
+            Path(config_file) if config_file else Path.home() / ".domainiq"
         )
-        self._loader = loader if loader is not None else _ApiKeyLoader(self.config_file_path)
+        self._loader = (
+            loader if loader is not None else _ApiKeyLoader(self.config_file_path)
+        )
         self.api_key = self._loader.load(api_key)
 
     def set_config_path(self, path: str | Path, api_key: str | None = None) -> None:
@@ -106,8 +106,6 @@ class Config:
         self.config_file_path = Path(path)
         self._loader = _ApiKeyLoader(self.config_file_path)
         self.api_key = self._loader.load(api_key)
-        # Run validation so any pending interactive key is persisted and the
-        # new path/key combination is verified.
         self.validate()
 
     def validate(self) -> None:
@@ -115,12 +113,6 @@ class Config:
 
         Raises:
             DomainIQConfigurationError: If configuration is invalid.
-
-        Side effects:
-            If the API key was obtained via interactive prompt during construction,
-            this method persists it to the config file (default ~/.domainiq, mode
-            0o600) by calling loader.flush_pending(). No file is written if the key
-            came from an environment variable or was passed directly.
         """
         if not self.api_key:
             msg = "API key is required"
@@ -141,9 +133,6 @@ class Config:
         if self.retry_delay < 0:
             msg = "Retry delay cannot be negative"
             raise DomainIQConfigurationError(msg)
-
-        # Persist any interactively entered key now that validation passed
-        self._loader.flush_pending()
 
     def __repr__(self) -> str:
         """String representation (without exposing API key)."""

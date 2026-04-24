@@ -7,12 +7,11 @@ from types import TracebackType
 from typing import Any, Self, TypeVar, Unpack
 
 from ._base_client import (
-    _BaseDomainIQClient,
     _assert_csv_str,
     _assert_json_dict,
     _assert_json_dict_or_list,
+    _BaseDomainIQClient,
 )
-from .constants import API_FORMAT_CSV, API_FORMAT_JSON, RETRY_EXHAUSTED_MSG
 from ._mixins import (
     _AsyncBulkMixin,
     _AsyncDNSMixin,
@@ -23,6 +22,7 @@ from ._mixins import (
     _AsyncWhoisMixin,
 )
 from .config import Config, ConfigKwargs
+from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .exceptions import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
@@ -32,8 +32,9 @@ from .exceptions import (
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
-from .http_transport import AiohttpTransport, AsyncResponse, AsyncTransport
+from .http_transport import AiohttpTransport, AsyncTransport
 from .models import DNSRecordType, DNSResult, WhoisResult
+from ._request_pipeline import execute_async_request
 from .validators import is_ip_address
 
 logger = logging.getLogger(__name__)
@@ -203,71 +204,19 @@ class AsyncDomainIQClient(
             self.config,
         )
 
-    def _handle_error_status(
-        self, response: AsyncResponse, attempt: int
-    ) -> float | None:
-        """Delegate to shared error classifier. Returns retry delay or None for success."""
-        return self._classify_response(
-            response.status_code, response.text, response.headers, attempt
-        )
-
-    async def _parse_response(
-        self, response: AsyncResponse, output_format: str
-    ) -> dict[str, Any] | list[Any] | str:
-        """Parse a successful HTTP response into the expected Python type."""
-        if output_format == API_FORMAT_JSON:
-            try:
-                json_response: dict[str, Any] | list[Any] = response.json()
-            except ValueError as e:
-                msg = f"Failed to parse JSON response: {e}"
-                raise DomainIQAPIError(msg) from e
-            return json_response
-        return response.text
-
     async def _make_request(
-        self, params: dict[str, Any], output_format: str = API_FORMAT_JSON
+        self,
+        params: dict[str, Any],
+        output_format: str = API_FORMAT_JSON,
     ) -> dict[str, Any] | list[Any] | str:
-        """Make an async API request to DomainIQ.
-
-        Args:
-            params: Request parameters
-            output_format: Output format ('json' or 'csv')
-
-        Returns:
-            Response data as dict (JSON) or string (CSV)
-
-        Raises:
-            DomainIQAPIError: If the API returns an error
-            DomainIQAuthenticationError: If authentication fails
-            DomainIQRateLimitError: If rate limit is exceeded
-            DomainIQTimeoutError: If request times out
-        """
+        """Make an async API request using the shared request pipeline."""
         request_params = self._build_request_params(params, output_format)
-
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                response = await self._transport.get(
-                    self.config.base_url,
-                    params=request_params,
-                    timeout=self.config.timeout,
-                )
-            except TimeoutError as e:
-                await asyncio.sleep(self._on_timeout(e, attempt))
-                continue
-            except OSError as e:
-                await asyncio.sleep(self._on_oserror(e, attempt))
-                continue
-
-            logger.debug("API response status: %s", response.status_code)
-
-            retry_delay = self._handle_error_status(response, attempt)
-            if retry_delay is not None:
-                await asyncio.sleep(retry_delay)
-                continue
-
-            return await self._parse_response(response, output_format)
-
-        raise DomainIQAPIError(RETRY_EXHAUSTED_MSG)
+        return await execute_async_request(
+            self._transport,
+            request_params,
+            output_format,
+            self._request_policy(),
+        )
 
     async def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Make async API request expecting JSON response."""

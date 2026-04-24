@@ -166,7 +166,7 @@ async def error_handling_examples() -> None:
         # Example with timeout handling
         try:
             # Create client with very short timeout
-            config = Config(timeout=0.1)  # Very short timeout
+            config = Config(api_key=client.config.api_key, timeout=0.1)
             async with AsyncDomainIQClient(config) as timeout_client:
                 await timeout_client.whois_lookup(domain="example.com")
         except DomainIQError as e:

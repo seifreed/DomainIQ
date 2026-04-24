@@ -34,7 +34,7 @@
 |---------|-------------|
 | **Sync & Async Clients** | Full synchronous and asynchronous API support |
 | **Structured Models** | Dataclass-based response models for clean API responses |
-| **Flexible Config** | Multiple API key sources (env, file, parameter, prompt) |
+| **Flexible Config** | Multiple API key sources (env, file, parameter; CLI prompt when needed) |
 | **CLI Tool** | Comprehensive command-line interface included |
 | **Error Handling** | Custom exception hierarchy for robust error handling |
 | **Type Hints** | Full type annotations throughout the codebase |

@@ -3,6 +3,7 @@
 import csv
 import logging
 from collections.abc import Callable, Mapping
+from enum import Enum
 from io import StringIO
 from typing import Any, TypeVar
 
@@ -14,18 +15,31 @@ __all__ = [
     "assert_json_dict",
     "compute_backoff",
     "csv_to_dict_list",
+    "enum_value",
     "ensure_list_of_models",
     "parse_retry_after",
     "setup_logging",
+    "truncate_repr",
 ]
+
+
+def enum_value(x: object) -> object:
+    """Return x.value if x is an Enum member, otherwise return x unchanged."""
+    return x.value if isinstance(x, Enum) else x
 
 
 def assert_json_dict(raw: dict[str, Any] | list[Any] | str) -> dict[str, Any]:
     """Raise DomainIQAPIError if raw is not a JSON object (dict)."""
     if isinstance(raw, dict):
         return raw
-    msg = f"Expected JSON dict but got {type(raw).__name__}: {raw!r}"
+    msg = f"Expected JSON dict but got {type(raw).__name__}: {truncate_repr(raw)}"
     raise DomainIQAPIError(msg)
+
+
+def truncate_repr(value: object, max_len: int = 200) -> str:
+    """Return repr(value) truncated to max_len characters with ellipsis."""
+    r = repr(value)
+    return r[:max_len] + "..." if len(r) > max_len else r
 
 
 def compute_backoff(retry_delay: int, attempt: int) -> float:
@@ -59,6 +73,7 @@ def csv_to_dict_list(csv_content: str) -> list[dict[str, Any]]:
     try:
         content = csv_content.strip()
         if not content:
+            logger.debug("csv_to_dict_list: received empty content, returning []")
             return []
         if content[0] in ("{", "["):
             msg = "Expected CSV but received JSON-like content"
@@ -104,6 +119,7 @@ def ensure_list_of_models(
     response: dict[str, Any] | list[Any],
     factory: Callable[[dict[str, Any]], _M],
 ) -> list[_M]:
+    """Wrap a single-item dict or a list of dicts through factory, returning a list."""
     if isinstance(response, dict):
         return [factory(response)]
     return [factory(item) for item in response]

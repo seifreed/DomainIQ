@@ -1,17 +1,15 @@
 """Main client for the DomainIQ API."""
 
 import logging
-import time
 from types import TracebackType
 from typing import Any, Self, Unpack
 
 from ._base_client import (
-    _BaseDomainIQClient,
     _assert_csv_str,
     _assert_json_dict,
     _assert_json_dict_or_list,
+    _BaseDomainIQClient,
 )
-from .constants import API_FORMAT_CSV, API_FORMAT_JSON, RETRY_EXHAUSTED_MSG
 from ._mixins import (
     _BulkMixin,
     _DNSMixin,
@@ -22,8 +20,9 @@ from ._mixins import (
     _WhoisMixin,
 )
 from .config import Config, ConfigKwargs
-from .exceptions import DomainIQAPIError
-from .http_transport import RequestsTransport, SyncResponse, SyncTransport
+from .constants import API_FORMAT_CSV, API_FORMAT_JSON
+from .http_transport import RequestsTransport, SyncTransport
+from ._request_pipeline import execute_sync_request
 
 logger = logging.getLogger(__name__)
 
@@ -75,72 +74,19 @@ class DomainIQClient(
 
         logger.debug("Initialized DomainIQ client with config: %s", self.config)
 
-    def _handle_error_status(
-        self, response: SyncResponse, attempt: int
-    ) -> float | None:
-        """Delegate to shared error classifier. Returns retry delay or None for success."""
-        return self._classify_response(
-            response.status_code, response.text, response.headers, attempt
-        )
-
-    def _parse_response(
-        self, response: SyncResponse, output_format: str
-    ) -> dict[str, Any] | list[Any] | str:
-        """Parse a successful HTTP response into the expected Python type."""
-        if output_format == API_FORMAT_JSON:
-            try:
-                json_response: dict[str, Any] | list[Any] = response.json()
-            except ValueError as e:
-                msg = f"Failed to parse JSON response: {e}"
-                raise DomainIQAPIError(msg) from e
-            logger.debug("API JSON response: %s", json_response)
-            return json_response
-        return response.text
-
     def _make_request(
-        self, params: dict[str, Any], output_format: str = API_FORMAT_JSON
+        self,
+        params: dict[str, Any],
+        output_format: str = API_FORMAT_JSON,
     ) -> dict[str, Any] | list[Any] | str:
-        """Make an API request to DomainIQ.
-
-        Args:
-            params: Request parameters
-            output_format: Output format ('json' or 'csv')
-
-        Returns:
-            Response data as dict (JSON) or string (CSV)
-
-        Raises:
-            DomainIQAPIError: If the API returns an error
-            DomainIQAuthenticationError: If authentication fails
-            DomainIQRateLimitError: If rate limit is exceeded
-            DomainIQTimeoutError: If request times out
-        """
+        """Make an API request using the shared request pipeline."""
         request_params = self._build_request_params(params, output_format)
-
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                response = self._transport.get(
-                    self.config.base_url,
-                    params=request_params,
-                    timeout=self.config.timeout,
-                )
-            except TimeoutError as e:
-                time.sleep(self._on_timeout(e, attempt))
-                continue
-            except OSError as e:
-                time.sleep(self._on_oserror(e, attempt))
-                continue
-
-            logger.debug("API response status: %s", response.status_code)
-
-            retry_delay = self._handle_error_status(response, attempt)
-            if retry_delay is not None:
-                time.sleep(retry_delay)
-                continue
-
-            return self._parse_response(response, output_format)
-
-        raise DomainIQAPIError(RETRY_EXHAUSTED_MSG)
+        return execute_sync_request(
+            self._transport,
+            request_params,
+            output_format,
+            self._request_policy(),
+        )
 
     def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Make an API request expecting a JSON dict response."""

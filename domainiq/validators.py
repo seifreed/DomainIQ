@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime
 
-from .exceptions import DomainIQError
+from .exceptions import DomainIQValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -146,24 +146,25 @@ def validate_whois_target(
 
     if domain_provided and not domain:
         msg = "domain cannot be empty or whitespace-only"
-        raise DomainIQError(msg)
+        raise DomainIQValidationError(msg, param_name="domain")
     if ip_provided and not ip:
         msg = "ip cannot be empty or whitespace-only"
-        raise DomainIQError(msg)
+        raise DomainIQValidationError(msg, param_name="ip")
     if not domain and not ip:
         msg = "Either domain or ip must be provided"
-        raise DomainIQError(msg)
+        raise DomainIQValidationError(msg, param_name="domain")
     if domain and ip:
         msg = "Cannot specify both domain and ip"
-        raise DomainIQError(msg)
+        raise DomainIQValidationError(msg, param_name="domain")
 
     return domain, ip
 
 
 def ensure_positive_int(field_name: str, value: int) -> int:
+    """Raise DomainIQValidationError if value is not a positive integer."""
     if value <= 0:
         msg = f"{field_name} must be positive, got {value}"
-        raise DomainIQError(msg)
+        raise DomainIQValidationError(msg, param_name=field_name)
     return value
 
 

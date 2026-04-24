@@ -18,7 +18,6 @@ from domainiq import (
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
-from domainiq.config import Config
 
 from .conftest import (
     MockAsyncTransport,
@@ -255,7 +254,7 @@ class TestAsyncRetryLogic:
     async def test_exhausted_retries_on_500_raises_api_error(
         self,
         mock_async_transport: MockAsyncTransport,
-        mock_async_client: "AsyncDomainIQClient",
+        mock_async_client: AsyncDomainIQClient,
     ) -> None:
         for _ in range(4):
             mock_async_transport.enqueue(make_async_response(500, '{"error": "err"}'))
@@ -270,7 +269,7 @@ class TestAsyncRetryLogic:
     async def test_recovers_after_transient_500(
         self,
         mock_async_transport: MockAsyncTransport,
-        mock_async_client: "AsyncDomainIQClient",
+        mock_async_client: AsyncDomainIQClient,
     ) -> None:
         mock_async_transport.enqueue(make_async_response(500, '{"error": "err"}'))
         mock_async_transport.enqueue(make_async_response(200, '{"domain": "example.com"}'))
@@ -289,7 +288,7 @@ class TestAsyncRateLimitHandling:
     async def test_exhausted_429_raises_rate_limit_error(
         self,
         mock_async_transport: MockAsyncTransport,
-        mock_async_client: "AsyncDomainIQClient",
+        mock_async_client: AsyncDomainIQClient,
     ) -> None:
         for _ in range(4):
             mock_async_transport.enqueue(
@@ -305,7 +304,7 @@ class TestAsyncRateLimitHandling:
     async def test_401_no_retries_async(
         self,
         mock_async_transport: MockAsyncTransport,
-        mock_async_client: "AsyncDomainIQClient",
+        mock_async_client: AsyncDomainIQClient,
     ) -> None:
         mock_async_transport.enqueue(make_async_response(401, '{"error": "bad key"}'))
 
@@ -318,7 +317,7 @@ class TestAsyncRateLimitHandling:
     async def test_timeout_then_success_async(
         self,
         mock_async_transport: MockAsyncTransport,
-        mock_async_client: "AsyncDomainIQClient",
+        mock_async_client: AsyncDomainIQClient,
     ) -> None:
         mock_async_transport.enqueue(TimeoutError("async timeout"))
         mock_async_transport.enqueue(make_async_response(200, '{"domain": "example.com"}'))
@@ -339,7 +338,7 @@ class TestCLIDispatch:
     def test_dispatch_whois_executes_when_arg_set(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli import _dispatch_whois
+        from domainiq.cli._dispatch import _dispatch_whois
 
         mock_transport.enqueue(make_sync_response(200, '{"domain": "example.com"}'))
 
@@ -356,7 +355,7 @@ class TestCLIDispatch:
     def test_dispatch_whois_skips_when_arg_not_set(
         self, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli import _dispatch_whois
+        from domainiq.cli._dispatch import _dispatch_whois
 
         args = argparse.Namespace(whois_lookup=None)
         executed, errored = _dispatch_whois(mock_client, args)
@@ -367,7 +366,7 @@ class TestCLIDispatch:
     def test_dispatch_dns_executes_when_arg_set(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli import _dispatch_dns
+        from domainiq.cli._dispatch import _dispatch_dns
 
         mock_transport.enqueue(
             make_sync_response(200, '{"domain": "example.com", "records": []}')
@@ -382,7 +381,7 @@ class TestCLIDispatch:
     def test_dispatch_dns_skips_when_arg_not_set(
         self, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli import _dispatch_dns
+        from domainiq.cli._dispatch import _dispatch_dns
 
         args = argparse.Namespace(dns_lookup=None)
         executed, errored = _dispatch_dns(mock_client, args)
@@ -393,7 +392,7 @@ class TestCLIDispatch:
     def test_dispatch_whois_returns_error_on_api_failure(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli import _dispatch_whois
+        from domainiq.cli._dispatch import _dispatch_whois
 
         # 401 exhausts immediately (no retries) → DomainIQAuthenticationError
         mock_transport.enqueue(make_sync_response(401, '{"error": "bad key"}'))

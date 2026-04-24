@@ -14,16 +14,19 @@ import pytest
 
 from domainiq.cli import main
 from domainiq.cli._args import create_parser
+from domainiq.cli._credentials import _is_interactive, prompt_for_api_key
 from domainiq.cli._dispatch import (
-    _EXIT_ERROR,
-    _EXIT_NO_COMMAND,
-    _EXIT_PARTIAL,
-    _EXIT_SUCCESS,
     _dispatch_command,
     _dispatch_dns,
     _dispatch_whois,
     _run_command,
     _validate_args,
+)
+from domainiq.constants import (
+    EXIT_ERROR as _EXIT_ERROR,
+    EXIT_NO_COMMAND as _EXIT_NO_COMMAND,
+    EXIT_PARTIAL as _EXIT_PARTIAL,
+    EXIT_SUCCESS as _EXIT_SUCCESS,
 )
 from domainiq.cli._handlers import (
     _serialize,
@@ -32,7 +35,8 @@ from domainiq.cli._handlers import (
     handle_whois_lookup,
     print_result,
 )
-from domainiq.exceptions import DomainIQError
+from domainiq.cli._types import DnsArgs, DomainSearchArgs, WhoisArgs
+from domainiq.exceptions import DomainIQConfigurationError, DomainIQError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -379,7 +383,7 @@ class TestHandleWhoisLookup:
     def test_domain_target_calls_whois_with_domain(self) -> None:
         client = _mock_client()
         client.whois_lookup.return_value = {}
-        args = _make_args(whois_lookup="example.com", full=False, current_only=False)
+        args = WhoisArgs(query="example.com", full=False, current_only=False)
         handle_whois_lookup(client, args)
         client.whois_lookup.assert_called_once_with(
             domain="example.com", ip=None, full=False, current_only=False
@@ -388,7 +392,7 @@ class TestHandleWhoisLookup:
     def test_ip_target_calls_whois_with_ip(self) -> None:
         client = _mock_client()
         client.whois_lookup.return_value = {}
-        args = _make_args(whois_lookup="8.8.8.8", full=False, current_only=False)
+        args = WhoisArgs(query="8.8.8.8", full=False, current_only=False)
         handle_whois_lookup(client, args)
         client.whois_lookup.assert_called_once_with(
             domain=None, ip="8.8.8.8", full=False, current_only=False
@@ -397,7 +401,7 @@ class TestHandleWhoisLookup:
     def test_full_flag_forwarded(self) -> None:
         client = _mock_client()
         client.whois_lookup.return_value = {}
-        args = _make_args(whois_lookup="example.com", full=True, current_only=False)
+        args = WhoisArgs(query="example.com", full=True, current_only=False)
         handle_whois_lookup(client, args)
         call_kwargs = client.whois_lookup.call_args.kwargs
         assert call_kwargs["full"] is True
@@ -407,14 +411,14 @@ class TestHandleDnsLookup:
     def test_no_types_passes_none(self) -> None:
         client = _mock_client()
         client.dns_lookup.return_value = []
-        args = _make_args(dns_lookup="example.com", types=None)
+        args = DnsArgs(query="example.com", types=None)
         handle_dns_lookup(client, args)
         client.dns_lookup.assert_called_once_with("example.com", record_types=None)
 
     def test_types_split_by_comma(self) -> None:
         client = _mock_client()
         client.dns_lookup.return_value = []
-        args = _make_args(dns_lookup="example.com", types="A,MX,TXT")
+        args = DnsArgs(query="example.com", types=["A", "MX", "TXT"])
         handle_dns_lookup(client, args)
         client.dns_lookup.assert_called_once_with(
             "example.com", record_types=["A", "MX", "TXT"]
@@ -422,10 +426,28 @@ class TestHandleDnsLookup:
 
 
 class TestHandleDomainSearch:
+    def _search_args(self, **kwargs: Any) -> DomainSearchArgs:
+        defaults: dict[str, Any] = {
+            "keywords": ["kw"],
+            "conditions": None,
+            "match": "any",
+            "count_only": False,
+            "exclude_dashed": False,
+            "exclude_numbers": False,
+            "exclude_idn": False,
+            "min_length": None,
+            "max_length": None,
+            "min_create_date": None,
+            "max_create_date": None,
+            "search_limit": None,
+        }
+        defaults.update(kwargs)
+        return DomainSearchArgs(**defaults)
+
     def test_basic_search_no_filters(self) -> None:
         client = _mock_client()
         client.domain_search.return_value = {}
-        args = _make_args(domain_search=["kw"], match="any")
+        args = self._search_args(keywords=["kw"])
         handle_domain_search(client, args)
         client.domain_search.assert_called_once()
         call_kwargs = client.domain_search.call_args.kwargs
@@ -435,7 +457,7 @@ class TestHandleDomainSearch:
     def test_exclude_dashed_sets_filter(self) -> None:
         client = _mock_client()
         client.domain_search.return_value = {}
-        args = _make_args(domain_search=["kw"], match="any", exclude_dashed=True)
+        args = self._search_args(exclude_dashed=True)
         handle_domain_search(client, args)
         call_kwargs = client.domain_search.call_args.kwargs
         assert call_kwargs["filters"]["exclude_dashed"] is True
@@ -443,7 +465,7 @@ class TestHandleDomainSearch:
     def test_count_only_sets_filter(self) -> None:
         client = _mock_client()
         client.domain_search.return_value = {}
-        args = _make_args(domain_search=["kw"], match="any", count_only=True)
+        args = self._search_args(count_only=True)
         handle_domain_search(client, args)
         call_kwargs = client.domain_search.call_args.kwargs
         assert call_kwargs["filters"]["count_only"] == 1
@@ -451,13 +473,48 @@ class TestHandleDomainSearch:
     def test_min_max_length(self) -> None:
         client = _mock_client()
         client.domain_search.return_value = {}
-        args = _make_args(
-            domain_search=["kw"], match="any", min_length=5, max_length=15
-        )
+        args = self._search_args(min_length=5, max_length=15)
         handle_domain_search(client, args)
         call_kwargs = client.domain_search.call_args.kwargs
         assert call_kwargs["filters"]["min_length"] == 5
         assert call_kwargs["filters"]["max_length"] == 15
+
+
+# ---------------------------------------------------------------------------
+# Credential helpers
+# ---------------------------------------------------------------------------
+
+
+class TestCliCredentials:
+    def test_is_interactive_requires_both_stdin_and_stdout(self) -> None:
+        with patch("os.isatty") as mock_isatty:
+            mock_isatty.side_effect = lambda fd: fd == 0
+            assert _is_interactive() is False
+
+        with patch("os.isatty") as mock_isatty:
+            mock_isatty.return_value = True
+            assert _is_interactive() is True
+
+    def test_prompt_for_api_key_persists_value(self, tmp_path) -> None:
+        target = tmp_path / "domainiq.key"
+
+        with (
+            patch("domainiq.cli._credentials._is_interactive", return_value=True),
+            patch(
+                "domainiq.cli._credentials._prompt_with_timeout",
+                return_value="interactive_key_xyz",
+            ),
+        ):
+            api_key = prompt_for_api_key(str(target))
+
+        assert api_key == "interactive_key_xyz"
+        assert target.exists()
+        assert target.read_text() == "interactive_key_xyz"
+
+    def test_prompt_for_api_key_raises_when_non_interactive(self) -> None:
+        with patch("domainiq.cli._credentials._is_interactive", return_value=False):
+            with pytest.raises(DomainIQError, match="No API key found"):
+                prompt_for_api_key(None)
 
 
 # ---------------------------------------------------------------------------
@@ -468,11 +525,10 @@ class TestHandleDomainSearch:
 class TestMain:
     def test_main_no_command_exits_no_command(self) -> None:
         with (
-            patch("sys.argv", ["domainiq"]),
+            patch("sys.argv", ["domainiq", "--api-key", "key"]),
             patch("domainiq.cli._args.create_parser") as mock_create,
             patch("domainiq.client.DomainIQClient.__enter__") as mock_enter,
             patch("domainiq.client.DomainIQClient.__exit__", return_value=False),
-            patch("domainiq.config.Config.validate"),
         ):
             parser = create_parser()
             mock_create.return_value = parser
@@ -482,9 +538,8 @@ class TestMain:
 
     def test_main_exits_1_on_domainiq_error(self) -> None:
         with (
-            patch("sys.argv", ["domainiq", "--whois-lookup", "example.com"]),
+            patch("sys.argv", ["domainiq", "--api-key", "key", "--whois-lookup", "example.com"]),
             patch("domainiq.client.DomainIQClient") as mock_cls,
-            patch("domainiq.config.Config.validate"),
         ):
             instance = mock_cls.return_value.__enter__.return_value
             instance.whois_lookup.side_effect = DomainIQError("test error")
@@ -495,8 +550,26 @@ class TestMain:
         with (
             patch("sys.argv", ["domainiq", "--api-key", "key"]),
             patch("domainiq.client.DomainIQClient") as mock_cls,
-            patch("domainiq.config.Config.validate"),
         ):
             mock_cls.return_value.__enter__.side_effect = KeyboardInterrupt
             code = main()
         assert code == 130
+
+    def test_main_prompts_when_sdk_config_has_no_key(self) -> None:
+        with (
+            patch("sys.argv", ["domainiq", "--whois-lookup", "example.com"]),
+            patch(
+                "domainiq.cli.Config",
+                side_effect=[
+                    DomainIQConfigurationError("missing key"),
+                    MagicMock(api_key="prompted"),
+                ],
+            ),
+            patch("domainiq.cli.prompt_for_api_key", return_value="prompted"),
+            patch("domainiq.client.DomainIQClient") as mock_cls,
+        ):
+            instance = mock_cls.return_value.__enter__.return_value
+            instance.whois_lookup.return_value = {}
+            code = main()
+
+        assert code == _EXIT_SUCCESS

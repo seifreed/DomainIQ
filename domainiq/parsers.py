@@ -1,7 +1,10 @@
 """Primitive parsing utilities shared across model deserialization."""
 
+import logging
 from datetime import datetime
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "parse_bool",
@@ -43,14 +46,14 @@ def try_parse_date(date_str: str | None) -> datetime | None:
     try:
         return datetime.fromisoformat(date_str)
     except (ValueError, AttributeError):
-        pass
+        logger.debug("try_parse_date: fromisoformat failed for %r", date_str[:80])
     stripped = date_str.strip()
     digits = stripped.lstrip("-")
     if "." in stripped or (digits.isdigit() and len(digits) >= _TIMESTAMP_MIN_DIGITS):
         try:
             return datetime.fromtimestamp(float(stripped))  # noqa: DTZ006 — API returns naive UTC epoch; naive datetime is the project-wide contract for parsed dates
         except (ValueError, TypeError, OSError):
-            pass
+            logger.debug("try_parse_date: timestamp parse failed for %r", date_str[:80])
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(date_str, fmt)  # noqa: DTZ007 — same naive-datetime contract as DTZ006; API does not supply timezone in string formats
@@ -72,12 +75,9 @@ def parse_bool(value: Any, default: bool = False) -> bool:
 
 def unwrap_api_envelope(data: dict[str, Any], exclude_keys: tuple[str, ...]) -> dict[str, Any]:
     """Unwrap {'result': {...}} top-level API envelope when present."""
-    if (
-        "result" in data
-        and isinstance(data["result"], dict)
-        and not any(k in data for k in exclude_keys)
-    ):
-        return data["result"]  # type: ignore[return-value]
+    result = data.get("result")
+    if isinstance(result, dict) and not any(k in data for k in exclude_keys):
+        return result
     return data
 
 

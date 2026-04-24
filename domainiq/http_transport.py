@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from aiohttp import ClientSession
 
-from ._http_constants import HTTP_BAD_REQUEST, HTTP_TOO_MANY_REQUESTS, HTTP_UNAUTHORIZED
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +209,7 @@ class AiohttpTransport:
                     headers=resp.headers,
                     _body=body,
                 )
-        except (TimeoutError, asyncio.TimeoutError) as e:
+        except TimeoutError as e:
             raise TimeoutError(str(e)) from e
         except self._aiohttp.ClientError as e:
             raise OSError(str(e)) from e

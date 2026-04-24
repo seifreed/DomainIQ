@@ -62,6 +62,19 @@ class DomainIQConfigurationError(DomainIQError):
     """Exception raised when there's a configuration error."""
 
 
+class DomainIQValidationError(DomainIQError):
+    """Raised when a parameter fails domain-level validation.
+
+    The ``param_name`` attribute identifies which parameter failed.
+    Subclasses ``DomainIQError`` so callers using ``except DomainIQError``
+    already handle it without changes.
+    """
+
+    def __init__(self, message: str, param_name: str | None = None) -> None:
+        super().__init__(message)
+        self.param_name = param_name
+
+
 class DomainIQPartialResultsError(DomainIQError, Generic[_T]):
     """Raised when concurrent operations partially fail; carries successful results."""
 

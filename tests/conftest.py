@@ -1,9 +1,6 @@
 """Shared fixtures for transport-based unit tests."""
 
 from __future__ import annotations
-
-import json
-from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
@@ -12,7 +9,6 @@ from domainiq import DomainIQClient
 from domainiq.async_client import AsyncDomainIQClient
 from domainiq.config import Config
 from domainiq.http_transport import AsyncResponse, SyncResponse
-
 
 # ---------------------------------------------------------------------------
 # Sync mock transport
@@ -125,3 +121,14 @@ def mock_async_transport() -> MockAsyncTransport:
 def mock_async_client(mock_async_transport: MockAsyncTransport) -> AsyncDomainIQClient:
     config = Config(api_key="test-key-fixture", timeout=5, max_retries=3, retry_delay=0)
     return AsyncDomainIQClient(config=config, transport=mock_async_transport)
+
+
+@pytest.fixture(autouse=True)
+def _disable_request_pipeline_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep retry tests deterministic by removing real sleep delays."""
+
+    async def _async_noop_sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("domainiq._request_pipeline._sync_sleep", lambda _: None)
+    monkeypatch.setattr("domainiq._request_pipeline._async_sleep", _async_noop_sleep)

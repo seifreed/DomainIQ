@@ -4,14 +4,18 @@ import argparse
 import base64
 import dataclasses
 import json
-import sys
 from datetime import datetime
 
-from ..constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_LIMIT, SNAPSHOT_DEFAULT_WIDTH
+from ..constants import (
+    SNAPSHOT_DEFAULT_HEIGHT,
+    SNAPSHOT_DEFAULT_WIDTH,
+)
+from .._params.search import build_search_filters
 from ..exceptions import DomainIQError
 from ..models import DomainSearchFilters, KeywordMatchType, SnapshotOptions
 from ..protocols import DNSProtocol, SearchProtocol, WhoisProtocol
-from ..validators import is_ip_address, validate_date_string
+from ..validators import is_ip_address
+from ._types import DnsArgs, DomainSearchArgs, WhoisArgs
 
 
 def build_snapshot_options(args: argparse.Namespace) -> SnapshotOptions:
@@ -54,69 +58,43 @@ def print_result(result: object, indent: int = 2) -> None:
         raise DomainIQError(msg) from e
 
 
-def handle_whois_lookup(client: WhoisProtocol, args: argparse.Namespace) -> None:
+def handle_whois_lookup(client: WhoisProtocol, args: WhoisArgs) -> None:
     """Handle WHOIS lookup command."""
     domain = None
     ip = None
-
-    query = args.whois_lookup
-    if is_ip_address(query):
-        ip = query
+    if is_ip_address(args.query):
+        ip = args.query
     else:
-        domain = query
-
-    result = client.whois_lookup(
-        domain=domain, ip=ip, full=args.full, current_only=args.current_only
-    )
+        domain = args.query
+    result = client.whois_lookup(domain=domain, ip=ip, full=args.full, current_only=args.current_only)
     print_result(result)
 
 
-def handle_dns_lookup(client: DNSProtocol, args: argparse.Namespace) -> None:
+def handle_dns_lookup(client: DNSProtocol, args: DnsArgs) -> None:
     """Handle DNS lookup command."""
-    types = args.types.split(",") if args.types else None
-    result = client.dns_lookup(args.dns_lookup, record_types=types)
+    result = client.dns_lookup(args.query, record_types=args.types)
     print_result(result)
 
 
-def _build_domain_search_filters(args: argparse.Namespace) -> DomainSearchFilters:
-    """Build domain search filters from CLI args, validating date fields."""
-    filters: DomainSearchFilters = {}
-
-    if args.count_only:
-        filters["count_only"] = 1
-    if args.exclude_dashed:
-        filters["exclude_dashed"] = True
-    if args.exclude_numbers:
-        filters["exclude_numbers"] = True
-    if args.exclude_idn:
-        filters["exclude_idn"] = True
-    if args.min_length is not None:
-        filters["min_length"] = args.min_length
-    if args.max_length is not None:
-        filters["max_length"] = args.max_length
-    if args.min_create_date:
-        parsed = validate_date_string(args.min_create_date)
-        if parsed is None:
-            msg = f"Invalid date format for --min-create-date: {args.min_create_date}"
-            raise ValueError(msg)
-        filters["min_create_date"] = parsed
-    if args.max_create_date:
-        parsed = validate_date_string(args.max_create_date)
-        if parsed is None:
-            msg = f"Invalid date format for --max-create-date: {args.max_create_date}"
-            raise ValueError(msg)
-        filters["max_create_date"] = parsed
-    if args.search_limit is not None:
-        filters["limit"] = args.search_limit
-
-    return filters
+def _build_domain_search_filters(args: DomainSearchArgs) -> DomainSearchFilters:
+    return build_search_filters(
+        count_only=args.count_only,
+        exclude_dashed=args.exclude_dashed,
+        exclude_numbers=args.exclude_numbers,
+        exclude_idn=args.exclude_idn,
+        min_length=args.min_length,
+        max_length=args.max_length,
+        min_create_date=args.min_create_date,
+        max_create_date=args.max_create_date,
+        limit=args.search_limit,
+    )
 
 
-def handle_domain_search(client: SearchProtocol, args: argparse.Namespace) -> None:
+def handle_domain_search(client: SearchProtocol, args: DomainSearchArgs) -> None:
     """Handle domain search command."""
     filters = _build_domain_search_filters(args)
     result = client.domain_search(
-        keywords=args.domain_search,
+        keywords=args.keywords,
         conditions=args.conditions,
         match=KeywordMatchType(args.match),
         filters=filters or None,

@@ -1,7 +1,7 @@
 # DomainIQ Makefile - Code Quality and Development Tasks
 # Requires Python 3.10+ and development dependencies installed
 
-.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs pre-commit all-checks
+.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs pre-commit all-checks gen-mixins
 
 # Default target
 help:  ## Show this help message
@@ -17,6 +17,11 @@ install-dev:  ## Install package with development dependencies
 
 install-quality:  ## Install only quality tools
 	pip install -e .[quality]
+
+gen-mixins:  ## Regenerate async mixin classes from their sync counterparts
+	@echo "⚙️  Regenerating async mixin classes..."
+	python scripts/generate_mixins.py
+	@echo "✅ Mixin generation completed"
 
 # Code quality targets
 quality: lint format type-check security  ## Run all code quality checks
@@ -54,12 +59,12 @@ test:  ## Run all tests
 
 test-unit:  ## Run unit tests only (no API key required)
 	@echo "🧪 Running unit tests..."
-	pytest -v -m "not integration" --tb=short
+	pytest -v --tb=short
 	@echo "✅ Unit tests completed"
 
 test-integration:  ## Run integration tests (requires API key)
 	@echo "🧪 Running integration tests..."
-	pytest -v -m integration --tb=short
+	pytest -o addopts='' tests/integration -v -m integration --tb=short --strict-markers --strict-config --cov=domainiq --cov-report=term-missing --cov-report=html --cov-report=xml
 	@echo "✅ Integration tests completed"
 
 test-parallel:  ## Run tests in parallel

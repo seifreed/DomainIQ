@@ -4,8 +4,15 @@ import argparse
 import sys
 from collections.abc import Callable
 from functools import partial
-from typing import Any
+from typing import Any, NamedTuple
 
+from ..constants import (
+    EXIT_ERROR,
+    EXIT_NO_COMMAND,
+    EXIT_PARTIAL,
+    EXIT_SUCCESS,
+    SNAPSHOT_DEFAULT_LIMIT,
+)
 from ..exceptions import DomainIQError
 from ..models import BulkWhoisType, ReverseMatchType
 from ..protocols import (
@@ -18,7 +25,6 @@ from ..protocols import (
     SearchProtocol,
     WhoisProtocol,
 )
-from ..constants import SNAPSHOT_DEFAULT_LIMIT
 from ._handlers import (
     build_snapshot_options,
     handle_dns_lookup,
@@ -26,8 +32,15 @@ from ._handlers import (
     handle_whois_lookup,
     print_result,
 )
+from ._types import DnsArgs, DomainSearchArgs, WhoisArgs
 
-_DispatchFn = Callable[[Any, "argparse.Namespace"], tuple[bool, bool]]
+
+class _CommandResult(NamedTuple):
+    executed: bool
+    errored: bool
+
+
+_DispatchFn = Callable[[Any, "argparse.Namespace"], _CommandResult]
 _DISPATCHERS: list[_DispatchFn] = []
 
 
@@ -37,43 +50,46 @@ def _dispatcher(fn: _DispatchFn) -> _DispatchFn:
     return fn
 
 
-def _run_command(fn: Callable[[], None]) -> tuple[bool, bool]:
+def _run_command(fn: Callable[[], None]) -> _CommandResult:
     """Run fn and return (executed=True, had_errors). Catches DomainIQError."""
     try:
         fn()
-        return True, False
+        return _CommandResult(executed=True, errored=False)
     except DomainIQError as e:
         print(f"Error: {e}", file=sys.stderr)
-        return True, True
+        return _CommandResult(executed=True, errored=True)
 
 
-def _aggregate(results: list[tuple[bool, bool]]) -> tuple[bool, bool]:
-    """Aggregate (executed, had_errors) pairs from multiple commands."""
+def _aggregate(results: list[_CommandResult]) -> _CommandResult:
+    """Aggregate (executed, errored) results from multiple commands."""
     if not results:
-        return False, False
-    return any(r[0] for r in results), any(r[1] for r in results)
+        return _CommandResult(executed=False, errored=False)
+    return _CommandResult(
+        executed=any(r.executed for r in results),
+        errored=any(r.errored for r in results),
+    )
 
 
 @_dispatcher
-def _dispatch_whois(client: WhoisProtocol, args: argparse.Namespace) -> tuple[bool, bool]:
+def _dispatch_whois(client: WhoisProtocol, args: argparse.Namespace) -> _CommandResult:
     """Dispatch WHOIS commands. Returns (executed, had_errors)."""
     if args.whois_lookup:
-        return _run_command(partial(handle_whois_lookup, client, args))
-    return False, False
+        return _run_command(partial(handle_whois_lookup, client, WhoisArgs.from_namespace(args)))
+    return _CommandResult(executed=False, errored=False)
 
 
 @_dispatcher
-def _dispatch_dns(client: DNSProtocol, args: argparse.Namespace) -> tuple[bool, bool]:
+def _dispatch_dns(client: DNSProtocol, args: argparse.Namespace) -> _CommandResult:
     """Dispatch DNS commands. Returns (executed, had_errors)."""
     if args.dns_lookup:
-        return _run_command(partial(handle_dns_lookup, client, args))
-    return False, False
+        return _run_command(partial(handle_dns_lookup, client, DnsArgs.from_namespace(args)))
+    return _CommandResult(executed=False, errored=False)
 
 
 @_dispatcher
 def _dispatch_domain_analysis(
     client: DomainAnalysisProtocol, args: argparse.Namespace
-) -> tuple[bool, bool]:
+) -> _CommandResult:
     """Dispatch domain analysis commands. Returns (executed, had_errors)."""
     results = []
     if args.domain_categorize:
@@ -106,7 +122,7 @@ _REPORT_COMMANDS: tuple[str, ...] = (
 @_dispatcher
 def _dispatch_reports(
     client: ReportProtocol, args: argparse.Namespace
-) -> tuple[bool, bool]:
+) -> _CommandResult:
     """Dispatch report commands. Returns (executed, had_errors)."""
     results = [
         _run_command(lambda cmd=cmd: print_result(getattr(client, cmd)(getattr(args, cmd))))
@@ -119,11 +135,11 @@ def _dispatch_reports(
 @_dispatcher
 def _dispatch_search(
     client: SearchProtocol, args: argparse.Namespace
-) -> tuple[bool, bool]:
+) -> _CommandResult:
     """Dispatch search commands. Returns (executed, had_errors)."""
     results = []
     if args.domain_search:
-        results.append(_run_command(partial(handle_domain_search, client, args)))
+        results.append(_run_command(partial(handle_domain_search, client, DomainSearchArgs.from_namespace(args))))
     if args.reverse_search_type and args.reverse_search:
         results.append(_run_command(lambda: print_result(
             client.reverse_search(
@@ -150,7 +166,7 @@ def _dispatch_search(
 @_dispatcher
 def _dispatch_bulk(
     client: BulkProtocol, args: argparse.Namespace
-) -> tuple[bool, bool]:
+) -> _CommandResult:
     """Dispatch bulk operation commands. Returns (executed, had_errors)."""
     results = []
     if args.bulk_dns:
@@ -167,7 +183,7 @@ def _dispatch_bulk(
 @_dispatcher
 def _dispatch_monitor(
     client: MonitorProtocol, args: argparse.Namespace
-) -> tuple[bool, bool]:
+) -> _CommandResult:
     """Dispatch monitoring commands. Returns (executed, had_errors)."""
     results = []
     if args.monitor_list:
@@ -191,47 +207,37 @@ def _dispatch_monitor(
     return _aggregate(results)
 
 
+_MONITOR_MANAGEMENT_COMMANDS: list[tuple[str, Callable[[MonitorProtocol, argparse.Namespace], Any]]] = [
+    (
+        "create_monitor_report",
+        lambda c, a: c.create_monitor_report(*a.create_monitor_report, email_alert=a.email_alert),
+    ),
+    (
+        "add_monitor_item",
+        lambda c, a: c.add_monitor_item(
+            int(a.add_monitor_item[0]),
+            a.add_monitor_item[1],
+            [x.strip() for x in a.add_monitor_item[2].split(",")],
+        ),
+    ),
+    ("enable_typos",          lambda c, a: c.enable_typos(*map(int, a.enable_typos))),
+    ("disable_typos",         lambda c, a: c.disable_typos(*map(int, a.disable_typos))),
+    ("modify_typo_strength",  lambda c, a: c.modify_typo_strength(*map(int, a.modify_typo_strength))),
+    ("delete_monitor_item",   lambda c, a: c.delete_monitor_item(a.delete_monitor_item)),
+    ("delete_monitor_report", lambda c, a: c.delete_monitor_report(a.delete_monitor_report)),
+]
+
+
 @_dispatcher
 def _dispatch_monitor_management(
     client: MonitorProtocol, args: argparse.Namespace
-) -> tuple[bool, bool]:
-    """Dispatch monitor management commands. Returns (executed, had_errors)."""
-    results = []
-    if args.create_monitor_report:
-        report_type, name = args.create_monitor_report
-        results.append(_run_command(lambda rt=report_type, n=name, ea=args.email_alert: print_result(
-            client.create_monitor_report(rt, n, email_alert=ea)
-        )))
-    if args.add_monitor_item:
-        report_id, item_type, items = args.add_monitor_item
-        results.append(_run_command(lambda rid=report_id, it=item_type, its=items: print_result(
-            client.add_monitor_item(
-                int(rid), it, [i.strip() for i in its.split(",")]
-            )
-        )))
-    if args.enable_typos:
-        report_id, item_id = map(int, args.enable_typos)
-        results.append(_run_command(
-            lambda rid=report_id, iid=item_id: print_result(client.enable_typos(rid, iid))
-        ))
-    if args.disable_typos:
-        report_id, item_id = map(int, args.disable_typos)
-        results.append(_run_command(
-            lambda rid=report_id, iid=item_id: print_result(client.disable_typos(rid, iid))
-        ))
-    if args.modify_typo_strength:
-        report_id, item_id, strength = map(int, args.modify_typo_strength)
-        results.append(_run_command(
-            lambda rid=report_id, iid=item_id, s=strength: print_result(client.modify_typo_strength(rid, iid, s))
-        ))
-    if args.delete_monitor_item is not None:
-        results.append(_run_command(
-            lambda item=args.delete_monitor_item: print_result(client.delete_monitor_item(item))
-        ))
-    if args.delete_monitor_report is not None:
-        results.append(_run_command(
-            lambda rep=args.delete_monitor_report: print_result(client.delete_monitor_report(rep))
-        ))
+) -> _CommandResult:
+    """Dispatch monitor management commands."""
+    results = [
+        _run_command(lambda handler=handler: print_result(handler(client, args)))
+        for attr, handler in _MONITOR_MANAGEMENT_COMMANDS
+        if getattr(args, attr) is not None
+    ]
     return _aggregate(results)
 
 
@@ -261,26 +267,20 @@ def _validate_args(args: argparse.Namespace) -> list[str]:
     return errors
 
 
-_EXIT_SUCCESS = 0
-_EXIT_ERROR = 1
-_EXIT_PARTIAL = 2
-_EXIT_NO_COMMAND = 3
-
-
 def _dispatch_command(client: DomainIQClientProtocol, args: argparse.Namespace) -> int:
     """Dispatch to the appropriate command handler.
 
     Returns:
-        _EXIT_SUCCESS (0): all commands succeeded,
-        _EXIT_ERROR (1): validation errors or all commands failed,
-        _EXIT_PARTIAL (2): some commands succeeded and some failed,
-        _EXIT_NO_COMMAND (3): no command matched (show help).
+        EXIT_SUCCESS (0): all commands succeeded,
+        EXIT_ERROR (1): validation errors or all commands failed,
+        EXIT_PARTIAL (2): some commands succeeded and some failed,
+        EXIT_NO_COMMAND (3): no command matched (show help).
     """
     errors = _validate_args(args)
     if errors:
         for error in errors:
             print(f"Error: {error}", file=sys.stderr)
-        return _EXIT_ERROR
+        return EXIT_ERROR
 
     # Intentionally runs ALL matching dispatchers so the user can combine
     # multiple operations in a single invocation (e.g. --whois-lookup + --dns-lookup).
@@ -288,17 +288,17 @@ def _dispatch_command(client: DomainIQClientProtocol, args: argparse.Namespace) 
     has_errors = False
     has_success = False
     for dispatcher in _DISPATCHERS:
-        ran, errored = dispatcher(client, args)
-        if ran:
+        result = dispatcher(client, args)
+        if result.executed:
             executed = True
-        if errored:
+        if result.errored:
             has_errors = True
-        if ran and not errored:
+        if result.executed and not result.errored:
             has_success = True
     if not executed and not has_errors:
-        return _EXIT_NO_COMMAND
+        return EXIT_NO_COMMAND
     if has_errors and has_success:
-        return _EXIT_PARTIAL
+        return EXIT_PARTIAL
     if has_errors:
-        return _EXIT_ERROR
-    return _EXIT_SUCCESS
+        return EXIT_ERROR
+    return EXIT_SUCCESS

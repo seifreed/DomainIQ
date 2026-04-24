@@ -6,7 +6,6 @@ from enum import Enum
 from typing import Any, TypedDict
 
 from .constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
-from .validators import ensure_positive_int
 
 
 class DNSRecordType(Enum):
@@ -94,7 +93,7 @@ MatchType = KeywordMatchType
 
 @dataclass
 class WhoisResult:
-    """WHOIS lookup result."""
+    """WHOIS lookup result. All datetime fields are naive UTC (API returns no timezone)."""
 
     domain: str | None = None
     ip: str | None = None
@@ -140,7 +139,7 @@ class DomainCategory:
 
 @dataclass
 class DomainSnapshot:
-    """Domain snapshot result."""
+    """Domain snapshot result. All datetime fields are naive UTC (API returns no timezone)."""
 
     domain: str
     screenshot_url: str | None = None
@@ -176,7 +175,7 @@ class MonitorItem:
 
 @dataclass
 class MonitorReport:
-    """Monitor report."""
+    """Monitor report. All datetime fields are naive UTC (API returns no timezone)."""
 
     id: int
     name: str
@@ -184,6 +183,14 @@ class MonitorReport:
     email_alerts: bool
     created_date: datetime | None = None
     items: list[MonitorItem] | None = None
+
+
+class MonitorActionResult(TypedDict, total=False):
+    """Result returned by monitor mutation and read operations."""
+
+    success: bool
+    message: str
+    data: dict[str, Any]
 
 
 @dataclass
@@ -196,9 +203,25 @@ class SnapshotOptions:
     width: int = SNAPSHOT_DEFAULT_WIDTH
     height: int = SNAPSHOT_DEFAULT_HEIGHT
 
-    def __post_init__(self) -> None:
-        ensure_positive_int("SnapshotOptions.width", self.width)
-        ensure_positive_int("SnapshotOptions.height", self.height)
+
+class BulkDNSResult(TypedDict, total=False):
+    """Row from a bulk DNS CSV response."""
+
+    domain: str
+    type: str
+    value: str
+    ttl: str
+
+
+class BulkWhoisResult(TypedDict, total=False):
+    """Row from a bulk WHOIS or bulk WHOIS IP CSV response."""
+
+    domain: str
+    registrar: str
+    creation_date: str
+    expiration_date: str
+    registrant_email: str
+    nameservers: str
 
 
 class IpReportResult(TypedDict, total=False):

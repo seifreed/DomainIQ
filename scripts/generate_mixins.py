@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""Generate async mixin classes from their sync counterparts.
+
+Usage:
+    python scripts/generate_mixins.py           # rewrite files in-place
+    python scripts/generate_mixins.py --dry-run # print diffs, no writes
+
+For each mixin file containing a sync class (e.g. _WhoisMixin), this script
+generates the async counterpart (_AsyncXxxMixin) by:
+  - Renaming the class from _XxxMixin(_SyncRequestable) to _AsyncXxxMixin(_AsyncRequestable)
+  - Changing 'def ' to 'async def ' in method definitions
+  - Inserting 'await ' before all _make_*_request() transport calls
+  - Appending " asynchronously" to single-line method docstrings
+
+The generated async class is written between these markers in each file:
+    # --- BEGIN GENERATED ---
+    # --- END GENERATED ---
+
+Workflow: edit the SYNC class body, then run this script to regenerate
+the async counterpart.  The file header (module docstring + imports) and
+the sync class are never touched by the script.
+"""
+from __future__ import annotations
+
+import re
+import sys
+import textwrap
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+PACKAGE = Path(__file__).parent.parent / "domainiq"
+
+MIXIN_FILES = [
+    "_whois_mixin.py",
+    "_dns_mixin.py",
+    "_domain_analysis_mixin.py",
+    "_report_mixin.py",
+    "_search_mixin.py",
+    "_bulk_mixin.py",
+    "_monitor_mixin.py",
+]
+
+_BEGIN_MARKER = "# --- BEGIN GENERATED ---\n"
+_END_MARKER = "# --- END GENERATED ---\n"
+
+_BEGIN_CLIENT_MARKER = "    # --- BEGIN GENERATED: make_request ---\n"
+_END_CLIENT_MARKER = "    # --- END GENERATED: make_request ---\n"
+
+# ---------------------------------------------------------------------------
+# Transformation helpers
+# ---------------------------------------------------------------------------
+
+_TRANSPORT_RE = re.compile(
+    r"\b(self\._make_(?:json_request|json_request_maybe_list|csv_request))\("
+)
+_CLASS_DECL_RE = re.compile(
+    r"^(class _)(\w+)(Mixin\()(_SyncRequestable)(\):)"
+)
+_DEF_RE = re.compile(r"^(\s+)def (\w+)\(")
+# Single-line docstring ending with '."""' or '."""' with trailing spaces
+_SINGLE_DOCSTRING_RE = re.compile(r'^(\s+""")(.*?)(\.?""")(\s*)$')
+
+
+def _transform_to_async(sync_source: str) -> str:
+    """Return the async version of a sync mixin class source."""
+    lines = sync_source.splitlines(keepends=True)
+    out: list[str] = []
+
+    for line in lines:
+        # 1. Class declaration
+        line = _CLASS_DECL_RE.sub(
+            lambda m: (
+                f"{m.group(1)}Async{m.group(2)}"
+                f"{m.group(3)}_AsyncRequestable{m.group(5)}"
+            ),
+            line,
+        )
+
+        # 2. Method definitions: 'def ' → 'async def '
+        #    Only indent + 'def ', not e.g. 'defaultdict'
+        line = re.sub(r"^(\s+)def (\w)", r"\1async def \2", line)
+
+        # 3. Transport calls: add 'await '
+        line = _TRANSPORT_RE.sub(r"await \1(", line)
+
+        # 4. Single-line docstrings: append " asynchronously" before closing """
+        m = _SINGLE_DOCSTRING_RE.match(line)
+        if m:
+            prefix, body, closing, trail = m.group(1), m.group(2), m.group(3), m.group(4)
+            if body and "asynchronously" not in body:
+                # Normalise period: strip trailing period, add ", asynchronously."
+                body_stripped = body.rstrip(".")
+                line = f'{prefix}{body_stripped} asynchronously.{closing[1:]}{trail}\n'
+
+        out.append(line)
+
+    return "".join(out)
+
+
+# ---------------------------------------------------------------------------
+# File processing
+# ---------------------------------------------------------------------------
+
+def _extract_last_class(source: str) -> str:
+    """Return the source of the last top-level class definition in source."""
+    # Find all 'class ' declarations at column 0
+    starts = [m.start() for m in re.finditer(r"^class ", source, re.MULTILINE)]
+    if not starts:
+        raise ValueError("No class definition found in source")
+    # The last class runs from its start to end of source
+    return source[starts[-1]:]
+
+
+def process_file(path: Path, dry_run: bool = False) -> bool:
+    """Regenerate the async class in path.  Return True if file was changed."""
+    text = path.read_text(encoding="utf-8")
+
+    if _BEGIN_MARKER not in text or _END_MARKER not in text:
+        print(f"  SKIP {path.name}: no generated markers found", file=sys.stderr)
+        return False
+
+    begin_idx = text.index(_BEGIN_MARKER)
+    end_idx = text.index(_END_MARKER) + len(_END_MARKER)
+
+    # Everything before the BEGIN marker contains the sync class
+    before_marker = text[:begin_idx]
+    sync_class_src = _extract_last_class(before_marker)
+
+    async_class_src = _transform_to_async(sync_class_src)
+
+    new_generated = (
+        _BEGIN_MARKER
+        + "# Async counterpart of the sync class above — generated by scripts/generate_mixins.py\n"
+        + "# Edit the sync class, then run `make gen-mixins` to regenerate.\n"
+        + async_class_src.rstrip("\n")
+        + "\n"
+        + _END_MARKER
+    )
+
+    new_text = before_marker + new_generated + text[end_idx:]
+
+    if new_text == text:
+        print(f"  OK  {path.name}: no changes")
+        return False
+
+    if dry_run:
+        # Show a simple diff
+        import difflib
+        diff = difflib.unified_diff(
+            text.splitlines(keepends=True),
+            new_text.splitlines(keepends=True),
+            fromfile=f"a/{path.name}",
+            tofile=f"b/{path.name}",
+        )
+        sys.stdout.writelines(diff)
+        return True
+
+    path.write_text(new_text, encoding="utf-8")
+    print(f"  WROTE {path.name}")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# client._make_request → async_client._make_request
+# ---------------------------------------------------------------------------
+
+def _extract_make_request(source: str) -> str:
+    """Return the _make_request method source (4-space indent) from source."""
+    m = re.search(r"^    def _make_request\b", source, re.MULTILINE)
+    if not m:
+        raise ValueError("_make_request not found in source")
+    start = m.start()
+    next_m = re.search(r"^    def ", source[start + 1:], re.MULTILINE)
+    end = start + 1 + next_m.start() if next_m else len(source)
+    return source[start:end].rstrip("\n") + "\n"
+
+
+def _transform_make_request_to_async(sync_source: str) -> str:
+    """Transform sync _make_request method to its async counterpart."""
+    out = re.sub(r"^(    )def _make_request\b", r"\1async def _make_request", sync_source, flags=re.MULTILINE)
+    out = out.replace("self._transport.get(", "await self._transport.get(")
+    out = out.replace("time.sleep(", "await asyncio.sleep(")
+    out = out.replace("return self._parse_response(", "return await self._parse_response(")
+    out = out.replace(
+        '"""Make an API request to DomainIQ.',
+        '"""Make an async API request to DomainIQ.',
+    )
+    return out
+
+
+def process_make_request(dry_run: bool = False) -> bool:
+    """Regenerate async_client._make_request from client._make_request."""
+    sync_text = (PACKAGE / "client.py").read_text(encoding="utf-8")
+    async_path = PACKAGE / "async_client.py"
+    async_text = async_path.read_text(encoding="utf-8")
+
+    if _BEGIN_CLIENT_MARKER not in async_text or _END_CLIENT_MARKER not in async_text:
+        print("  SKIP async_client.py: no make_request markers found", file=sys.stderr)
+        return False
+
+    sync_method = _extract_make_request(sync_text)
+    async_method = _transform_make_request_to_async(sync_method)
+
+    begin_idx = async_text.index(_BEGIN_CLIENT_MARKER)
+    end_idx = async_text.index(_END_CLIENT_MARKER) + len(_END_CLIENT_MARKER)
+
+    new_generated = (
+        _BEGIN_CLIENT_MARKER
+        + "    # Async counterpart of client._make_request — generated by scripts/generate_mixins.py\n"
+        + "    # Edit the sync version in client.py, then run `make gen-mixins` to regenerate.\n"
+        + async_method.rstrip("\n") + "\n"
+        + _END_CLIENT_MARKER
+    )
+
+    new_text = async_text[:begin_idx] + new_generated + async_text[end_idx:]
+
+    if new_text == async_text:
+        print("  OK  async_client.py: no changes")
+        return False
+
+    if dry_run:
+        import difflib
+        diff = difflib.unified_diff(
+            async_text.splitlines(keepends=True),
+            new_text.splitlines(keepends=True),
+            fromfile="a/async_client.py",
+            tofile="b/async_client.py",
+        )
+        sys.stdout.writelines(diff)
+        return True
+
+    async_path.write_text(new_text, encoding="utf-8")
+    print("  WROTE async_client.py")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    dry_run = "--dry-run" in sys.argv
+
+    if dry_run:
+        print("DRY RUN — no files will be written\n")
+
+    changed = 0
+    for name in MIXIN_FILES:
+        path = PACKAGE / name
+        if not path.exists():
+            print(f"  MISSING {path}", file=sys.stderr)
+            continue
+        if process_file(path, dry_run=dry_run):
+            changed += 1
+
+    total = len(MIXIN_FILES) + 1
+    if process_make_request(dry_run=dry_run):
+        changed += 1
+
+    print(f"\n{changed}/{total} file(s) {'would be ' if dry_run else ''}updated.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

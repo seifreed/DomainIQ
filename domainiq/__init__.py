@@ -6,7 +6,6 @@ DNS queries, and monitoring capabilities.
 """
 
 from .async_client import AsyncDomainIQClient
-from ._base_client import classify_http_response
 from .client import DomainIQClient
 from .config import ConfigKwargs
 from .deserializers import (
@@ -25,6 +24,7 @@ from .exceptions import (
     DomainIQPartialResultsError,
     DomainIQRateLimitError,
     DomainIQTimeoutError,
+    DomainIQValidationError,
 )
 from .models import (
     DNSResult,
@@ -34,6 +34,7 @@ from .models import (
     IpReportResult,
     KeywordMatchType,
     MatchType,
+    MonitorActionResult,
     MonitorReport,
     NameReportResult,
     OrganizationReportResult,
@@ -69,7 +70,6 @@ __license__ = "MIT"
 
 __all__ = [
     "AsyncBulkProtocol",
-    "classify_http_response",
     "AsyncDNSProtocol",
     "AsyncDomainAnalysisProtocol",
     "AsyncDomainIQClient",
@@ -92,12 +92,14 @@ __all__ = [
     "DomainIQPartialResultsError",
     "DomainIQRateLimitError",
     "DomainIQTimeoutError",
+    "DomainIQValidationError",
     "DomainReport",
     "DomainSearchFilters",
     "EmailReportResult",
     "IpReportResult",
     "KeywordMatchType",
     "MatchType",
+    "MonitorActionResult",
     "MonitorProtocol",
     "MonitorReport",
     "NameReportResult",

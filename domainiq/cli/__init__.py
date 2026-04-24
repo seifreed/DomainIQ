@@ -1,69 +1,74 @@
 """Command-line interface for the DomainIQ library."""
 
+import argparse
 import sys
 import traceback
 
 from ..config import Config
-from ..exceptions import DomainIQError
+from ..constants import EXIT_NO_COMMAND
+from ..exceptions import DomainIQConfigurationError, DomainIQError
 from ..utils import setup_logging
 from ._args import create_parser
-from ._dispatch import (
-    _dispatch_command,
-    _dispatch_dns,
-    _dispatch_whois,
-    _EXIT_NO_COMMAND,
-    _EXIT_SUCCESS,
-)
+from ._credentials import prompt_for_api_key
 
-__all__ = ["main", "create_parser"]
+__all__ = ["create_parser", "main"]
 
 
-def main() -> int:
-    """Main CLI entry point."""
-    parser = create_parser()
-    args = parser.parse_args()
-
-    if args.debug:
-        log_level = "DEBUG"
-    elif args.verbose:
-        log_level = "INFO"
-    else:
-        log_level = "WARNING"
-
-    setup_logging(level=log_level)
-
+def _build_config(args: argparse.Namespace) -> Config:
+    """Build Config from parsed CLI arguments."""
     try:
-        config = Config(
+        return Config(
             api_key=args.api_key,
             timeout=args.timeout,
             config_file=args.config_file,
         )
+    except DomainIQConfigurationError:
+        api_key = prompt_for_api_key(args.config_file)
+        return Config(
+            api_key=api_key,
+            timeout=args.timeout,
+            config_file=args.config_file,
+        )
 
+
+def _handle_cli_error(exc: Exception, debug: bool) -> int:
+    """Map a caught exception to a CLI exit code, printing to stderr."""
+    if isinstance(exc, DomainIQError):
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    if isinstance(exc, KeyboardInterrupt):
+        return 130
+    if isinstance(exc, ValueError):
+        print(f"Invalid argument: {exc}", file=sys.stderr)
+        return 1
+    if isinstance(exc, OSError):
+        print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+        if debug:
+            traceback.print_exc()
+        return 1
+    raise exc
+
+
+def main() -> int:
+    """Main CLI entry point."""
+    from ._dispatch import _dispatch_command
+
+    parser = create_parser()
+    args = parser.parse_args()
+
+    log_level = "DEBUG" if args.debug else "INFO" if args.verbose else "WARNING"
+    setup_logging(level=log_level)
+
+    try:
+        config = _build_config(args)
         from ..client import DomainIQClient
         with DomainIQClient(config) as client:
             exit_code = _dispatch_command(client, args)
-            if exit_code == _EXIT_NO_COMMAND:
+            if exit_code == EXIT_NO_COMMAND:
                 parser.print_help()
-                return exit_code
-            if exit_code != _EXIT_SUCCESS:
-                return exit_code
-
-    except DomainIQError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except KeyboardInterrupt:
-        return 130
-    except ValueError as e:
-        # User-provided argument values failed validation
-        print(f"Invalid argument: {e}", file=sys.stderr)
-        return 1
-    except OSError as e:
-        print(f"{type(e).__name__}: {e}", file=sys.stderr)
-        if args.debug:
-            traceback.print_exc()
-        return 1
-
-    return 0
+            return exit_code
+    except (DomainIQError, KeyboardInterrupt, ValueError, OSError) as e:
+        return _handle_cli_error(e, args.debug)
 
 
 if __name__ == "__main__":
