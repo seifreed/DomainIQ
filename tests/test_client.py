@@ -260,6 +260,22 @@ class TestLogicBugRegressions:
             "ns5.example.com",
         ]
 
+    def test_whois_nameservers_accept_single_host_dict(self):
+        data = {
+            "domain": "example.com",
+            "nameservers": {"host": "ns1.example.com"},
+        }
+        result = parse_whois_result(data)
+        assert result.nameservers == ["ns1.example.com"]
+
+    def test_whois_nameservers_accept_list_of_host_dicts(self):
+        data = {
+            "domain": "example.com",
+            "nameservers": [{"host": "ns1.example.com"}],
+        }
+        result = parse_whois_result(data)
+        assert result.nameservers == ["ns1.example.com"]
+
     def test_validate_ipv4_rejects_signed_octets(self):
         assert not validate_ipv4("-0.0.0.0")
         assert not validate_ipv4("+1.2.3.4")

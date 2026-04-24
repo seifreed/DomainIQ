@@ -96,7 +96,12 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
 
     if not nameservers:
         raw_ns = result.get("nameservers", []) or []
-        nameservers = [raw_ns] if isinstance(raw_ns, str) and raw_ns else list(raw_ns)
+        if isinstance(raw_ns, str):
+            nameservers = [raw_ns] if raw_ns else []
+        elif isinstance(raw_ns, dict):
+            nameservers = [raw_ns]
+        else:
+            nameservers = list(raw_ns)
 
     normalized: list[str] = []
     for ns in nameservers:
