@@ -21,6 +21,12 @@ from domainiq.cli._dispatch import (
     _dispatch_whois,
     _run_command,
 )
+from domainiq.cli._dispatch_bulk import _dispatch_bulk
+from domainiq.cli._dispatch_monitor import (
+    _dispatch_monitor,
+    _dispatch_monitor_management,
+)
+from domainiq.cli._dispatch_search import _dispatch_search
 from domainiq.cli._handlers import (
     handle_dns_lookup,
     handle_domain_search,
@@ -43,6 +49,7 @@ from domainiq.constants import (
     EXIT_SUCCESS as _EXIT_SUCCESS,
 )
 from domainiq.exceptions import DomainIQConfigurationError, DomainIQError
+from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -312,6 +319,147 @@ class TestDispatch:
         args = _make_args(reverse_search="foo")  # missing reverse_search_type
         result = _dispatch_command(client, args)
         assert result == _EXIT_ERROR
+
+
+class TestDispatchSearch:
+    def test_dispatch_domain_search_forwards_namespace_args(self) -> None:
+        client = _mock_client()
+        client.domain_search.return_value = {}
+        args = _make_args(
+            domain_search=["brand"],
+            match="all",
+            exclude_idn=True,
+            max_length=12,
+        )
+
+        result = _dispatch_search(client, args)
+
+        assert result.executed is True
+        assert result.errored is False
+        call_kwargs = client.domain_search.call_args.kwargs
+        assert call_kwargs["keywords"] == ["brand"]
+        assert call_kwargs["match"] is KeywordMatchType.ALL
+        assert call_kwargs["filters"] == {"exclude_idn": True, "max_length": 12}
+
+    def test_dispatch_reverse_search_commands(self) -> None:
+        client = _mock_client()
+        client.reverse_search.return_value = {}
+        client.reverse_dns.return_value = {}
+        client.reverse_ip.return_value = {}
+        client.reverse_mx.return_value = {}
+        args = _make_args(
+            reverse_search_type="email",
+            reverse_search="admin@example.com",
+            reverse_match="begins",
+            reverse_dns="example.com",
+            reverse_ip_type="ip",
+            reverse_ip_data="192.0.2.1",
+            reverse_mx_type="domain",
+            reverse_mx_data="example.com",
+            recursive=True,
+        )
+
+        result = _dispatch_search(client, args)
+
+        assert result.executed is True
+        assert result.errored is False
+        client.reverse_search.assert_called_once_with(
+            "email", "admin@example.com", match=ReverseMatchType.BEGINS
+        )
+        client.reverse_dns.assert_called_once_with("example.com")
+        client.reverse_ip.assert_called_once_with("ip", "192.0.2.1")
+        client.reverse_mx.assert_called_once_with(
+            "domain", "example.com", recursive=True
+        )
+
+
+class TestDispatchBulk:
+    def test_dispatch_bulk_commands(self) -> None:
+        client = _mock_client()
+        client.bulk_dns.return_value = {}
+        client.bulk_whois.return_value = {}
+        client.bulk_whois_ip.return_value = {}
+        args = _make_args(
+            bulk_dns=["example.com", "example.net"],
+            bulk_whois=["example.org"],
+            bulk_whois_type="cached",
+            bulk_whois_ip=["192.0.2.1"],
+        )
+
+        result = _dispatch_bulk(client, args)
+
+        assert result.executed is True
+        assert result.errored is False
+        client.bulk_dns.assert_called_once_with(["example.com", "example.net"])
+        client.bulk_whois.assert_called_once_with(
+            ["example.org"], BulkWhoisType.CACHED
+        )
+        client.bulk_whois_ip.assert_called_once_with(["192.0.2.1"])
+
+
+class TestDispatchMonitor:
+    def test_dispatch_monitor_read_commands(self) -> None:
+        client = _mock_client()
+        client.monitor_list.return_value = {}
+        client.monitor_report_items.return_value = {}
+        client.monitor_report_summary.return_value = {}
+        client.monitor_report_changes.return_value = {}
+        args = _make_args(
+            monitor_list=True,
+            monitor_report_items=42,
+            monitor_report_summary=42,
+            monitor_item=7,
+            monitor_range=30,
+            monitor_report_changes=42,
+            monitor_change=99,
+        )
+
+        result = _dispatch_monitor(client, args)
+
+        assert result.executed is True
+        assert result.errored is False
+        client.monitor_list.assert_called_once_with()
+        client.monitor_report_items.assert_called_once_with(42)
+        client.monitor_report_summary.assert_called_once_with(
+            42, item_id=7, days_range=30
+        )
+        client.monitor_report_changes.assert_called_once_with(42, 99)
+
+    def test_dispatch_monitor_management_commands(self) -> None:
+        client = _mock_client()
+        client.create_monitor_report.return_value = {}
+        client.add_monitor_item.return_value = {}
+        client.enable_typos.return_value = {}
+        client.disable_typos.return_value = {}
+        client.modify_typo_strength.return_value = {}
+        client.delete_monitor_item.return_value = {}
+        client.delete_monitor_report.return_value = {}
+        args = _make_args(
+            create_monitor_report=["domain", "brand-watch"],
+            email_alert=False,
+            add_monitor_item=["42", "domain", "example.com, example.net"],
+            enable_typos=["42", "7"],
+            disable_typos=["42", "7"],
+            modify_typo_strength=["42", "7", "10"],
+            delete_monitor_item=7,
+            delete_monitor_report=42,
+        )
+
+        result = _dispatch_monitor_management(client, args)
+
+        assert result.executed is True
+        assert result.errored is False
+        client.create_monitor_report.assert_called_once_with(
+            "domain", "brand-watch", email_alert=False
+        )
+        client.add_monitor_item.assert_called_once_with(
+            42, "domain", ["example.com", "example.net"]
+        )
+        client.enable_typos.assert_called_once_with(42, 7)
+        client.disable_typos.assert_called_once_with(42, 7)
+        client.modify_typo_strength.assert_called_once_with(42, 7, 10)
+        client.delete_monitor_item.assert_called_once_with(7)
+        client.delete_monitor_report.assert_called_once_with(42)
 
 
 class TestRunCommand:
