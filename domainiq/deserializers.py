@@ -138,7 +138,7 @@ def parse_domain_snapshot(envelope: dict[str, Any]) -> DomainSnapshot:
     raw_bytes: bytes | None = None
     if isinstance(raw_str, str) and raw_str:
         try:
-            raw_bytes = base64.b64decode(raw_str)
+            raw_bytes = base64.b64decode(raw_str, validate=True)
         except binascii.Error:
             logger.debug("Failed to base64-decode raw_data field: %r", raw_str[:50])
     return DomainSnapshot(

@@ -47,6 +47,13 @@ class TestDomainSnapshotDeserializer:
 
         assert result.raw_data is None
 
+    def test_raw_snapshot_data_with_non_base64_suffix_is_ignored(self) -> None:
+        result = parse_domain_snapshot(
+            {"domain": "example.com", "raw": "aGVsbG8=!!!!"}
+        )
+
+        assert result.raw_data is None
+
 
 class TestDomainReportDeserializer:
     def test_parses_nested_whois_dns_and_optional_fields(self) -> None:
