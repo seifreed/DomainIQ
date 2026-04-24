@@ -120,6 +120,31 @@ class TestDomainReportDeserializer:
 
         assert result.categories == ["Security", "Malware"]
 
+    def test_domain_report_splits_comma_separated_related_domains(self) -> None:
+        result = parse_domain_report(
+            {
+                "domain": "example.com",
+                "related_domains": "example.net, example.org, ",
+            }
+        )
+
+        assert result.related_domains == ["example.net", "example.org"]
+
+    def test_domain_report_strips_and_filters_related_domains(self) -> None:
+        result = parse_domain_report(
+            {
+                "domain": "example.com",
+                "related_domains": [" example.net ", "", None, "example.org"],
+            }
+        )
+
+        assert result.related_domains == ["example.net", "example.org"]
+
+    def test_domain_report_missing_related_domains_stays_none(self) -> None:
+        result = parse_domain_report({"domain": "example.com"})
+
+        assert result.related_domains is None
+
 
 class TestMonitorDeserializer:
     def test_parse_bool_strips_surrounding_whitespace(self) -> None:

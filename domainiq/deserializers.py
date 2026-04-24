@@ -121,23 +121,19 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     return DNSResult(domain=domain, records=records)
 
 
-def _normalize_categories(raw: object) -> list[str]:
+def _normalize_string_list(raw: object) -> list[str]:
     if raw is None:
         return []
     if isinstance(raw, str):
-        return [
-            category
-            for category in (part.strip() for part in raw.split(","))
-            if category
-        ]
+        return [item for item in (part.strip() for part in raw.split(",")) if item]
     if isinstance(raw, list):
         return [
-            category
-            for category in (str(value).strip() for value in raw if value is not None)
-            if category
+            item
+            for item in (str(value).strip() for value in raw if value is not None)
+            if item
         ]
-    category = str(raw).strip()
-    return [category] if category else []
+    item = str(raw).strip()
+    return [item] if item else []
 
 
 def parse_domain_category(envelope: dict[str, Any]) -> DomainCategory:
@@ -145,7 +141,7 @@ def parse_domain_category(envelope: dict[str, Any]) -> DomainCategory:
     inner = unwrap_api_envelope(envelope, ("domain", "categories"))
     return DomainCategory(
         domain=inner.get("domain", ""),
-        categories=_normalize_categories(inner.get("categories")),
+        categories=_normalize_string_list(inner.get("categories")),
         confidence_score=inner.get("confidence_score"),
     )
 
@@ -174,14 +170,19 @@ def parse_domain_report(envelope: dict[str, Any]) -> DomainReport:
     """Parse a DomainIQ API domain report response dict into a DomainReport."""
     inner = unwrap_api_envelope(envelope, ("domain", "whois"))
     categories = (
-        _normalize_categories(inner["categories"]) if "categories" in inner else None
+        _normalize_string_list(inner["categories"]) if "categories" in inner else None
+    )
+    related_domains = (
+        _normalize_string_list(inner["related_domains"])
+        if "related_domains" in inner
+        else None
     )
     return DomainReport(
         domain=inner.get("domain", ""),
         whois_data=parse_whois_result(inner["whois"]) if inner.get("whois") else None,
         dns_data=parse_dns_result(inner["dns"]) if inner.get("dns") else None,
         categories=categories,
-        related_domains=inner.get("related_domains"),
+        related_domains=related_domains,
         risk_score=inner.get("risk_score"),
     )
 
