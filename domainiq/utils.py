@@ -3,8 +3,11 @@
 import csv
 import logging
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from enum import Enum
 from io import StringIO
+from math import ceil
 from typing import Any
 
 from .exceptions import DomainIQAPIError, DomainIQError
@@ -58,7 +61,15 @@ def parse_retry_after(headers: Mapping[str, str]) -> int | None:
         try:
             return int(value)
         except (ValueError, TypeError):
-            logger.debug("Could not parse Retry-After header value: %r", value)
+            try:
+                retry_at = parsedate_to_datetime(value)
+            except (TypeError, ValueError, IndexError, OverflowError):
+                logger.debug("Could not parse Retry-After header value: %r", value)
+                return None
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=UTC)
+            seconds = ceil((retry_at - datetime.now(UTC)).total_seconds())
+            return seconds if seconds > 0 else None
     return None
 
 

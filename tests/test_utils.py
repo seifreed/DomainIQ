@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -49,6 +51,21 @@ class TestRetryAndCsvHelpers:
         assert parse_retry_after({"Retry-After": "soon"}) is None
         assert parse_retry_after({"retry-after": "soon"}) is None
         assert parse_retry_after({}) is None
+
+    def test_parse_retry_after_http_date(self) -> None:
+        retry_at = datetime.now(UTC) + timedelta(seconds=60)
+        header = format_datetime(retry_at, usegmt=True)
+
+        retry_after = parse_retry_after({"Retry-After": header})
+
+        assert retry_after is not None
+        assert 45 <= retry_after <= 60
+
+    def test_parse_retry_after_past_http_date_returns_none(self) -> None:
+        retry_at = datetime.now(UTC) - timedelta(seconds=60)
+        header = format_datetime(retry_at, usegmt=True)
+
+        assert parse_retry_after({"Retry-After": header}) is None
 
     def test_csv_to_dict_list_parses_rows_and_empty_content(self) -> None:
         assert csv_to_dict_list("domain,ip\nexample.com,192.0.2.1\n") == [

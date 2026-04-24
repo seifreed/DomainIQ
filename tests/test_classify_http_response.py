@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
+
 import pytest
 
 from domainiq._request_pipeline import RequestPolicy, classify_http_response
@@ -85,6 +88,21 @@ class TestRateLimitError:
         delay = classify_http_response(429, "rate limited", _RETRY_HEADERS, 0, _POLICY)
         assert delay == 5.0
 
+    def test_429_honours_retry_after_http_date(self) -> None:
+        retry_at = datetime.now(UTC) + timedelta(seconds=60)
+        header = format_datetime(retry_at, usegmt=True)
+
+        delay = classify_http_response(
+            429,
+            "rate limited",
+            {"Retry-After": header},
+            0,
+            _POLICY,
+        )
+
+        assert delay is not None
+        assert 45 <= delay <= 60
+
     @pytest.mark.parametrize("header_name", ["retry-after", "RETRY-AFTER"])
     def test_429_honours_retry_after_header_case_insensitively(
         self, header_name: str
@@ -116,6 +134,22 @@ class TestRateLimitError:
             classify_http_response(429, "rate limited", {header_name: "5"}, 3, _POLICY)
 
         assert exc_info.value.retry_after == 5
+
+    def test_rate_limit_error_preserves_retry_after_http_date(self) -> None:
+        retry_at = datetime.now(UTC) + timedelta(seconds=60)
+        header = format_datetime(retry_at, usegmt=True)
+
+        with pytest.raises(DomainIQRateLimitError) as exc_info:
+            classify_http_response(
+                429,
+                "rate limited",
+                {"Retry-After": header},
+                3,
+                _POLICY,
+            )
+
+        assert exc_info.value.retry_after is not None
+        assert 45 <= exc_info.value.retry_after <= 60
 
 
 class TestGeneric4xxErrors:
