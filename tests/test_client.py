@@ -118,6 +118,8 @@ class TestUtilsUnit:
         assert not validate_domain(".example.com")
         assert not validate_domain("example.com.")
         assert not validate_domain("example..com")
+        assert not validate_domain("example\n.com")
+        assert not validate_domain("example.com\n")
         assert not validate_domain("a" * 64 + ".com")
 
     def test_validate_ipv4_valid(self):
@@ -145,6 +147,8 @@ class TestUtilsUnit:
         assert not validate_email("user @example.com")
         assert not validate_email("user\n@example.com")
         assert not validate_email("user\t@example.com")
+        assert not validate_email("user@example\n.com")
+        assert not validate_email("user@example.com\n")
         assert not validate_email(".user@example.com")
         assert not validate_email("user.@example.com")
         assert not validate_email("user..name@example.com")

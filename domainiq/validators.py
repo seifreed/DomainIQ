@@ -36,7 +36,7 @@ def _validate_label(label: str) -> bool:
         return False
     if label.startswith("-") or label.endswith("-"):
         return False
-    return bool(_LABEL_PATTERN.match(label))
+    return bool(_LABEL_PATTERN.fullmatch(label))
 
 
 def validate_domain(domain: str) -> bool:
