@@ -43,11 +43,13 @@ def try_parse_date(date_str: str | None) -> datetime | None:
     """
     if not date_str:
         return None
+    stripped = date_str.strip()
+    if not stripped:
+        return None
     try:
-        return datetime.fromisoformat(date_str)
+        return datetime.fromisoformat(stripped)
     except (ValueError, AttributeError):
         logger.debug("try_parse_date: fromisoformat failed for %r", date_str[:80])
-    stripped = date_str.strip()
     digits = stripped.lstrip("-")
     if "." in stripped or (digits.isdigit() and len(digits) >= _TIMESTAMP_MIN_DIGITS):
         try:
@@ -56,7 +58,7 @@ def try_parse_date(date_str: str | None) -> datetime | None:
             logger.debug("try_parse_date: timestamp parse failed for %r", date_str[:80])
     for fmt in _DATE_FORMATS:
         try:
-            return datetime.strptime(date_str, fmt)  # noqa: DTZ007 — same naive-datetime contract as DTZ006; API does not supply timezone in string formats
+            return datetime.strptime(stripped, fmt)  # noqa: DTZ007 — same naive-datetime contract as DTZ006; API does not supply timezone in string formats
         except ValueError:
             continue
     return None

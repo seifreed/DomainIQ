@@ -215,6 +215,30 @@ class TestLogicBugRegressions:
         assert isinstance(parsed, datetime)
         assert parsed.year == 2023
 
+    def test_try_parse_date_strips_surrounding_whitespace(self):
+        parsed = _try_parse_date(" 2024-01-01 ")
+        assert isinstance(parsed, datetime)
+        assert parsed.year == 2024
+        assert parsed.month == 1
+        assert parsed.day == 1
+
+    def test_try_parse_date_strips_surrounding_whitespace_for_iso_datetime(self):
+        parsed = _try_parse_date(" 2023-01-01T00:00:00 ")
+        assert isinstance(parsed, datetime)
+        assert parsed.year == 2023
+
+    def test_try_parse_date_whitespace_only_returns_none(self):
+        assert _try_parse_date("   ") is None
+
+    def test_whois_creation_date_strips_surrounding_whitespace(self):
+        result = parse_whois_result(
+            {"domain": "example.com", "creation_date": " 2024-01-01 "}
+        )
+        assert result.creation_date is not None
+        assert result.creation_date.year == 2024
+        assert result.creation_date.month == 1
+        assert result.creation_date.day == 1
+
     def test_whois_emails_filter_whitespace_entries(self):
         data = {
             "domain": "example.com",
