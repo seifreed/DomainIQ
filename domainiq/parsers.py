@@ -62,7 +62,7 @@ def try_parse_date(date_str: str | None) -> datetime | None:
     return None
 
 
-def parse_bool(value: Any, default: bool = False) -> bool:
+def parse_bool(value: object, default: bool = False) -> bool:
     """Parse a value to bool, handling string representations from API responses."""
     if isinstance(value, bool):
         return value
@@ -73,7 +73,9 @@ def parse_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
-def unwrap_api_envelope(data: dict[str, Any], exclude_keys: tuple[str, ...]) -> dict[str, Any]:
+def unwrap_api_envelope(
+    data: dict[str, Any], exclude_keys: tuple[str, ...]
+) -> dict[str, Any]:
     """Unwrap {'result': {...}} top-level API envelope when present."""
     result = data.get("result")
     if isinstance(result, dict) and not any(k in data for k in exclude_keys):
@@ -107,7 +109,7 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
     return normalized
 
 
-def parse_statuses(raw: Any) -> list[str]:
+def parse_statuses(raw: object) -> list[str]:
     """Normalize status field to a list of strings."""
     status = raw or []
     if isinstance(status, str):
@@ -122,9 +124,7 @@ def parse_emails(result: dict[str, Any]) -> list[str] | None:
     raw_emails = result.get("emails") or result.get("registrant_email")
     if isinstance(raw_emails, list):
         return [
-            s
-            for s in (str(e).strip() for e in raw_emails if e is not None)
-            if s
+            s for s in (str(e).strip() for e in raw_emails if e is not None) if s
         ] or None
     if isinstance(raw_emails, str):
         return [e.strip() for e in raw_emails.split(",") if e.strip()] or None

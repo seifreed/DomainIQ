@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..constants import API_FLAG_ENABLED
-from ..models import SnapshotOptions
-from ..validators import ensure_positive_int
+from domainiq.constants import API_FLAG_ENABLED
+from domainiq.validators import ensure_positive_int
+
 from ._shared import require_non_empty
+
+if TYPE_CHECKING:
+    from domainiq.models import SnapshotOptions
 
 
 def build_domain_categorize_params(domains: list[str]) -> dict[str, Any]:

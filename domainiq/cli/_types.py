@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import argparse
+
+    from domainiq.models import DNSRecordType
 
 
 @dataclass(frozen=True)
@@ -14,13 +19,15 @@ class WhoisArgs:
 
     @classmethod
     def from_namespace(cls, args: argparse.Namespace) -> WhoisArgs:
-        return cls(query=args.whois_lookup, full=args.full, current_only=args.current_only)
+        return cls(
+            query=args.whois_lookup, full=args.full, current_only=args.current_only
+        )
 
 
 @dataclass(frozen=True)
 class DnsArgs:
     query: str
-    types: list[str] | None
+    types: list[str | DNSRecordType] | None
 
     @classmethod
     def from_namespace(cls, args: argparse.Namespace) -> DnsArgs:

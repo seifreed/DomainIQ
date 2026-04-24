@@ -1,11 +1,6 @@
-"""Backward-compatible protocol exports.
+"""Internal protocol modules used by the public compatibility wrapper."""
 
-Concrete protocol definitions live in ``domainiq._protocols`` so sync and
-async capability contracts can evolve independently without breaking existing
-``domainiq.protocols`` imports.
-"""
-
-from ._protocols import (
+from .async_ import (
     AsyncBulkProtocol,
     AsyncDNSProtocol,
     AsyncDomainAnalysisProtocol,
@@ -14,6 +9,8 @@ from ._protocols import (
     AsyncReportProtocol,
     AsyncSearchProtocol,
     AsyncWhoisProtocol,
+)
+from .sync import (
     BulkProtocol,
     DNSProtocol,
     DomainAnalysisProtocol,

@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from unittest.mock import patch
 
 import pytest
 
+import domainiq
 from domainiq import (
     DomainIQClient,
     DomainIQConfigurationError,
     DomainIQError,
-    parse_dns_result,
-    parse_whois_result,
 )
+from domainiq.cli import create_parser
 from domainiq.config import Config
+from domainiq.deserializers import parse_dns_result, parse_whois_result
+from domainiq.formatters import format_api_params
+from domainiq.parsers import try_parse_date as _try_parse_date
 from domainiq.validators import validate_domain, validate_email, validate_ipv4
 
 
@@ -141,6 +145,10 @@ class TestUtilsUnit:
 class TestModelsUnit:
     """Unit tests for data models."""
 
+    def test_parse_helpers_are_not_root_exports(self):
+        assert "parse_whois_result" not in domainiq.__all__
+        assert not hasattr(domainiq, "parse_whois_result")
+
     def test_whois_result_from_dict(self):
         data = {
             "domain": "example.com",
@@ -190,27 +198,19 @@ class TestLogicBugRegressions:
     """Regression tests for previously identified logic bugs."""
 
     def test_try_parse_date_rejects_short_numeric_string(self):
-        from domainiq.parsers import try_parse_date as _try_parse_date
-
         assert _try_parse_date("2023") is None
         assert _try_parse_date("123") is None
 
     def test_try_parse_date_accepts_plausible_timestamp(self):
-        from domainiq.parsers import try_parse_date as _try_parse_date
-
         parsed = _try_parse_date("1700000000")
         assert isinstance(parsed, datetime)
         assert parsed.year >= 2020
 
     def test_try_parse_date_accepts_float_timestamp(self):
-        from domainiq.parsers import try_parse_date as _try_parse_date
-
         parsed = _try_parse_date("1700000000.5")
         assert isinstance(parsed, datetime)
 
     def test_try_parse_date_still_parses_iso(self):
-        from domainiq.parsers import try_parse_date as _try_parse_date
-
         parsed = _try_parse_date("2023-01-01T00:00:00")
         assert isinstance(parsed, datetime)
         assert parsed.year == 2023
@@ -268,24 +268,17 @@ class TestLogicBugRegressions:
         assert result.records[0].value == "2001:db8::1"
 
     def test_format_api_params_serializes_nested_dicts_as_json(self):
-        from domainiq.formatters import format_api_params
-        import json
-
         formatted = format_api_params({"payload": [{"a": 1}, {"b": 2}]})
         assert '"' in formatted["payload"]
         assert "'" not in formatted["payload"]
         assert json.loads(formatted["payload"]) == [{"a": 1}, {"b": 2}]
 
     def test_cli_email_alert_default_is_true(self):
-        from domainiq.cli import create_parser
-
         parser = create_parser()
         args = parser.parse_args([])
         assert args.email_alert is True
 
     def test_cli_no_email_alert_flag_disables(self):
-        from domainiq.cli import create_parser
-
         parser = create_parser()
         args = parser.parse_args(["--no-email-alert"])
         assert args.email_alert is False

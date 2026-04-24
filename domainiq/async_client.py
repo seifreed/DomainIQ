@@ -2,10 +2,12 @@
 
 import asyncio
 import logging
+import warnings
 from collections.abc import Callable, Coroutine
 from types import TracebackType
 from typing import Any, Self, TypeVar, Unpack
 
+from ._async_concurrency import _LookupFailure, _run_with_critical_cancel
 from ._base_client import (
     _assert_csv_str,
     _assert_json_dict,
@@ -21,6 +23,7 @@ from ._mixins import (
     _AsyncSearchMixin,
     _AsyncWhoisMixin,
 )
+from ._request_pipeline import execute_async_request
 from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .exceptions import (
@@ -28,34 +31,16 @@ from .exceptions import (
     DomainIQAuthenticationError,
     DomainIQConfigurationError,
     DomainIQError,
-    DomainIQPartialResultsError,
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
 from .http_transport import AiohttpTransport, AsyncTransport
 from .models import DNSRecordType, DNSResult, WhoisResult
-from ._request_pipeline import execute_async_request
 from .validators import is_ip_address
 
 logger = logging.getLogger(__name__)
 
-_T = TypeVar("_T")
 _LT = TypeVar("_LT")
-
-
-class _LookupFailure:
-    """Internal sentinel: a non-critical concurrent-lookup failure.
-
-    Carries the failed target and exception for logging context.
-    Collapsed to None in public return types by _concurrent_lookup.
-    """
-
-    def __init__(self, target: str, error: Exception) -> None:
-        self.target = target
-        self.error = error
-
-    def __repr__(self) -> str:
-        return f"_LookupFailure(target={self.target!r}, error={self.error!r})"
 
 
 def _make_default_async_transport(config: "Config") -> AsyncTransport:
@@ -67,87 +52,21 @@ def _make_default_async_transport(config: "Config") -> AsyncTransport:
             connector_limit_per_host=config.connector_limit_per_host,
         )
     except ImportError as e:
-        msg = "aiohttp is required for AsyncDomainIQClient. Install it with: pip install aiohttp"
+        msg = (
+            "aiohttp is required for AsyncDomainIQClient. "
+            "Install it with: pip install aiohttp"
+        )
         raise DomainIQError(msg) from e
 
 
-def _collect_task_results(
-    tasks: list[asyncio.Task[_T | None]],
-    expected_type: type[_T],
-) -> list[_T | None]:
-    """Collect results from a list of tasks, aligning by submission order."""
-    partials: list[_T | None] = []
-    for task in tasks:
-        if task.done() and not task.cancelled() and task.exception() is None:
-            result = task.result()
-            partials.append(result if isinstance(result, expected_type) else None)
-        else:
-            partials.append(None)
-    return partials
-
-
-def _find_critical_exception(
-    tasks: list[asyncio.Task[Any]],
-) -> BaseException | None:
-    """Return the first non-cancelled exception from done tasks, or None."""
-    for task in tasks:
-        if task.done() and not task.cancelled() and task.exception() is not None:
-            return task.exception()
-    return None
-
-
-async def _cancel_and_settle(tasks: list[asyncio.Task[Any]]) -> None:
-    """Cancel all unfinished tasks and await their termination."""
-    for task in tasks:
-        if not task.done():
-            task.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
-
-
-async def _run_with_critical_cancel(
-    coros: list[Coroutine[Any, Any, _T | None]],
-    expected_type: type[_T],
-) -> list[_T | None]:
-    """Run lookup coroutines, cancelling in-flight ones on first exception.
-
-    Each coroutine is expected to swallow non-critical errors internally
-    (returning ``None``). Any exception that escapes is treated as critical:
-    still-pending tasks are cancelled, completed results are collected into
-    ``exc.partial_results`` (aligned by submission order, with ``None`` for
-    tasks that hadn't produced a value), and the exception is re-raised.
-
-    Returns results aligned by submission order when no task raises.
-    """
-    tasks: list[asyncio.Task[_T | None]] = [asyncio.create_task(c) for c in coros]
-
-    try:
-        # FIRST_EXCEPTION: returns as soon as any task raises, leaving the rest pending.
-        # Non-critical errors are swallowed by coroutines themselves (they return None).
-        _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-    except (Exception, asyncio.CancelledError):
-        # asyncio.wait itself was cancelled from outside — clean up everything.
-        await _cancel_and_settle(tasks)
-        raise
-
-    critical = _find_critical_exception(tasks)
-    if critical is not None:
-        for task in tasks:
-            if task.done() and not task.cancelled():
-                exc = task.exception()
-                if exc is not None and exc is not critical:
-                    # Keep only the first; log extras rather than swallow.
-                    logger.warning("Additional critical exception discarded: %s", exc)
-        await _cancel_and_settle(tasks)
-        raise DomainIQPartialResultsError(
-            critical, _collect_task_results(tasks, expected_type)
-        ) from critical
-
-    return _collect_task_results(tasks, expected_type)
-
-
 class AsyncDomainIQClient(
-    _AsyncWhoisMixin, _AsyncDNSMixin, _AsyncDomainAnalysisMixin,
-    _AsyncReportMixin, _AsyncSearchMixin, _AsyncBulkMixin, _AsyncMonitorMixin,
+    _AsyncWhoisMixin,
+    _AsyncDNSMixin,
+    _AsyncDomainAnalysisMixin,
+    _AsyncReportMixin,
+    _AsyncSearchMixin,
+    _AsyncBulkMixin,
+    _AsyncMonitorMixin,
     _BaseDomainIQClient,
 ):
     """Asynchronous client for the DomainIQ API.
@@ -195,7 +114,8 @@ class AsyncDomainIQClient(
         """
         super().__init__(config=config, **kwargs)
         self._transport: AsyncTransport = (
-            transport if transport is not None
+            transport
+            if transport is not None
             else _make_default_async_transport(self.config)
         )
 
@@ -220,7 +140,9 @@ class AsyncDomainIQClient(
 
     async def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Make async API request expecting JSON response."""
-        return _assert_json_dict(await self._make_request(params, output_format=API_FORMAT_JSON))
+        return _assert_json_dict(
+            await self._make_request(params, output_format=API_FORMAT_JSON)
+        )
 
     async def _make_json_request_maybe_list(
         self, params: dict[str, Any]
@@ -232,7 +154,9 @@ class AsyncDomainIQClient(
 
     async def _make_csv_request(self, params: dict[str, Any]) -> str:
         """Make async API request expecting CSV response."""
-        return _assert_csv_str(await self._make_request(params, output_format=API_FORMAT_CSV))
+        return _assert_csv_str(
+            await self._make_request(params, output_format=API_FORMAT_CSV)
+        )
 
     async def _concurrent_lookup(
         self,
@@ -255,7 +179,12 @@ class AsyncDomainIQClient(
                     DomainIQRateLimitError,
                 ):
                     raise
-                except (DomainIQAPIError, DomainIQTimeoutError, TimeoutError, OSError) as e:
+                except (
+                    DomainIQAPIError,
+                    DomainIQTimeoutError,
+                    TimeoutError,
+                    OSError,
+                ) as e:
                     logger.warning("%s lookup failed for %s: %s", label, target, e)
                     return _LookupFailure(target, e)
 
@@ -278,12 +207,15 @@ class AsyncDomainIQClient(
         already completed before the failure, aligned by task submission
         order.
         """
+
         async def _do(target: str) -> WhoisResult:
             if is_ip_address(target):
                 return await self.whois_lookup(ip=target)
             return await self.whois_lookup(domain=target)
 
-        return await self._concurrent_lookup(_do, targets, max_concurrent, "WHOIS", WhoisResult)
+        return await self._concurrent_lookup(
+            _do, targets, max_concurrent, "WHOIS", WhoisResult
+        )
 
     async def concurrent_dns_lookup(
         self,
@@ -296,10 +228,13 @@ class AsyncDomainIQClient(
         See ``concurrent_whois_lookup`` for the critical-error cancellation
         and ``partial_results`` behavior.
         """
+
         async def _do(domain: str) -> DNSResult:
             return await self.dns_lookup(domain, record_types)
 
-        return await self._concurrent_lookup(_do, domains, max_concurrent, "DNS", DNSResult)
+        return await self._concurrent_lookup(
+            _do, domains, max_concurrent, "DNS", DNSResult
+        )
 
     async def close(self) -> None:
         """Close the HTTP transport."""
@@ -324,8 +259,6 @@ class AsyncDomainIQClient(
         if transport is None:
             return
         if getattr(transport, "is_open", False):
-            import warnings
-
             warnings.warn(
                 f"Unclosed {self.__class__.__name__}. "
                 "Use 'async with' or call 'await client.close()' explicitly.",

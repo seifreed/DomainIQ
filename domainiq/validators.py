@@ -3,7 +3,7 @@
 import ipaddress
 import logging
 import re
-from datetime import datetime
+from datetime import date
 
 from .exceptions import DomainIQValidationError
 
@@ -13,6 +13,8 @@ MAX_DOMAIN_LENGTH = 255
 MAX_LABEL_LENGTH = 63
 MIN_DOMAIN_LABELS = 2
 MAX_EMAIL_PARTS = 2
+IPV4_VERSION = 4
+IPV6_VERSION = 6
 
 _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
 
@@ -20,7 +22,8 @@ _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
 def _validate_label(label: str) -> bool:
     """Validate a single DNS label (handles IDN and ASCII labels)."""
     try:
-        label = label.encode("idna").decode("ascii")  # intentional rebind: normalise IDN label to ASCII before length/char validation
+        # Intentional rebind: normalize IDN label before length/char validation.
+        label = label.encode("idna").decode("ascii")
     except (UnicodeError, UnicodeDecodeError):
         if not label.isascii():
             return (
@@ -68,7 +71,7 @@ def validate_ipv4(ip: str) -> bool:
     if not ip or not isinstance(ip, str):
         return False
     try:
-        return ipaddress.ip_address(ip).version == 4
+        return ipaddress.ip_address(ip).version == IPV4_VERSION
     except ValueError:
         return False
 
@@ -86,9 +89,10 @@ def validate_ipv6(ip: str) -> bool:
         return False
     try:
         addr = ipaddress.ip_address(ip)
-        return addr.version == 6
     except ValueError:
         return False
+    else:
+        return addr.version == IPV6_VERSION
 
 
 def is_ip_address(value: str) -> bool:
@@ -184,7 +188,7 @@ def validate_date_string(date_str: str) -> str | None:
 
     if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
         try:
-            datetime.strptime(date_str, "%Y-%m-%d")
+            date.fromisoformat(date_str)
         except ValueError:
             pass
         else:

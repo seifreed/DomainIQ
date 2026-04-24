@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..constants import API_FLAG_ENABLED
-from ..validators import validate_whois_target
+from domainiq.constants import API_FLAG_ENABLED
+from domainiq.validators import validate_whois_target
 
 
 def build_whois_params(

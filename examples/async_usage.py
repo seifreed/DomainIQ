@@ -95,8 +95,7 @@ async def concurrent_operations_examples() -> None:
         successful_dns = sum(1 for result in dns_results if result is not None)
 
         msg_dns = (
-            f"Completed {successful_dns}/{len(domains)} "
-            f"DNS lookups in {elapsed:.2f}s"
+            f"Completed {successful_dns}/{len(domains)} DNS lookups in {elapsed:.2f}s"
         )
         print(msg_dns)
 

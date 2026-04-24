@@ -1,7 +1,7 @@
 # DomainIQ Makefile - Code Quality and Development Tasks
 # Requires Python 3.10+ and development dependencies installed
 
-.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs pre-commit all-checks gen-mixins
+.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs pre-commit all-checks gen-mixins gen-mixins-check
 
 # Default target
 help:  ## Show this help message
@@ -22,6 +22,11 @@ gen-mixins:  ## Regenerate async mixin classes from their sync counterparts
 	@echo "⚙️  Regenerating async mixin classes..."
 	python scripts/generate_mixins.py
 	@echo "✅ Mixin generation completed"
+
+gen-mixins-check:  ## Check generated async mixins are up to date
+	@echo "⚙️  Checking async mixin generation drift..."
+	python scripts/generate_mixins.py --dry-run
+	@echo "✅ Generated mixins are current"
 
 # Code quality targets
 quality: lint format type-check security  ## Run all code quality checks
@@ -91,7 +96,7 @@ pre-commit:  ## Run pre-commit hooks on all files
 # Comprehensive quality checks
 all-checks: quality test coverage security  ## Run all quality checks and tests
 
-ci-checks: format-check lint type-check security test-unit  ## Run CI/CD checks
+ci-checks: gen-mixins-check format-check lint type-check security test-unit  ## Run CI/CD checks
 
 # Build and distribution
 clean:  ## Clean build artifacts and cache files
@@ -156,6 +161,7 @@ benchmark:  ## Run performance benchmarks
 # Quality gates
 quality-gate:  ## Quality gate - all checks must pass
 	@echo "🚪 Running quality gate..."
+	@$(MAKE) gen-mixins-check
 	@$(MAKE) format-check
 	@$(MAKE) lint
 	@$(MAKE) type-check

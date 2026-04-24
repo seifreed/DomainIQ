@@ -60,7 +60,8 @@ class TestRetryableServerErrors:
     def test_delay_increases_with_attempt(self) -> None:
         delay0 = classify_http_response(500, "", _EMPTY_HEADERS, 0, _DEEP_POLICY)
         delay1 = classify_http_response(500, "", _EMPTY_HEADERS, 1, _DEEP_POLICY)
-        assert delay0 is not None and delay1 is not None
+        assert delay0 is not None
+        assert delay1 is not None
         assert delay1 >= delay0
 
 

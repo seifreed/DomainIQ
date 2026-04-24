@@ -9,19 +9,18 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Unpack
 
+from ._request_pipeline import RequestPolicy
 from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .exceptions import DomainIQAPIError
 from .formatters import format_api_params, sanitize_params_for_log
-from ._request_pipeline import RequestPolicy
 from .utils import assert_json_dict, truncate_repr
 
 logger = logging.getLogger(__name__)
 
 
 class _BaseDomainIQClient:
-    """Common state and helpers for sync and async DomainIQ clients.
-    """
+    """Common state and helpers for sync and async DomainIQ clients."""
 
     # ── Construction ──────────────────────────────────────────────────────────
     def __init__(
@@ -75,7 +74,9 @@ def _assert_json_dict_or_list(
     """Validate that a raw API response is a JSON dict or list."""
     if isinstance(raw, (dict, list)):
         return raw
-    msg = f"Expected JSON dict or list but got {type(raw).__name__}: {truncate_repr(raw)}"
+    msg = (
+        f"Expected JSON dict or list but got {type(raw).__name__}: {truncate_repr(raw)}"
+    )
     raise DomainIQAPIError(msg)
 
 

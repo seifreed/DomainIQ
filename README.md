@@ -13,7 +13,7 @@
   <a href="https://pypi.org/project/domainiq/"><img src="https://img.shields.io/pypi/pyversions/domainiq?style=flat-square&logo=python&logoColor=white" alt="Python Versions"></a>
   <a href="https://github.com/seifreed/DomainIQ/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://github.com/seifreed/DomainIQ/actions"><img src="https://img.shields.io/github/actions/workflow/status/seifreed/DomainIQ/quality.yml?style=flat-square&logo=github&label=CI" alt="CI Status"></a>
-  <img src="https://img.shields.io/badge/coverage-93%25-brightgreen?style=flat-square" alt="Coverage">
+  <img src="https://img.shields.io/badge/coverage-73%25-yellowgreen?style=flat-square" alt="Coverage">
 </p>
 
 <p align="center">
@@ -179,6 +179,12 @@ domainiq --create-monitor-report keyword "My Monitor" --email-alert
 ```
 
 ### Python Library
+
+#### Public API Surface
+
+Since 3.0.0, the package root exports clients, exceptions, model types, and
+protocol contracts. Response parser helpers are intentionally not re-exported
+from `domainiq`; endpoint methods own response parsing internally.
 
 #### Context Manager
 

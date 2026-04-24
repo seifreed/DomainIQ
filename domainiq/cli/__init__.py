@@ -4,10 +4,13 @@ import argparse
 import sys
 import traceback
 
-from ..config import Config
-from ..constants import EXIT_NO_COMMAND
-from ..exceptions import DomainIQConfigurationError, DomainIQError
-from ..utils import setup_logging
+import domainiq.client as client_module
+from domainiq.cli._dispatch import _dispatch_command
+from domainiq.config import Config
+from domainiq.constants import EXIT_NO_COMMAND
+from domainiq.exceptions import DomainIQConfigurationError, DomainIQError
+from domainiq.utils import setup_logging
+
 from ._args import create_parser
 from ._credentials import prompt_for_api_key
 
@@ -31,18 +34,18 @@ def _build_config(args: argparse.Namespace) -> Config:
         )
 
 
-def _handle_cli_error(exc: Exception, debug: bool) -> int:
+def _handle_cli_error(exc: BaseException, debug: bool) -> int:
     """Map a caught exception to a CLI exit code, printing to stderr."""
     if isinstance(exc, DomainIQError):
-        print(f"Error: {exc}", file=sys.stderr)
+        sys.stderr.write(f"Error: {exc}\n")
         return 1
     if isinstance(exc, KeyboardInterrupt):
         return 130
     if isinstance(exc, ValueError):
-        print(f"Invalid argument: {exc}", file=sys.stderr)
+        sys.stderr.write(f"Invalid argument: {exc}\n")
         return 1
     if isinstance(exc, OSError):
-        print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.stderr.write(f"{type(exc).__name__}: {exc}\n")
         if debug:
             traceback.print_exc()
         return 1
@@ -51,8 +54,6 @@ def _handle_cli_error(exc: Exception, debug: bool) -> int:
 
 def main() -> int:
     """Main CLI entry point."""
-    from ._dispatch import _dispatch_command
-
     parser = create_parser()
     args = parser.parse_args()
 
@@ -61,8 +62,7 @@ def main() -> int:
 
     try:
         config = _build_config(args)
-        from ..client import DomainIQClient
-        with DomainIQClient(config) as client:
+        with client_module.DomainIQClient(config) as client:
             exit_code = _dispatch_command(client, args)
             if exit_code == EXIT_NO_COMMAND:
                 parser.print_help()

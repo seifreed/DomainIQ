@@ -19,6 +19,7 @@ from .models import (
     DomainReport,
     DomainSnapshot,
     IpReportResult,
+    MonitorActionResult,
     MonitorItem,
     MonitorReport,
     ReverseSearchResult,
@@ -41,12 +42,12 @@ logger = logging.getLogger(__name__)
 # Different record types use different key names (e.g. 'address' for A/AAAA,
 # 'exchange' for MX); 'value' is the generic fallback for unknown types.
 _RECORD_VALUE_KEYS: dict[str, tuple[str, ...]] = {
-    "A":     ("ip", "value"),
-    "AAAA":  ("ip", "value"),
-    "MX":    ("target", "value"),
+    "A": ("ip", "value"),
+    "AAAA": ("ip", "value"),
+    "MX": ("target", "value"),
     "CNAME": ("target", "value"),
-    "TXT":   ("txt", "value"),
-    "NS":    ("target", "value"),
+    "TXT": ("txt", "value"),
+    "NS": ("target", "value"),
 }
 
 
@@ -104,13 +105,15 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     records = []
     for record_data in results:
         record_type = record_data.get("type", "")
-        records.append(DNSRecord(
-            name=record_data.get("host", record_data.get("name", "")),
-            type=record_type,
-            value=_extract_record_value(record_data, record_type),
-            ttl=record_data.get("ttl"),
-            priority=record_data.get("pri", record_data.get("priority")),
-        ))
+        records.append(
+            DNSRecord(
+                name=record_data.get("host", record_data.get("name", "")),
+                type=record_type,
+                value=_extract_record_value(record_data, record_type),
+                ttl=record_data.get("ttl"),
+                priority=record_data.get("pri", record_data.get("priority")),
+            )
+        )
     return DNSResult(domain=domain, records=records)
 
 
@@ -181,13 +184,18 @@ def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
     )
 
 
+def parse_monitor_action_result(data: dict[str, Any]) -> MonitorActionResult:
+    """Validate and cast a monitor action/read response."""
+    return cast("MonitorActionResult", data)
+
+
 def parse_search_result(data: dict[str, Any]) -> SearchResult:
-    """Wrap raw API dict as a SearchResult (passthrough cast, centralized for testability)."""
+    """Wrap raw API dict as a SearchResult."""
     return cast("SearchResult", data)
 
 
 def parse_reverse_search_result(data: dict[str, Any]) -> ReverseSearchResult:
-    """Wrap raw API dict as ReverseSearchResult (passthrough cast, centralized for testability)."""
+    """Wrap raw API dict as ReverseSearchResult."""
     return cast("ReverseSearchResult", data)
 
 

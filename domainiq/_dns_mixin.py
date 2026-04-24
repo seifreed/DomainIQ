@@ -9,10 +9,14 @@ modules and deserializers.py; what remains is structural boilerplate.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ._base_client import _AsyncRequestable, _SyncRequestable
 from ._params.dns import build_dns_params
 from .deserializers import parse_dns_result
-from .models import DNSRecordType, DNSResult
+
+if TYPE_CHECKING:
+    from .models import DNSRecordType, DNSResult
 
 
 class _DNSMixin(_SyncRequestable):
@@ -36,7 +40,8 @@ class _AsyncDNSMixin(_AsyncRequestable):
         record_types: list[str | DNSRecordType] | None = None,
     ) -> DNSResult:
         """Perform DNS lookup for a domain or hostname asynchronously."""
-
         params = build_dns_params(query, record_types)
         return parse_dns_result(await self._make_json_request(params))
+
+
 # --- END GENERATED ---

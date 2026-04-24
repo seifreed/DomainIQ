@@ -8,14 +8,6 @@ DNS queries, and monitoring capabilities.
 from .async_client import AsyncDomainIQClient
 from .client import DomainIQClient
 from .config import ConfigKwargs
-from .deserializers import (
-    parse_dns_result,
-    parse_domain_category,
-    parse_domain_report,
-    parse_domain_snapshot,
-    parse_monitor_report,
-    parse_whois_result,
-)
 from .exceptions import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
@@ -63,7 +55,7 @@ from .protocols import (
     WhoisProtocol,
 )
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"
 __author__ = "seifreed"
 __email__ = "mriverolopez@gmail.com"
 __license__ = "MIT"
@@ -112,10 +104,4 @@ __all__ = [
     "SnapshotOptions",
     "WhoisProtocol",
     "WhoisResult",
-    "parse_dns_result",
-    "parse_domain_category",
-    "parse_domain_report",
-    "parse_domain_snapshot",
-    "parse_monitor_report",
-    "parse_whois_result",
 ]

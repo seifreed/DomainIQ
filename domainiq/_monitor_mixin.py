@@ -9,9 +9,10 @@ modules and deserializers.py; what remains is structural boilerplate.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ._base_client import _AsyncRequestable, _SyncRequestable
 from ._params.monitor import (
-    TYPO_STRENGTH_MAX,
     build_add_monitor_item_params,
     build_create_monitor_report_params,
     build_delete_monitor_item_params,
@@ -24,9 +25,17 @@ from ._params.monitor import (
     build_monitor_report_items_params,
     build_monitor_report_summary_params,
 )
-from .deserializers import parse_monitor_report
-from .models import MonitorActionResult, MonitorItemType, MonitorReport, MonitorReportType
+from .constants import TYPO_STRENGTH_MAX
+from .deserializers import parse_monitor_action_result, parse_monitor_report
 from .utils import ensure_list_of_models
+
+if TYPE_CHECKING:
+    from .models import (
+        MonitorActionResult,
+        MonitorItemType,
+        MonitorReport,
+        MonitorReportType,
+    )
 
 
 class _MonitorMixin(_SyncRequestable):
@@ -37,19 +46,33 @@ class _MonitorMixin(_SyncRequestable):
 
     def monitor_report_items(self, report_id: int) -> MonitorActionResult:
         """Get items in a monitor report."""
-        return self._make_json_request(build_monitor_report_items_params(report_id))
-
-    def monitor_report_summary(self, report_id: int, item_id: int | None = None, days_range: int | None = None) -> MonitorActionResult:
-        """Get monitor report summary."""
-        return self._make_json_request(
-            build_monitor_report_summary_params(report_id, item_id, days_range)
+        return parse_monitor_action_result(
+            self._make_json_request(build_monitor_report_items_params(report_id))
         )
 
-    def monitor_report_changes(self, report_id: int, change_id: int) -> MonitorActionResult:
-        """Get monitor report changes."""
-        return self._make_json_request(build_monitor_report_changes_params(report_id, change_id))
+    def monitor_report_summary(
+        self, report_id: int, item_id: int | None = None, days_range: int | None = None
+    ) -> MonitorActionResult:
+        """Get monitor report summary."""
+        return parse_monitor_action_result(
+            self._make_json_request(
+                build_monitor_report_summary_params(report_id, item_id, days_range)
+            )
+        )
 
-    def create_monitor_report(self, report_type: MonitorReportType | str, name: str, email_alert: bool = True) -> MonitorReport:
+    def monitor_report_changes(
+        self, report_id: int, change_id: int
+    ) -> MonitorActionResult:
+        """Get monitor report changes."""
+        return parse_monitor_action_result(
+            self._make_json_request(
+                build_monitor_report_changes_params(report_id, change_id)
+            )
+        )
+
+    def create_monitor_report(
+        self, report_type: MonitorReportType | str, name: str, email_alert: bool = True
+    ) -> MonitorReport:
         """Create a new monitor report."""
         result = self._make_json_request(
             build_create_monitor_report_params(report_type, name, email_alert)
@@ -57,34 +80,58 @@ class _MonitorMixin(_SyncRequestable):
         return parse_monitor_report(result)
 
     def add_monitor_item(
-        self, report_id: int, item_type: MonitorItemType | str, items: list[str], enabled: bool | None = None
+        self,
+        report_id: int,
+        item_type: MonitorItemType | str,
+        items: list[str],
+        enabled: bool | None = None,
     ) -> MonitorActionResult:
         """Add items to a monitor report."""
-        return self._make_json_request(
-            build_add_monitor_item_params(report_id, item_type, items, enabled=enabled)
+        return parse_monitor_action_result(
+            self._make_json_request(
+                build_add_monitor_item_params(
+                    report_id, item_type, items, enabled=enabled
+                )
+            )
         )
 
-    def enable_typos(self, report_id: int, item_id: int, strength: int = TYPO_STRENGTH_MAX) -> MonitorActionResult:
+    def enable_typos(
+        self, report_id: int, item_id: int, strength: int = TYPO_STRENGTH_MAX
+    ) -> MonitorActionResult:
         """Enable typo monitoring for a keyword monitor item."""
-        return self._make_json_request(build_enable_typos_params(report_id, item_id, strength))
+        return parse_monitor_action_result(
+            self._make_json_request(
+                build_enable_typos_params(report_id, item_id, strength)
+            )
+        )
 
     def disable_typos(self, report_id: int, item_id: int) -> MonitorActionResult:
         """Disable typo monitoring for a keyword monitor item."""
-        return self._make_json_request(build_disable_typos_params(report_id, item_id))
+        return parse_monitor_action_result(
+            self._make_json_request(build_disable_typos_params(report_id, item_id))
+        )
 
-    def modify_typo_strength(self, report_id: int, item_id: int, strength: int) -> MonitorActionResult:
+    def modify_typo_strength(
+        self, report_id: int, item_id: int, strength: int
+    ) -> MonitorActionResult:
         """Modify typo monitoring strength for a keyword monitor item."""
-        return self._make_json_request(
-            build_modify_typo_strength_params(report_id, item_id, strength)
+        return parse_monitor_action_result(
+            self._make_json_request(
+                build_modify_typo_strength_params(report_id, item_id, strength)
+            )
         )
 
     def delete_monitor_item(self, item_id: int) -> MonitorActionResult:
         """Delete a monitor item."""
-        return self._make_json_request(build_delete_monitor_item_params(item_id))
+        return parse_monitor_action_result(
+            self._make_json_request(build_delete_monitor_item_params(item_id))
+        )
 
     def delete_monitor_report(self, report_id: int) -> MonitorActionResult:
         """Delete a monitor report."""
-        return self._make_json_request(build_delete_monitor_report_params(report_id))
+        return parse_monitor_action_result(
+            self._make_json_request(build_delete_monitor_report_params(report_id))
+        )
 
 
 # --- BEGIN GENERATED ---
@@ -93,70 +140,99 @@ class _MonitorMixin(_SyncRequestable):
 class _AsyncMonitorMixin(_AsyncRequestable):
     async def monitor_list(self) -> list[MonitorReport]:
         """Get list of active monitors asynchronously."""
-
         result = await self._make_json_request_maybe_list(build_monitor_list_params())
         return ensure_list_of_models(result, parse_monitor_report)
 
     async def monitor_report_items(self, report_id: int) -> MonitorActionResult:
         """Get items in a monitor report asynchronously."""
-
-        return await self._make_json_request(build_monitor_report_items_params(report_id))
-
-    async def monitor_report_summary(self, report_id: int, item_id: int | None = None, days_range: int | None = None) -> MonitorActionResult:
-        """Get monitor report summary asynchronously."""
-
-        return await self._make_json_request(
-            build_monitor_report_summary_params(report_id, item_id, days_range)
+        return parse_monitor_action_result(
+            await self._make_json_request(build_monitor_report_items_params(report_id))
         )
 
-    async def monitor_report_changes(self, report_id: int, change_id: int) -> MonitorActionResult:
+    async def monitor_report_summary(
+        self, report_id: int, item_id: int | None = None, days_range: int | None = None
+    ) -> MonitorActionResult:
+        """Get monitor report summary asynchronously."""
+        return parse_monitor_action_result(
+            await self._make_json_request(
+                build_monitor_report_summary_params(report_id, item_id, days_range)
+            )
+        )
+
+    async def monitor_report_changes(
+        self, report_id: int, change_id: int
+    ) -> MonitorActionResult:
         """Get monitor report changes asynchronously."""
+        return parse_monitor_action_result(
+            await self._make_json_request(
+                build_monitor_report_changes_params(report_id, change_id)
+            )
+        )
 
-        return await self._make_json_request(build_monitor_report_changes_params(report_id, change_id))
-
-    async def create_monitor_report(self, report_type: MonitorReportType | str, name: str, email_alert: bool = True) -> MonitorReport:
+    async def create_monitor_report(
+        self, report_type: MonitorReportType | str, name: str, email_alert: bool = True
+    ) -> MonitorReport:
         """Create a new monitor report asynchronously."""
-
         result = await self._make_json_request(
             build_create_monitor_report_params(report_type, name, email_alert)
         )
         return parse_monitor_report(result)
 
     async def add_monitor_item(
-        self, report_id: int, item_type: MonitorItemType | str, items: list[str], enabled: bool | None = None
+        self,
+        report_id: int,
+        item_type: MonitorItemType | str,
+        items: list[str],
+        enabled: bool | None = None,
     ) -> MonitorActionResult:
         """Add items to a monitor report asynchronously."""
-
-        return await self._make_json_request(
-            build_add_monitor_item_params(report_id, item_type, items, enabled=enabled)
+        return parse_monitor_action_result(
+            await self._make_json_request(
+                build_add_monitor_item_params(
+                    report_id, item_type, items, enabled=enabled
+                )
+            )
         )
 
-    async def enable_typos(self, report_id: int, item_id: int, strength: int = TYPO_STRENGTH_MAX) -> MonitorActionResult:
+    async def enable_typos(
+        self, report_id: int, item_id: int, strength: int = TYPO_STRENGTH_MAX
+    ) -> MonitorActionResult:
         """Enable typo monitoring for a keyword monitor item asynchronously."""
-
-        return await self._make_json_request(
-            build_enable_typos_params(report_id, item_id, strength)
+        return parse_monitor_action_result(
+            await self._make_json_request(
+                build_enable_typos_params(report_id, item_id, strength)
+            )
         )
 
     async def disable_typos(self, report_id: int, item_id: int) -> MonitorActionResult:
         """Disable typo monitoring for a keyword monitor item asynchronously."""
+        return parse_monitor_action_result(
+            await self._make_json_request(
+                build_disable_typos_params(report_id, item_id)
+            )
+        )
 
-        return await self._make_json_request(build_disable_typos_params(report_id, item_id))
-
-    async def modify_typo_strength(self, report_id: int, item_id: int, strength: int) -> MonitorActionResult:
+    async def modify_typo_strength(
+        self, report_id: int, item_id: int, strength: int
+    ) -> MonitorActionResult:
         """Modify typo monitoring strength for a keyword monitor item asynchronously."""
-
-        return await self._make_json_request(
-            build_modify_typo_strength_params(report_id, item_id, strength)
+        return parse_monitor_action_result(
+            await self._make_json_request(
+                build_modify_typo_strength_params(report_id, item_id, strength)
+            )
         )
 
     async def delete_monitor_item(self, item_id: int) -> MonitorActionResult:
         """Delete a monitor item asynchronously."""
-
-        return await self._make_json_request(build_delete_monitor_item_params(item_id))
+        return parse_monitor_action_result(
+            await self._make_json_request(build_delete_monitor_item_params(item_id))
+        )
 
     async def delete_monitor_report(self, report_id: int) -> MonitorActionResult:
         """Delete a monitor report asynchronously."""
+        return parse_monitor_action_result(
+            await self._make_json_request(build_delete_monitor_report_params(report_id))
+        )
 
-        return await self._make_json_request(build_delete_monitor_report_params(report_id))
+
 # --- END GENERATED ---

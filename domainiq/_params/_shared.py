@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..exceptions import DomainIQValidationError
+from domainiq.exceptions import DomainIQValidationError
 
 
 def require_non_empty(name: str, items: list[Any]) -> None:

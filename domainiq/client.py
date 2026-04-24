@@ -19,17 +19,22 @@ from ._mixins import (
     _SearchMixin,
     _WhoisMixin,
 )
+from ._request_pipeline import execute_sync_request
 from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .http_transport import RequestsTransport, SyncTransport
-from ._request_pipeline import execute_sync_request
 
 logger = logging.getLogger(__name__)
 
 
 class DomainIQClient(
-    _WhoisMixin, _DNSMixin, _DomainAnalysisMixin,
-    _ReportMixin, _SearchMixin, _BulkMixin, _MonitorMixin,
+    _WhoisMixin,
+    _DNSMixin,
+    _DomainAnalysisMixin,
+    _ReportMixin,
+    _SearchMixin,
+    _BulkMixin,
+    _MonitorMixin,
     _BaseDomainIQClient,
 ):
     """Synchronous client for the DomainIQ API.
@@ -70,7 +75,9 @@ class DomainIQClient(
             **kwargs: Additional arguments passed to Config if config is None
         """
         super().__init__(config=config, **kwargs)
-        self._transport: SyncTransport = transport if transport is not None else RequestsTransport()
+        self._transport: SyncTransport = (
+            transport if transport is not None else RequestsTransport()
+        )
 
         logger.debug("Initialized DomainIQ client with config: %s", self.config)
 
@@ -90,13 +97,17 @@ class DomainIQClient(
 
     def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Make an API request expecting a JSON dict response."""
-        return _assert_json_dict(self._make_request(params, output_format=API_FORMAT_JSON))
+        return _assert_json_dict(
+            self._make_request(params, output_format=API_FORMAT_JSON)
+        )
 
     def _make_json_request_maybe_list(
         self, params: dict[str, Any]
     ) -> dict[str, Any] | list[Any]:
         """Make API request expecting JSON (may be dict or list)."""
-        return _assert_json_dict_or_list(self._make_request(params, output_format=API_FORMAT_JSON))
+        return _assert_json_dict_or_list(
+            self._make_request(params, output_format=API_FORMAT_JSON)
+        )
 
     def _make_csv_request(self, params: dict[str, Any]) -> str:
         """Make an API request expecting CSV response."""

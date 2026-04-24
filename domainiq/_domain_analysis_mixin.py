@@ -29,7 +29,9 @@ class _DomainAnalysisMixin(_SyncRequestable):
     def domain_categorize(self, domains: list[str]) -> list[DomainCategory]:
         """Categorize domain names."""
         params = build_domain_categorize_params(domains)
-        return ensure_list_of_models(self._make_json_request_maybe_list(params), parse_domain_category)
+        return ensure_list_of_models(
+            self._make_json_request_maybe_list(params), parse_domain_category
+        )
 
     def domain_snapshot(
         self,
@@ -49,7 +51,9 @@ class _DomainAnalysisMixin(_SyncRequestable):
     ) -> list[DomainSnapshot]:
         """Get snapshot history for a domain."""
         params = build_domain_snapshot_history_params(domain, width, height, limit)
-        return ensure_list_of_models(self._make_json_request_maybe_list(params), parse_domain_snapshot)
+        return ensure_list_of_models(
+            self._make_json_request_maybe_list(params), parse_domain_snapshot
+        )
 
 
 # --- BEGIN GENERATED ---
@@ -58,9 +62,10 @@ class _DomainAnalysisMixin(_SyncRequestable):
 class _AsyncDomainAnalysisMixin(_AsyncRequestable):
     async def domain_categorize(self, domains: list[str]) -> list[DomainCategory]:
         """Categorize domain names asynchronously."""
-
         params = build_domain_categorize_params(domains)
-        return ensure_list_of_models(await self._make_json_request_maybe_list(params), parse_domain_category)
+        return ensure_list_of_models(
+            await self._make_json_request_maybe_list(params), parse_domain_category
+        )
 
     async def domain_snapshot(
         self,
@@ -68,7 +73,6 @@ class _AsyncDomainAnalysisMixin(_AsyncRequestable):
         options: SnapshotOptions | None = None,
     ) -> DomainSnapshot:
         """Get a snapshot of a domain asynchronously."""
-
         params = build_domain_snapshot_params(domain, options or SnapshotOptions())
         return parse_domain_snapshot(await self._make_json_request(params))
 
@@ -80,7 +84,10 @@ class _AsyncDomainAnalysisMixin(_AsyncRequestable):
         limit: int = SNAPSHOT_DEFAULT_LIMIT,
     ) -> list[DomainSnapshot]:
         """Get snapshot history for a domain asynchronously."""
-
         params = build_domain_snapshot_history_params(domain, width, height, limit)
-        return ensure_list_of_models(await self._make_json_request_maybe_list(params), parse_domain_snapshot)
+        return ensure_list_of_models(
+            await self._make_json_request_maybe_list(params), parse_domain_snapshot
+        )
+
+
 # --- END GENERATED ---

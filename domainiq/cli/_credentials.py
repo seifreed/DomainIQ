@@ -7,8 +7,8 @@ import signal
 import time
 from pathlib import Path
 
-from ..constants import INTERACTIVE_PROMPT_TIMEOUT
-from ..exceptions import DomainIQConfigurationError
+from domainiq.constants import INTERACTIVE_PROMPT_TIMEOUT
+from domainiq.exceptions import DomainIQConfigurationError
 
 
 def _default_config_path(config_file: str | None) -> Path:
@@ -29,7 +29,8 @@ def _prompt_with_timeout(prompt: str, timeout: int) -> str:
         return input(prompt).strip()
 
     def _alarm_handler(*_args: object) -> None:
-        raise TimeoutError("Prompt timed out")
+        msg = "Prompt timed out"
+        raise TimeoutError(msg)
 
     old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
     old_alarm = signal.alarm(timeout)

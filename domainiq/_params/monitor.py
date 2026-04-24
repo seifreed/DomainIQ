@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..constants import API_BOOL_FALSE, API_BOOL_TRUE, TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
-from ..exceptions import DomainIQValidationError
-from ..models import MonitorItemType, MonitorReportType
+from domainiq.constants import (
+    API_BOOL_FALSE,
+    API_BOOL_TRUE,
+    TYPO_STRENGTH_MAX,
+    TYPO_STRENGTH_MIN,
+)
+from domainiq.exceptions import DomainIQValidationError
+
+if TYPE_CHECKING:
+    from domainiq.models import MonitorItemType, MonitorReportType
 
 
 def _validate_typo_strength(strength: int) -> None:

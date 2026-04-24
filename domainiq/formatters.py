@@ -33,7 +33,7 @@ def _format_single_value(value: object) -> str:
     return str(value)
 
 
-def _format_list_param(key: str, values: list | tuple) -> str:
+def _format_list_param(key: str, values: list[Any] | tuple[Any, ...]) -> str:
     """Format a list/tuple parameter for API serialization."""
     if key in _BULK_SEPARATOR_KEYS:
         return ">>".join(_format_single_value(v) for v in values)

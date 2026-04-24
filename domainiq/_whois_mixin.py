@@ -9,10 +9,14 @@ modules and deserializers.py; what remains is structural boilerplate.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ._base_client import _AsyncRequestable, _SyncRequestable
 from ._params.whois import build_whois_params
 from .deserializers import parse_whois_result
-from .models import WhoisResult
+
+if TYPE_CHECKING:
+    from .models import WhoisResult
 
 
 class _WhoisMixin(_SyncRequestable):
@@ -40,7 +44,8 @@ class _AsyncWhoisMixin(_AsyncRequestable):
         current_only: bool = False,
     ) -> WhoisResult:
         """Perform WHOIS lookup for a domain or IP address asynchronously."""
-
         params = build_whois_params(domain, ip, full, current_only)
         return parse_whois_result(await self._make_json_request(params))
+
+
 # --- END GENERATED ---

@@ -38,6 +38,12 @@ jobs:
         echo "::group::Ruff Linting"
         ruff check domainiq/ tests/ examples/ --output-format=github
         echo "::endgroup::"
+
+    - name: Check generated mixins
+      run: |
+        echo "::group::Generated Mixin Drift"
+        python scripts/generate_mixins.py --dry-run
+        echo "::endgroup::"
         
     - name: Check Ruff formatting
       run: |

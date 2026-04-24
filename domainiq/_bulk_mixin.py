@@ -25,17 +25,30 @@ class _BulkMixin(_SyncRequestable):
     def bulk_dns(self, domains: list[str]) -> list[BulkDNSResult]:
         """Perform bulk DNS lookups."""
         csv_response = self._make_csv_request(build_bulk_dns_params(domains))
-        return cast("list[BulkDNSResult]", csv_to_dict_list(csv_response) if csv_response else [])
+        return cast(
+            "list[BulkDNSResult]",
+            csv_to_dict_list(csv_response) if csv_response else [],
+        )
 
-    def bulk_whois(self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE) -> list[BulkWhoisResult]:
+    def bulk_whois(
+        self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE
+    ) -> list[BulkWhoisResult]:
         """Perform bulk WHOIS lookups."""
-        csv_response = self._make_csv_request(build_bulk_whois_params(items, lookup_type))
-        return cast("list[BulkWhoisResult]", csv_to_dict_list(csv_response) if csv_response else [])
+        csv_response = self._make_csv_request(
+            build_bulk_whois_params(items, lookup_type)
+        )
+        return cast(
+            "list[BulkWhoisResult]",
+            csv_to_dict_list(csv_response) if csv_response else [],
+        )
 
     def bulk_whois_ip(self, domains: list[str]) -> list[BulkWhoisResult]:
         """Perform bulk domain IP WHOIS lookups."""
         csv_response = self._make_csv_request(build_bulk_whois_ip_params(domains))
-        return cast("list[BulkWhoisResult]", csv_to_dict_list(csv_response) if csv_response else [])
+        return cast(
+            "list[BulkWhoisResult]",
+            csv_to_dict_list(csv_response) if csv_response else [],
+        )
 
 
 # --- BEGIN GENERATED ---
@@ -44,19 +57,31 @@ class _BulkMixin(_SyncRequestable):
 class _AsyncBulkMixin(_AsyncRequestable):
     async def bulk_dns(self, domains: list[str]) -> list[BulkDNSResult]:
         """Perform bulk DNS lookups asynchronously."""
-
         csv_response = await self._make_csv_request(build_bulk_dns_params(domains))
-        return cast("list[BulkDNSResult]", csv_to_dict_list(csv_response) if csv_response else [])
+        return cast(
+            "list[BulkDNSResult]",
+            csv_to_dict_list(csv_response) if csv_response else [],
+        )
 
-    async def bulk_whois(self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE) -> list[BulkWhoisResult]:
+    async def bulk_whois(
+        self, items: list[str], lookup_type: BulkWhoisType = BulkWhoisType.LIVE
+    ) -> list[BulkWhoisResult]:
         """Perform bulk WHOIS lookups asynchronously."""
-
-        csv_response = await self._make_csv_request(build_bulk_whois_params(items, lookup_type))
-        return cast("list[BulkWhoisResult]", csv_to_dict_list(csv_response) if csv_response else [])
+        csv_response = await self._make_csv_request(
+            build_bulk_whois_params(items, lookup_type)
+        )
+        return cast(
+            "list[BulkWhoisResult]",
+            csv_to_dict_list(csv_response) if csv_response else [],
+        )
 
     async def bulk_whois_ip(self, domains: list[str]) -> list[BulkWhoisResult]:
         """Perform bulk domain IP WHOIS lookups asynchronously."""
-
         csv_response = await self._make_csv_request(build_bulk_whois_ip_params(domains))
-        return cast("list[BulkWhoisResult]", csv_to_dict_list(csv_response) if csv_response else [])
+        return cast(
+            "list[BulkWhoisResult]",
+            csv_to_dict_list(csv_response) if csv_response else [],
+        )
+
+
 # --- END GENERATED ---

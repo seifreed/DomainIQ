@@ -8,6 +8,11 @@ import importlib.util
 import pytest
 
 from domainiq import DomainIQError
+from domainiq.async_client import _run_with_critical_cancel
+from domainiq.exceptions import (
+    DomainIQAuthenticationError,
+    DomainIQPartialResultsError,
+)
 from domainiq.models import WhoisResult
 
 AIOHTTP_AVAILABLE = importlib.util.find_spec("aiohttp") is not None
@@ -37,19 +42,14 @@ class TestConcurrentLookupCriticalCancel:
     """Regression for critical errors cancelling concurrent work."""
 
     async def test_critical_error_attaches_partial_results(self):
-        from domainiq.async_client import _run_with_critical_cancel
-        from domainiq.exceptions import (
-            DomainIQAuthenticationError,
-            DomainIQPartialResultsError,
-        )
-
         async def ok() -> WhoisResult:
             await asyncio.sleep(0)
             return WhoisResult(domain="ok.com")
 
         async def fail() -> WhoisResult:
             await asyncio.sleep(0)
-            raise DomainIQAuthenticationError("bad key")
+            msg = "bad key"
+            raise DomainIQAuthenticationError(msg)
 
         async def slow() -> WhoisResult:
             await asyncio.sleep(10)
@@ -67,8 +67,6 @@ class TestConcurrentLookupCriticalCancel:
         assert any(isinstance(result, WhoisResult) for result in partial)
 
     async def test_all_success_returns_ordered_results(self):
-        from domainiq.async_client import _run_with_critical_cancel
-
         async def make(name: str) -> WhoisResult:
             await asyncio.sleep(0)
             return WhoisResult(domain=name)

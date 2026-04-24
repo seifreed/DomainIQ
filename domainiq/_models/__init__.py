@@ -1,40 +1,39 @@
-"""Backward-compatible model exports.
+"""Internal model modules used by the public compatibility wrapper."""
 
-The concrete model definitions live in ``domainiq._models`` so the package can
-keep enums, dataclass responses, filters, and TypedDict responses separated
-without breaking existing ``domainiq.models`` imports.
-"""
-
-from ._models import (
-    BulkDNSResult,
-    BulkWhoisResult,
+from .enums import (
     BulkWhoisType,
-    DNSRecord,
     DNSRecordType,
-    DNSResult,
-    DomainCategory,
-    DomainReport,
-    DomainSearchFilters,
-    DomainSnapshot,
-    EmailReportResult,
-    IpReportResult,
     KeywordMatchType,
     MatchType,
-    MonitorActionResult,
-    MonitorItem,
     MonitorItemType,
-    MonitorReport,
     MonitorReportType,
-    NameReportResult,
-    OrganizationReportResult,
     ReverseIpSearchType,
     ReverseMatchType,
     ReverseMxSearchType,
-    ReverseSearchResult,
     ReverseSearchType,
-    SearchResult,
+)
+from .filters import DomainSearchFilters
+from .results import (
+    DNSRecord,
+    DNSResult,
+    DomainCategory,
+    DomainReport,
+    DomainSnapshot,
+    MonitorItem,
+    MonitorReport,
     SnapshotOptions,
     WhoisResult,
+)
+from .typed import (
+    BulkDNSResult,
+    BulkWhoisResult,
+    EmailReportResult,
+    IpReportResult,
+    MonitorActionResult,
+    NameReportResult,
+    OrganizationReportResult,
+    ReverseSearchResult,
+    SearchResult,
 )
 
 __all__ = [

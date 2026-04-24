@@ -20,22 +20,28 @@ from domainiq.cli._dispatch import (
     _dispatch_dns,
     _dispatch_whois,
     _run_command,
-    _validate_args,
-)
-from domainiq.constants import (
-    EXIT_ERROR as _EXIT_ERROR,
-    EXIT_NO_COMMAND as _EXIT_NO_COMMAND,
-    EXIT_PARTIAL as _EXIT_PARTIAL,
-    EXIT_SUCCESS as _EXIT_SUCCESS,
 )
 from domainiq.cli._handlers import (
-    _serialize,
     handle_dns_lookup,
     handle_domain_search,
     handle_whois_lookup,
-    print_result,
 )
+from domainiq.cli._serialization import print_result
+from domainiq.cli._serialization import serialize_result as _serialize
 from domainiq.cli._types import DnsArgs, DomainSearchArgs, WhoisArgs
+from domainiq.cli._validation import validate_args as _validate_args
+from domainiq.constants import (
+    EXIT_ERROR as _EXIT_ERROR,
+)
+from domainiq.constants import (
+    EXIT_NO_COMMAND as _EXIT_NO_COMMAND,
+)
+from domainiq.constants import (
+    EXIT_PARTIAL as _EXIT_PARTIAL,
+)
+from domainiq.constants import (
+    EXIT_SUCCESS as _EXIT_SUCCESS,
+)
 from domainiq.exceptions import DomainIQConfigurationError, DomainIQError
 
 # ---------------------------------------------------------------------------
@@ -158,14 +164,20 @@ class TestArgParsing:
         assert args.match == "any"
 
     def test_parse_domain_search_with_filters(self) -> None:
-        args = self.parser.parse_args([
-            "--domain-search", "kw",
-            "--match", "all",
-            "--exclude-dashed",
-            "--min-length", "5",
-            "--max-length", "20",
-            "--count-only",
-        ])
+        args = self.parser.parse_args(
+            [
+                "--domain-search",
+                "kw",
+                "--match",
+                "all",
+                "--exclude-dashed",
+                "--min-length",
+                "5",
+                "--max-length",
+                "20",
+                "--count-only",
+            ]
+        )
         assert args.match == "all"
         assert args.exclude_dashed is True
         assert args.min_length == 5
@@ -179,10 +191,15 @@ class TestArgParsing:
         assert args.timeout == 60
 
     def test_parse_bulk_whois(self) -> None:
-        args = self.parser.parse_args([
-            "--bulk-whois", "a.com", "b.com",
-            "--bulk-whois-type", "cached",
-        ])
+        args = self.parser.parse_args(
+            [
+                "--bulk-whois",
+                "a.com",
+                "b.com",
+                "--bulk-whois-type",
+                "cached",
+            ]
+        )
         assert args.bulk_whois == ["a.com", "b.com"]
         assert args.bulk_whois_type == "cached"
 
@@ -512,9 +529,11 @@ class TestCliCredentials:
         assert target.read_text() == "interactive_key_xyz"
 
     def test_prompt_for_api_key_raises_when_non_interactive(self) -> None:
-        with patch("domainiq.cli._credentials._is_interactive", return_value=False):
-            with pytest.raises(DomainIQError, match="No API key found"):
-                prompt_for_api_key(None)
+        with (
+            patch("domainiq.cli._credentials._is_interactive", return_value=False),
+            pytest.raises(DomainIQError, match="No API key found"),
+        ):
+            prompt_for_api_key(None)
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +557,10 @@ class TestMain:
 
     def test_main_exits_1_on_domainiq_error(self) -> None:
         with (
-            patch("sys.argv", ["domainiq", "--api-key", "key", "--whois-lookup", "example.com"]),
+            patch(
+                "sys.argv",
+                ["domainiq", "--api-key", "key", "--whois-lookup", "example.com"],
+            ),
             patch("domainiq.client.DomainIQClient") as mock_cls,
         ):
             instance = mock_cls.return_value.__enter__.return_value

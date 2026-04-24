@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..models import BulkWhoisType
-from ..utils import enum_value
+from domainiq.utils import enum_value
+
 from ._shared import require_non_empty
+
+if TYPE_CHECKING:
+    from domainiq.models import BulkWhoisType
 
 
 def build_bulk_dns_params(domains: list[str]) -> dict[str, Any]:

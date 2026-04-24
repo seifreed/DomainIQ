@@ -1,6 +1,7 @@
 """Shared fixtures for transport-based unit tests."""
 
 from __future__ import annotations
+
 from typing import Any
 
 import pytest
@@ -28,9 +29,11 @@ class MockSyncTransport:
     def get(self, url: str, params: dict[str, str], timeout: float) -> SyncResponse:
         self.calls.append({"url": url, "params": params, "timeout": timeout})
         if not self._queue:
-            raise AssertionError(
-                f"MockSyncTransport: no more enqueued responses (call #{len(self.calls)})"
+            msg = (
+                "MockSyncTransport: no more enqueued responses "
+                f"(call #{len(self.calls)})"
             )
+            raise AssertionError(msg)
         item = self._queue.pop(0)
         if isinstance(item, BaseException):
             raise item
@@ -68,13 +71,15 @@ class MockAsyncTransport:
         self._queue.append(item)
 
     async def get(
-        self, url: str, params: dict[str, str], timeout: float
+        self, url: str, params: dict[str, str], request_timeout: float
     ) -> AsyncResponse:
-        self.calls.append({"url": url, "params": params, "timeout": timeout})
+        self.calls.append({"url": url, "params": params, "timeout": request_timeout})
         if not self._queue:
-            raise AssertionError(
-                f"MockAsyncTransport: no more enqueued responses (call #{len(self.calls)})"
+            msg = (
+                "MockAsyncTransport: no more enqueued responses "
+                f"(call #{len(self.calls)})"
             )
+            raise AssertionError(msg)
         item = self._queue.pop(0)
         if isinstance(item, BaseException):
             raise item

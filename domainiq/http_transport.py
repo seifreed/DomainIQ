@@ -8,22 +8,31 @@ standard Python exceptions so callers never need to import requests or aiohttp.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json as _json
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from aiohttp import ClientSession
 
 
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Response snapshots
-# ---------------------------------------------------------------------------
+def _decode_json_body(text: str) -> dict[str, Any] | list[Any]:
+    decoded = _json.loads(text)
+    if isinstance(decoded, (dict, list)):
+        return decoded
+    msg = f"Expected JSON object or array, got {type(decoded).__name__}"
+    raise ValueError(msg)
 
 
 @dataclass
@@ -33,12 +42,12 @@ class SyncResponse:
     status_code: int
     headers: Mapping[str, str]
     text: str
-    _json_data: Any = field(default=None, repr=False)
+    _json_data: dict[str, Any] | list[Any] | None = field(default=None, repr=False)
 
     def json(self) -> dict[str, Any] | list[Any]:
         if self._json_data is None:
-            self._json_data = _json.loads(self.text)
-        return self._json_data  # type: ignore[return-value]
+            self._json_data = _decode_json_body(self.text)
+        return self._json_data
 
 
 @dataclass
@@ -48,7 +57,7 @@ class AsyncResponse:
     status: int
     headers: Mapping[str, str]
     _body: str
-    _json_data: Any = field(default=None, repr=False)
+    _json_data: dict[str, Any] | list[Any] | None = field(default=None, repr=False)
 
     @property
     def status_code(self) -> int:
@@ -60,8 +69,8 @@ class AsyncResponse:
 
     def json(self) -> dict[str, Any] | list[Any]:
         if self._json_data is None:
-            self._json_data = _json.loads(self._body)
-        return self._json_data  # type: ignore[return-value]
+            self._json_data = _decode_json_body(self._body)
+        return self._json_data
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +109,7 @@ class AsyncTransport(Protocol):
         self,
         url: str,
         params: dict[str, str],
-        timeout: float,
+        request_timeout: float,
     ) -> AsyncResponse: ...
 
     async def close(self) -> None: ...
@@ -109,19 +118,10 @@ class AsyncTransport(Protocol):
     def is_open(self) -> bool: ...
 
 
-# ---------------------------------------------------------------------------
-# RequestsTransport (sync)
-# ---------------------------------------------------------------------------
-
-
 class RequestsTransport:
     """SyncTransport backed by the requests library."""
 
     def __init__(self) -> None:
-        import requests
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-
         self._session = requests.Session()
         self._requests_timeout_exc = requests.exceptions.Timeout
         self._requests_request_exc = requests.exceptions.RequestException
@@ -152,11 +152,6 @@ class RequestsTransport:
         self._session.close()
 
 
-# ---------------------------------------------------------------------------
-# AiohttpTransport (async)
-# ---------------------------------------------------------------------------
-
-
 class AiohttpTransport:
     """AsyncTransport backed by aiohttp."""
 
@@ -167,7 +162,7 @@ class AiohttpTransport:
         connector_limit_per_host: int = 30,
     ) -> None:
         try:
-            import aiohttp as _aiohttp
+            self._aiohttp: Any = importlib.import_module("aiohttp")
         except ImportError as e:
             msg = (
                 "aiohttp is required for AsyncDomainIQClient. "
@@ -175,7 +170,6 @@ class AiohttpTransport:
             )
             raise ImportError(msg) from e
 
-        self._aiohttp = _aiohttp
         self._timeout = timeout
         self._connector_limit = connector_limit
         self._connector_limit_per_host = connector_limit_per_host
@@ -197,9 +191,9 @@ class AiohttpTransport:
         self,
         url: str,
         params: dict[str, str],
-        timeout: float,
+        request_timeout: float,
     ) -> AsyncResponse:
-        client_timeout = self._aiohttp.ClientTimeout(total=timeout)
+        client_timeout = self._aiohttp.ClientTimeout(total=request_timeout)
         session = await self._get_session()
         try:
             async with session.get(url, params=params, timeout=client_timeout) as resp:

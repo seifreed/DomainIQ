@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -18,6 +19,7 @@ from domainiq import (
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
+from domainiq.cli._dispatch import _dispatch_dns, _dispatch_whois
 
 from .conftest import (
     MockAsyncTransport,
@@ -26,10 +28,13 @@ from .conftest import (
     make_sync_response,
 )
 
+if TYPE_CHECKING:
+    from domainiq.async_client import AsyncDomainIQClient
+
 AIOHTTP_AVAILABLE = importlib.util.find_spec("aiohttp") is not None
 
 if AIOHTTP_AVAILABLE:
-    from domainiq.async_client import AsyncDomainIQClient
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +277,9 @@ class TestAsyncRetryLogic:
         mock_async_client: AsyncDomainIQClient,
     ) -> None:
         mock_async_transport.enqueue(make_async_response(500, '{"error": "err"}'))
-        mock_async_transport.enqueue(make_async_response(200, '{"domain": "example.com"}'))
+        mock_async_transport.enqueue(
+            make_async_response(200, '{"domain": "example.com"}')
+        )
 
         result = await mock_async_client.whois_lookup(domain="example.com")
 
@@ -320,7 +327,9 @@ class TestAsyncRateLimitHandling:
         mock_async_client: AsyncDomainIQClient,
     ) -> None:
         mock_async_transport.enqueue(TimeoutError("async timeout"))
-        mock_async_transport.enqueue(make_async_response(200, '{"domain": "example.com"}'))
+        mock_async_transport.enqueue(
+            make_async_response(200, '{"domain": "example.com"}')
+        )
 
         result = await mock_async_client.whois_lookup(domain="example.com")
 
@@ -338,8 +347,6 @@ class TestCLIDispatch:
     def test_dispatch_whois_executes_when_arg_set(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli._dispatch import _dispatch_whois
-
         mock_transport.enqueue(make_sync_response(200, '{"domain": "example.com"}'))
 
         args = argparse.Namespace(
@@ -355,8 +362,6 @@ class TestCLIDispatch:
     def test_dispatch_whois_skips_when_arg_not_set(
         self, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli._dispatch import _dispatch_whois
-
         args = argparse.Namespace(whois_lookup=None)
         executed, errored = _dispatch_whois(mock_client, args)
 
@@ -366,8 +371,6 @@ class TestCLIDispatch:
     def test_dispatch_dns_executes_when_arg_set(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli._dispatch import _dispatch_dns
-
         mock_transport.enqueue(
             make_sync_response(200, '{"domain": "example.com", "records": []}')
         )
@@ -381,8 +384,6 @@ class TestCLIDispatch:
     def test_dispatch_dns_skips_when_arg_not_set(
         self, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli._dispatch import _dispatch_dns
-
         args = argparse.Namespace(dns_lookup=None)
         executed, errored = _dispatch_dns(mock_client, args)
 
@@ -392,8 +393,6 @@ class TestCLIDispatch:
     def test_dispatch_whois_returns_error_on_api_failure(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
     ) -> None:
-        from domainiq.cli._dispatch import _dispatch_whois
-
         # 401 exhausts immediately (no retries) → DomainIQAuthenticationError
         mock_transport.enqueue(make_sync_response(401, '{"error": "bad key"}'))
 

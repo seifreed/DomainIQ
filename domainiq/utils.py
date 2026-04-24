@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable, Mapping
 from enum import Enum
 from io import StringIO
-from typing import Any, TypeVar
+from typing import Any
 
 from .exceptions import DomainIQAPIError, DomainIQError
 
@@ -15,8 +15,8 @@ __all__ = [
     "assert_json_dict",
     "compute_backoff",
     "csv_to_dict_list",
-    "enum_value",
     "ensure_list_of_models",
+    "enum_value",
     "parse_retry_after",
     "setup_logging",
     "truncate_repr",
@@ -44,7 +44,7 @@ def truncate_repr(value: object, max_len: int = 200) -> str:
 
 def compute_backoff(retry_delay: int, attempt: int) -> float:
     """Exponential backoff: retry_delay * 2^attempt."""
-    return float(retry_delay * (2 ** attempt))
+    return float(retry_delay * (2**attempt))
 
 
 def parse_retry_after(headers: Mapping[str, str]) -> int | None:
@@ -112,13 +112,10 @@ def setup_logging(
         lib_logger.addHandler(handler)
 
 
-_M = TypeVar("_M")
-
-
-def ensure_list_of_models(
+def ensure_list_of_models[M](
     response: dict[str, Any] | list[Any],
-    factory: Callable[[dict[str, Any]], _M],
-) -> list[_M]:
+    factory: Callable[[dict[str, Any]], M],
+) -> list[M]:
     """Wrap a single-item dict or a list of dicts through factory, returning a list."""
     if isinstance(response, dict):
         return [factory(response)]

@@ -65,7 +65,9 @@ class _SearchMixin(_SyncRequestable):
             self._make_json_request(build_reverse_dns_params(domain))
         )
 
-    def reverse_ip(self, search_type: ReverseIpSearchType | str, data: str) -> ReverseSearchResult:
+    def reverse_ip(
+        self, search_type: ReverseIpSearchType | str, data: str
+    ) -> ReverseSearchResult:
         """Perform reverse IP search."""
         return parse_reverse_search_result(
             self._make_json_request(build_reverse_ip_params(search_type, data))
@@ -76,7 +78,9 @@ class _SearchMixin(_SyncRequestable):
     ) -> ReverseSearchResult:
         """Perform reverse MX search."""
         return parse_reverse_search_result(
-            self._make_json_request(build_reverse_mx_params(search_type, data, recursive))
+            self._make_json_request(
+                build_reverse_mx_params(search_type, data, recursive)
+            )
         )
 
 
@@ -93,7 +97,6 @@ class _AsyncSearchMixin(_AsyncRequestable):
         **kwargs: Unpack[DomainSearchFilters],
     ) -> SearchResult:
         """Search for domains matching keywords asynchronously."""
-
         merged: DomainSearchFilters = {**(filters or {}), **kwargs}
         params = build_domain_search_params(keywords, conditions, match, merged or None)
         return parse_search_result(await self._make_json_request(params))
@@ -105,7 +108,6 @@ class _AsyncSearchMixin(_AsyncRequestable):
         match: ReverseMatchType = ReverseMatchType.CONTAINS,
     ) -> ReverseSearchResult:
         """Perform reverse search by email, name, or organization asynchronously."""
-
         return parse_reverse_search_result(
             await self._make_json_request(
                 build_reverse_search_params(search_type, search_term, match)
@@ -114,14 +116,14 @@ class _AsyncSearchMixin(_AsyncRequestable):
 
     async def reverse_dns(self, domain: str) -> ReverseSearchResult:
         """Perform reverse DNS search asynchronously."""
-
         return parse_reverse_search_result(
             await self._make_json_request(build_reverse_dns_params(domain))
         )
 
-    async def reverse_ip(self, search_type: ReverseIpSearchType | str, data: str) -> ReverseSearchResult:
+    async def reverse_ip(
+        self, search_type: ReverseIpSearchType | str, data: str
+    ) -> ReverseSearchResult:
         """Perform reverse IP search asynchronously."""
-
         return parse_reverse_search_result(
             await self._make_json_request(build_reverse_ip_params(search_type, data))
         )
@@ -130,8 +132,11 @@ class _AsyncSearchMixin(_AsyncRequestable):
         self, search_type: ReverseMxSearchType | str, data: str, recursive: bool = False
     ) -> ReverseSearchResult:
         """Perform reverse MX search asynchronously."""
-
         return parse_reverse_search_result(
-            await self._make_json_request(build_reverse_mx_params(search_type, data, recursive))
+            await self._make_json_request(
+                build_reverse_mx_params(search_type, data, recursive)
+            )
         )
+
+
 # --- END GENERATED ---

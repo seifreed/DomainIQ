@@ -18,16 +18,10 @@ from .exceptions import DomainIQConfigurationError
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BASE_URL = os.getenv(
-    "DOMAINIQ_BASE_URL", "https://www.domainiq.com/api"
-)
+_DEFAULT_BASE_URL = os.getenv("DOMAINIQ_BASE_URL", "https://www.domainiq.com/api")
 _DEFAULT_TIMEOUT = float(os.getenv("DOMAINIQ_TIMEOUT", str(DEFAULT_TIMEOUT)))
-_DEFAULT_MAX_RETRIES = int(
-    os.getenv("DOMAINIQ_MAX_RETRIES", str(DEFAULT_MAX_RETRIES))
-)
-_DEFAULT_RETRY_DELAY = int(
-    os.getenv("DOMAINIQ_RETRY_DELAY", str(DEFAULT_RETRY_DELAY))
-)
+_DEFAULT_MAX_RETRIES = int(os.getenv("DOMAINIQ_MAX_RETRIES", str(DEFAULT_MAX_RETRIES)))
+_DEFAULT_RETRY_DELAY = int(os.getenv("DOMAINIQ_RETRY_DELAY", str(DEFAULT_RETRY_DELAY)))
 _DEFAULT_CONNECTOR_LIMIT = int(
     os.getenv("DOMAINIQ_CONNECTOR_LIMIT", str(DEFAULT_CONNECTOR_LIMIT))
 )
@@ -55,7 +49,7 @@ class ConfigKwargs(TypedDict, total=False):
 class Config:
     """Configuration object for DomainIQ clients."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - config preserves explicit keyword options.
         self,
         api_key: str | None = None,
         base_url: str = _DEFAULT_BASE_URL,
@@ -78,6 +72,8 @@ class Config:
             retry_delay: Delay between retries in seconds.
             config_file: Path to config file containing API key.
                 If None, defaults to ~/.domainiq.
+            connector_limit: Maximum async connector pool size.
+            connector_limit_per_host: Maximum async connections per host.
             loader: Optional pre-built key loader (inject for testing or custom
                 key sources). If None, a default _ApiKeyLoader is created.
         """

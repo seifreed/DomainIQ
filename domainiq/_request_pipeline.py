@@ -5,9 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ._http_constants import HTTP_BAD_REQUEST, HTTP_TOO_MANY_REQUESTS, HTTP_UNAUTHORIZED
 from .constants import API_FORMAT_JSON, RETRY_EXHAUSTED_MSG
@@ -17,8 +16,17 @@ from .exceptions import (
     DomainIQRateLimitError,
     DomainIQTimeoutError,
 )
-from .http_transport import AsyncResponse, AsyncTransport, SyncResponse, SyncTransport
 from .utils import compute_backoff, parse_retry_after
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from .http_transport import (
+        AsyncResponse,
+        AsyncTransport,
+        SyncResponse,
+        SyncTransport,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +35,11 @@ _RETRYABLE_STATUSES: frozenset[int] = frozenset({500, 502, 503, 504})
 
 def _sync_sleep(delay: float) -> None:
     """Indirection point so tests can stub retries without patching stdlib time."""
-
     time.sleep(delay)
 
 
 async def _async_sleep(delay: float) -> None:
     """Indirection point so tests can stub retries without patching asyncio globally."""
-
     await asyncio.sleep(delay)
 
 
@@ -106,7 +112,8 @@ def _handle_rate_limit(
             policy.max_retries + 1,
         )
         return delay
-    raise DomainIQRateLimitError("Rate limit exceeded", retry_after=retry_after_secs)
+    msg = "Rate limit exceeded"
+    raise DomainIQRateLimitError(msg, retry_after=retry_after_secs)
 
 
 def classify_http_response(
@@ -192,8 +199,8 @@ def execute_sync_request(
         try:
             response = transport.get(
                 policy.base_url,
-                params=request_params,
-                timeout=policy.timeout,
+                request_params,
+                policy.timeout,
             )
         except TimeoutError as exc:
             _sync_sleep(_on_timeout_error(exc, attempt, policy))
@@ -231,8 +238,8 @@ async def execute_async_request(
         try:
             response = await transport.get(
                 policy.base_url,
-                params=request_params,
-                timeout=policy.timeout,
+                request_params,
+                policy.timeout,
             )
         except TimeoutError as exc:
             await _async_sleep(_on_timeout_error(exc, attempt, policy))

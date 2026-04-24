@@ -2,13 +2,14 @@
 
 import argparse
 
-from ..models import ReverseMxSearchType
+from domainiq.models import ReverseMxSearchType
 
 
 def _positive_int(value: str) -> int:
     n = int(value)
     if n <= 0:
-        raise argparse.ArgumentTypeError(f"must be a positive integer, got {n}")
+        msg = f"must be a positive integer, got {n}"
+        raise argparse.ArgumentTypeError(msg)
     return n
 
 
@@ -88,8 +89,12 @@ def _add_search_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--exclude-idn", action="store_true", help="Exclude IDN domains"
     )
-    parser.add_argument("--min-length", type=_positive_int, help="Minimum domain length")
-    parser.add_argument("--max-length", type=_positive_int, help="Maximum domain length")
+    parser.add_argument(
+        "--min-length", type=_positive_int, help="Minimum domain length"
+    )
+    parser.add_argument(
+        "--max-length", type=_positive_int, help="Maximum domain length"
+    )
     parser.add_argument("--min-create-date", help="Minimum creation date (YYYY-MM-DD)")
     parser.add_argument("--max-create-date", help="Maximum creation date (YYYY-MM-DD)")
     parser.add_argument("--search-limit", type=int, help="Limit search results")

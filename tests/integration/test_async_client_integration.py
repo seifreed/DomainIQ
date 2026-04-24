@@ -98,10 +98,11 @@ class TestAsyncDomainIQClientIntegration:
             domains = TEST_DOMAINS[:3]
 
             start_time = time.time()
-            sequential_results = []
-            for domain in domains:
-                sequential_results.append(await client.whois_lookup(domain=domain))
+            sequential_results = [
+                await client.whois_lookup(domain=domain) for domain in domains
+            ]
             sequential_time = time.time() - start_time
+            assert len(sequential_results) == len(domains)
 
             start_time = time.time()
             concurrent_results = await client.concurrent_whois_lookup(
