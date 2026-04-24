@@ -13,7 +13,7 @@
   <a href="https://pypi.org/project/domainiq/"><img src="https://img.shields.io/pypi/pyversions/domainiq?style=flat-square&logo=python&logoColor=white" alt="Python Versions"></a>
   <a href="https://github.com/seifreed/DomainIQ/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://github.com/seifreed/DomainIQ/actions"><img src="https://img.shields.io/github/actions/workflow/status/seifreed/DomainIQ/quality.yml?style=flat-square&logo=github&label=CI" alt="CI Status"></a>
-  <img src="https://img.shields.io/badge/coverage-89%25-brightgreen?style=flat-square" alt="Coverage">
+  <img src="https://img.shields.io/badge/coverage-91%25-brightgreen?style=flat-square" alt="Coverage">
 </p>
 
 <p align="center">

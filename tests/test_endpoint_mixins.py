@@ -192,6 +192,77 @@ class TestSearchMixins:
         }
 
 
+class TestReportMixins:
+    def test_sync_report_methods(
+        self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
+    ) -> None:
+        for body in (
+            '{"domain": "example.com", "whois": {"domain": "example.com"}}',
+            '{"name": "Alice Example", "domains": ["example.com"]}',
+            '{"organization": "Example Org", "domains": ["example.org"]}',
+            '{"email": "admin@example.com", "domains": ["example.net"]}',
+            '{"ip": "192.0.2.1", "domains": ["example.com"]}',
+        ):
+            mock_transport.enqueue(make_sync_response(200, body))
+
+        domain = mock_client.domain_report("example.com")
+        name = mock_client.name_report("Alice Example")
+        organization = mock_client.organization_report("Example Org")
+        email = mock_client.email_report("admin@example.com")
+        ip = mock_client.ip_report("192.0.2.1")
+
+        assert domain.domain == "example.com"
+        assert domain.whois_data is not None
+        assert domain.whois_data.domain == "example.com"
+        assert name["name"] == "Alice Example"
+        assert organization["organization"] == "Example Org"
+        assert email["email"] == "admin@example.com"
+        assert ip["ip"] == "192.0.2.1"
+        assert [call["params"]["service"] for call in mock_transport.calls] == [
+            "domain_report",
+            "name_report",
+            "organization_report",
+            "email_report",
+            "ip_report",
+        ]
+        assert mock_transport.calls[1]["params"]["name"] == "Alice Example"
+        assert mock_transport.calls[2]["params"]["organization"] == "Example Org"
+
+    @pytest.mark.asyncio
+    async def test_async_report_methods(
+        self,
+        mock_async_transport: MockAsyncTransport,
+        mock_async_client: AsyncDomainIQClient,
+    ) -> None:
+        for body in (
+            '{"domain": "example.com"}',
+            '{"name": "Alice Example"}',
+            '{"organization": "Example Org"}',
+            '{"email": "admin@example.com"}',
+            '{"ip": "192.0.2.1"}',
+        ):
+            mock_async_transport.enqueue(make_async_response(200, body))
+
+        domain = await mock_async_client.domain_report("example.com")
+        name = await mock_async_client.name_report("Alice Example")
+        organization = await mock_async_client.organization_report("Example Org")
+        email = await mock_async_client.email_report("admin@example.com")
+        ip = await mock_async_client.ip_report("192.0.2.1")
+
+        assert domain.domain == "example.com"
+        assert name["name"] == "Alice Example"
+        assert organization["organization"] == "Example Org"
+        assert email["email"] == "admin@example.com"
+        assert ip["ip"] == "192.0.2.1"
+        assert [call["params"]["service"] for call in mock_async_transport.calls] == [
+            "domain_report",
+            "name_report",
+            "organization_report",
+            "email_report",
+            "ip_report",
+        ]
+
+
 class TestMonitorMixins:
     def test_sync_monitor_methods(
         self, mock_transport: MockSyncTransport, mock_client: DomainIQClient

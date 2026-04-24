@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
-from domainiq.cli._credentials import _default_config_path, prompt_for_api_key
+from domainiq.cli import _credentials as credentials
+from domainiq.cli._credentials import (
+    _default_config_path,
+    _prompt_with_timeout,
+    prompt_for_api_key,
+)
 from domainiq.exceptions import DomainIQConfigurationError
 
 if TYPE_CHECKING:
@@ -71,3 +76,61 @@ class TestCredentialPrompting:
         assert api_key == "default_key"
         assert target.read_text() == "default_key"
         assert target.stat().st_mode & 0o777 == 0o600
+
+
+class TestPromptWithTimeout:
+    def test_prompt_without_sigalrm_uses_plain_input(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delattr(credentials.signal, "SIGALRM", raising=False)
+
+        with patch("builtins.input", return_value=" api-key "):
+            assert _prompt_with_timeout("prompt: ", 5) == "api-key"
+
+    def test_prompt_restores_handler_and_prior_alarm(self) -> None:
+        old_handler = object()
+
+        with (
+            patch("builtins.input", return_value=" api-key "),
+            patch(
+                "domainiq.cli._credentials.signal.signal",
+                side_effect=[old_handler, None],
+            ) as mock_signal,
+            patch(
+                "domainiq.cli._credentials.signal.alarm",
+                side_effect=[9, 0, 0],
+            ) as mock_alarm,
+            patch(
+                "domainiq.cli._credentials.time.monotonic",
+                side_effect=[100.0, 103.2],
+            ),
+        ):
+            result = _prompt_with_timeout("prompt: ", 5)
+
+        assert result == "api-key"
+        assert mock_signal.call_args_list[1] == call(
+            credentials.signal.SIGALRM, old_handler
+        )
+        assert mock_alarm.call_args_list == [call(5), call(0), call(6)]
+
+    def test_prompt_restores_alarm_after_input_exception(self) -> None:
+        old_handler = object()
+
+        with (
+            patch("builtins.input", side_effect=EOFError),
+            patch(
+                "domainiq.cli._credentials.signal.signal",
+                side_effect=[old_handler, None],
+            ) as mock_signal,
+            patch(
+                "domainiq.cli._credentials.signal.alarm",
+                side_effect=[0, 0],
+            ) as mock_alarm,
+            pytest.raises(EOFError),
+        ):
+            _prompt_with_timeout("prompt: ", 5)
+
+        assert mock_signal.call_args_list[1] == call(
+            credentials.signal.SIGALRM, old_handler
+        )
+        assert mock_alarm.call_args_list == [call(5), call(0)]
