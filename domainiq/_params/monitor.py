@@ -11,6 +11,7 @@ from domainiq.constants import (
     TYPO_STRENGTH_MIN,
 )
 from domainiq.exceptions import DomainIQValidationError
+from domainiq.validators import ensure_positive_int
 
 from ._shared import require_non_empty
 
@@ -24,11 +25,18 @@ def _validate_typo_strength(strength: int) -> None:
         raise DomainIQValidationError(msg, param_name="strength")
 
 
+def _validate_positive_ids(**ids: int | None) -> None:
+    for field_name, value in ids.items():
+        if value is not None:
+            ensure_positive_int(field_name, value)
+
+
 def build_monitor_list_params() -> dict[str, Any]:
     return {"service": "monitor", "action": "list"}
 
 
 def build_monitor_report_items_params(report_id: int) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id)
     return {"service": "monitor", "action": "report_items", "report": report_id}
 
 
@@ -37,6 +45,11 @@ def build_monitor_report_summary_params(
     item_id: int | None,
     days_range: int | None,
 ) -> dict[str, Any]:
+    _validate_positive_ids(
+        report_id=report_id,
+        item_id=item_id,
+        days_range=days_range,
+    )
     params: dict[str, Any] = {
         "service": "monitor",
         "action": "report_summary",
@@ -53,6 +66,7 @@ def build_monitor_report_changes_params(
     report_id: int,
     change_id: int,
 ) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id, change_id=change_id)
     return {
         "service": "monitor",
         "action": "report_changes",
@@ -81,6 +95,7 @@ def build_add_monitor_item_params(
     items: list[str],
     enabled: bool | None = None,
 ) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id)
     require_non_empty("items", items)
     params: dict[str, Any] = {
         "service": "monitor",
@@ -99,6 +114,7 @@ def build_enable_typos_params(
     item_id: int,
     strength: int,
 ) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id, item_id=item_id)
     _validate_typo_strength(strength)
     return {
         "service": "monitor",
@@ -110,6 +126,7 @@ def build_enable_typos_params(
 
 
 def build_disable_typos_params(report_id: int, item_id: int) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id, item_id=item_id)
     return {
         "service": "monitor",
         "action": "disable_typos",
@@ -123,6 +140,7 @@ def build_modify_typo_strength_params(
     item_id: int,
     strength: int,
 ) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id, item_id=item_id)
     _validate_typo_strength(strength)
     return {
         "service": "monitor",
@@ -134,6 +152,7 @@ def build_modify_typo_strength_params(
 
 
 def build_delete_monitor_item_params(item_id: int) -> dict[str, Any]:
+    _validate_positive_ids(item_id=item_id)
     return {
         "service": "monitor",
         "action": "report_item_delete",
@@ -142,6 +161,7 @@ def build_delete_monitor_item_params(item_id: int) -> dict[str, Any]:
 
 
 def build_delete_monitor_report_params(report_id: int) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id)
     return {
         "service": "monitor",
         "action": "report_delete",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from domainiq._params.monitor import (
@@ -20,6 +22,9 @@ from domainiq._params.monitor import (
 from domainiq.constants import API_BOOL_FALSE, API_BOOL_TRUE, TYPO_STRENGTH_MAX
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.models import MonitorItemType, MonitorReportType
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class TestMonitorReadParams:
@@ -59,6 +64,25 @@ class TestMonitorReadParams:
             "report": 42,
             "change": 99,
         }
+
+    @pytest.mark.parametrize(
+        ("build_params", "param_name"),
+        [
+            (lambda: build_monitor_report_items_params(0), "report_id"),
+            (lambda: build_monitor_report_summary_params(-1, None, None), "report_id"),
+            (lambda: build_monitor_report_summary_params(42, 0, None), "item_id"),
+            (lambda: build_monitor_report_summary_params(42, None, 0), "days_range"),
+            (lambda: build_monitor_report_changes_params(0, 99), "report_id"),
+            (lambda: build_monitor_report_changes_params(42, 0), "change_id"),
+        ],
+    )
+    def test_read_params_reject_non_positive_identifiers(
+        self, build_params: Callable[[], object], param_name: str
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_params()
+
+        assert exc_info.value.param_name == param_name
 
 
 class TestMonitorMutationParams:
@@ -131,3 +155,30 @@ class TestMonitorMutationParams:
             "action": "report_delete",
             "report_id": 42,
         }
+
+    @pytest.mark.parametrize(
+        ("build_params", "param_name"),
+        [
+            (
+                lambda: build_add_monitor_item_params(
+                    0, "domain", ["example.com"]
+                ),
+                "report_id",
+            ),
+            (lambda: build_enable_typos_params(0, 7, 5), "report_id"),
+            (lambda: build_enable_typos_params(42, 0, 5), "item_id"),
+            (lambda: build_disable_typos_params(0, 7), "report_id"),
+            (lambda: build_disable_typos_params(42, 0), "item_id"),
+            (lambda: build_modify_typo_strength_params(0, 7, 5), "report_id"),
+            (lambda: build_modify_typo_strength_params(42, 0, 5), "item_id"),
+            (lambda: build_delete_monitor_item_params(0), "item_id"),
+            (lambda: build_delete_monitor_report_params(0), "report_id"),
+        ],
+    )
+    def test_mutation_params_reject_non_positive_identifiers(
+        self, build_params: Callable[[], object], param_name: str
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_params()
+
+        assert exc_info.value.param_name == param_name
