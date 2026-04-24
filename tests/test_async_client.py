@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
-from typing import TYPE_CHECKING
+import warnings
 
 import pytest
 
+import domainiq.async_client as async_client_module
 from domainiq import DomainIQError
-from domainiq.async_client import _run_with_critical_cancel
+from domainiq.async_client import AsyncDomainIQClient, _run_with_critical_cancel
+from domainiq.config import Config
 from domainiq.exceptions import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
@@ -18,13 +20,26 @@ from domainiq.exceptions import (
 )
 from domainiq.models import DNSResult, WhoisResult
 
-if TYPE_CHECKING:
-    from domainiq.async_client import AsyncDomainIQClient
-
 AIOHTTP_AVAILABLE = importlib.util.find_spec("aiohttp") is not None
 
 if AIOHTTP_AVAILABLE:
-    from domainiq.async_client import AsyncDomainIQClient
+    from domainiq.async_client import AsyncDomainIQClient as AiohttpAsyncDomainIQClient
+
+
+class LifecycleAsyncTransport:
+    def __init__(self, is_open: bool = False) -> None:
+        self.is_open = is_open
+        self.closed = False
+
+    async def get(
+        self, _url: str, _params: dict[str, str], _request_timeout: float
+    ) -> object:
+        msg = "Lifecycle transport should not issue requests"
+        raise AssertionError(msg)
+
+    async def close(self) -> None:
+        self.closed = True
+        self.is_open = False
 
 
 class TestAsyncClientUnit:
@@ -32,7 +47,7 @@ class TestAsyncClientUnit:
 
     @pytest.mark.skipif(not AIOHTTP_AVAILABLE, reason="aiohttp not available")
     def test_async_client_requires_aiohttp(self):
-        assert AsyncDomainIQClient is not None
+        assert AiohttpAsyncDomainIQClient is not None
 
     def test_async_client_import_error_without_aiohttp(self):
         if AIOHTTP_AVAILABLE:
@@ -40,6 +55,99 @@ class TestAsyncClientUnit:
 
         with pytest.raises(DomainIQError, match="aiohttp is required"):
             AsyncDomainIQClient(api_key="test_key")
+
+    def test_make_default_async_transport_forwards_config(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class FakeAiohttpTransport:
+            def __init__(
+                self,
+                timeout: float,
+                connector_limit: int,
+                connector_limit_per_host: int,
+            ) -> None:
+                self.timeout = timeout
+                self.connector_limit = connector_limit
+                self.connector_limit_per_host = connector_limit_per_host
+
+        monkeypatch.setattr(
+            async_client_module,
+            "AiohttpTransport",
+            FakeAiohttpTransport,
+        )
+        config = Config(
+            api_key="key",
+            timeout=7,
+            connector_limit=11,
+            connector_limit_per_host=3,
+        )
+
+        transport = async_client_module._make_default_async_transport(config)
+
+        assert transport.timeout == 7
+        assert transport.connector_limit == 11
+        assert transport.connector_limit_per_host == 3
+
+    def test_make_default_async_transport_maps_import_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class MissingAiohttpTransport:
+            def __init__(self, *_args: object, **_kwargs: object) -> None:
+                msg = "missing aiohttp"
+                raise ImportError(msg)
+
+        monkeypatch.setattr(
+            async_client_module,
+            "AiohttpTransport",
+            MissingAiohttpTransport,
+        )
+        config = Config(api_key="key")
+
+        with pytest.raises(DomainIQError, match="aiohttp is required"):
+            async_client_module._make_default_async_transport(config)
+
+    @pytest.mark.asyncio
+    async def test_close_and_async_context_close_transport(self) -> None:
+        first_transport = LifecycleAsyncTransport(is_open=True)
+        client = AsyncDomainIQClient(api_key="key", transport=first_transport)
+
+        await client.close()
+
+        assert first_transport.closed is True
+        assert first_transport.is_open is False
+
+        second_transport = LifecycleAsyncTransport(is_open=True)
+        async with AsyncDomainIQClient(
+            api_key="key", transport=second_transport
+        ) as context_client:
+            assert context_client._transport is second_transport
+
+        assert second_transport.closed is True
+        assert second_transport.is_open is False
+
+    def test_del_noops_without_transport(self) -> None:
+        client = AsyncDomainIQClient.__new__(AsyncDomainIQClient)
+
+        client.__del__()
+
+    def test_del_noops_when_transport_is_closed(self) -> None:
+        client = AsyncDomainIQClient.__new__(AsyncDomainIQClient)
+        client._transport = LifecycleAsyncTransport(is_open=False)
+
+        with warnings.catch_warnings(record=True) as caught:
+            client.__del__()
+
+        assert caught == []
+
+    def test_del_warns_when_transport_is_still_open(self) -> None:
+        client = AsyncDomainIQClient.__new__(AsyncDomainIQClient)
+        transport = LifecycleAsyncTransport(is_open=True)
+        client._transport = transport
+
+        with pytest.warns(ResourceWarning, match="Unclosed AsyncDomainIQClient"):
+            client.__del__()
+
+        transport.is_open = False
 
 
 @pytest.mark.skipif(not AIOHTTP_AVAILABLE, reason="aiohttp not available")

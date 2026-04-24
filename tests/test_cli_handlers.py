@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import domainiq.cli as cli_module
 from domainiq.cli import main
 from domainiq.cli._args import create_parser
 from domainiq.cli._credentials import _is_interactive, prompt_for_api_key
@@ -227,6 +229,74 @@ class TestCliCredentials:
 
 
 class TestMain:
+    def test_build_config_uses_direct_cli_args(self, tmp_path) -> None:
+        config_file = tmp_path / "domainiq.key"
+        args = argparse.Namespace(
+            api_key="direct-key",
+            timeout=12,
+            config_file=str(config_file),
+        )
+        config = cli_module._build_config(args)
+
+        assert config.api_key == "direct-key"
+        assert config.timeout == 12
+        assert config.config_file_path == config_file
+
+    def test_build_config_prompts_after_configuration_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        args = argparse.Namespace(api_key=None, timeout=9, config_file="missing.key")
+        config_factory = MagicMock(
+            side_effect=[
+                DomainIQConfigurationError("missing key"),
+                MagicMock(api_key="prompted-key"),
+            ]
+        )
+        monkeypatch.setattr(cli_module, "Config", config_factory)
+        monkeypatch.setattr(cli_module, "prompt_for_api_key", lambda _path: "prompted")
+
+        config = cli_module._build_config(args)
+
+        assert config.api_key == "prompted-key"
+        assert config_factory.call_args_list[1].kwargs == {
+            "api_key": "prompted",
+            "timeout": 9,
+            "config_file": "missing.key",
+        }
+
+    @pytest.mark.parametrize(
+        ("exc", "debug", "expected_code", "expected_stderr"),
+        [
+            (DomainIQError("api failed"), False, 1, "Error: api failed"),
+            (KeyboardInterrupt(), False, 130, ""),
+            (ValueError("bad flag"), False, 1, "Invalid argument: bad flag"),
+            (OSError("disk failed"), False, 1, "OSError: disk failed"),
+        ],
+    )
+    def test_handle_cli_error_known_errors(
+        self,
+        exc: BaseException,
+        debug: bool,
+        expected_code: int,
+        expected_stderr: str,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        assert cli_module._handle_cli_error(exc, debug) == expected_code
+        assert expected_stderr in capsys.readouterr().err
+
+    def test_handle_cli_error_prints_traceback_when_debug(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        print_exc = MagicMock()
+        monkeypatch.setattr(cli_module.traceback, "print_exc", print_exc)
+
+        assert cli_module._handle_cli_error(OSError("disk failed"), True) == 1
+        print_exc.assert_called_once_with()
+
+    def test_handle_cli_error_reraises_unknown_errors(self) -> None:
+        with pytest.raises(RuntimeError, match="boom"):
+            cli_module._handle_cli_error(RuntimeError("boom"), False)
+
     def test_main_no_command_exits_no_command(self) -> None:
         with (
             patch("sys.argv", ["domainiq", "--api-key", "key"]),

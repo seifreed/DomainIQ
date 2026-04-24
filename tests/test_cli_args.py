@@ -193,7 +193,27 @@ class TestValidateArgs:
         errors = _validate_args(args)
         assert any("reverse-ip-data" in e for e in errors)
 
+    def test_reverse_ip_data_requires_type(self) -> None:
+        args = _make_args(reverse_ip_data="192.0.2.1")
+        errors = _validate_args(args)
+        assert any("reverse-ip-type" in e for e in errors)
+
+    def test_reverse_mx_type_requires_data(self) -> None:
+        args = _make_args(reverse_mx_type="domain")
+        errors = _validate_args(args)
+        assert any("reverse-mx-data" in e for e in errors)
+
+    def test_reverse_mx_data_requires_type(self) -> None:
+        args = _make_args(reverse_mx_data="example.com")
+        errors = _validate_args(args)
+        assert any("reverse-mx-type" in e for e in errors)
+
     def test_monitor_changes_requires_change_id(self) -> None:
         args = _make_args(monitor_report_changes=5)
         errors = _validate_args(args)
         assert any("monitor-change" in e for e in errors)
+
+    def test_monitor_change_requires_report_id(self) -> None:
+        args = _make_args(monitor_change=9)
+        errors = _validate_args(args)
+        assert any("monitor-report-changes" in e for e in errors)
