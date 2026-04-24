@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .exceptions import DomainIQValidationError
-from .validators import validate_date_string
+from .validators import ensure_positive_int, validate_date_string
 
 if TYPE_CHECKING:
     from ._models import DomainSearchFilters
@@ -17,6 +17,12 @@ def _validate_date_param(value: str, param_name: str) -> str:
         msg = f"Invalid date format for {param_name}: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
     return parsed
+
+
+def _validate_length_range(min_length: int | None, max_length: int | None) -> None:
+    if min_length is not None and max_length is not None and min_length > max_length:
+        msg = "min_length cannot be greater than max_length"
+        raise DomainIQValidationError(msg, param_name="min_length")
 
 
 def build_search_filters(  # noqa: PLR0913 - filters map directly to CLI/API knobs.
@@ -40,6 +46,13 @@ def build_search_filters(  # noqa: PLR0913 - filters map directly to CLI/API kno
         filters["exclude_numbers"] = True
     if exclude_idn:
         filters["exclude_idn"] = True
+    if min_length is not None:
+        min_length = ensure_positive_int("min_length", min_length)
+    if max_length is not None:
+        max_length = ensure_positive_int("max_length", max_length)
+    if limit is not None:
+        limit = ensure_positive_int("limit", limit)
+    _validate_length_range(min_length, max_length)
     if min_length is not None:
         filters["min_length"] = min_length
     if max_length is not None:

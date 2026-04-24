@@ -97,7 +97,9 @@ def _add_search_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--min-create-date", help="Minimum creation date (YYYY-MM-DD)")
     parser.add_argument("--max-create-date", help="Maximum creation date (YYYY-MM-DD)")
-    parser.add_argument("--search-limit", type=int, help="Limit search results")
+    parser.add_argument(
+        "--search-limit", type=_positive_int, help="Limit search results"
+    )
 
 
 def _add_reverse_search_args(parser: argparse.ArgumentParser) -> None:

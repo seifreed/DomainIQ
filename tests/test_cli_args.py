@@ -172,6 +172,11 @@ class TestArgParsing:
         with pytest.raises(SystemExit):
             self.parser.parse_args(["--domain-search", "kw", "--min-length", "0"])
 
+    @pytest.mark.parametrize("value", ["0", "-5"])
+    def test_search_limit_must_be_positive(self, value: str) -> None:
+        with pytest.raises(SystemExit):
+            self.parser.parse_args(["--domain-search", "kw", "--search-limit", value])
+
 
 class TestValidateArgs:
     def test_no_errors_when_args_valid(self) -> None:
