@@ -98,6 +98,13 @@ class TestMonitorMutationParams:
 
         assert params["enabled"] is False
 
+    @pytest.mark.parametrize("items", [[], [""], ["  "], ["example.com", ""]])
+    def test_add_monitor_item_rejects_empty_items(self, items: list[str]) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_add_monitor_item_params(42, "domain", items)
+
+        assert exc_info.value.param_name == "items"
+
     def test_typo_actions_validate_strength(self) -> None:
         assert build_enable_typos_params(42, 7, TYPO_STRENGTH_MAX)["strength"] == 41
         assert build_modify_typo_strength_params(42, 7, 5)["strength"] == 5

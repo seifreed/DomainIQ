@@ -31,7 +31,7 @@ from domainiq.constants import (
 from domainiq.constants import (
     EXIT_SUCCESS as _EXIT_SUCCESS,
 )
-from domainiq.exceptions import DomainIQError
+from domainiq.exceptions import DomainIQError, DomainIQValidationError
 from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
 
 if TYPE_CHECKING:
@@ -365,6 +365,25 @@ class TestDispatchMonitor:
         client.modify_typo_strength.assert_called_once_with(42, 7, 10)
         client.delete_monitor_item.assert_called_once_with(7)
         client.delete_monitor_report.assert_called_once_with(42)
+
+    def test_dispatch_monitor_management_reports_empty_add_item_value(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        client = _mock_client()
+        client.add_monitor_item.side_effect = DomainIQValidationError(
+            "items must not contain empty values",
+            param_name="items",
+        )
+        args = _make_args(add_monitor_item=["42", "domain", "example.com,"])
+
+        result = _dispatch_monitor_management(client, args)
+
+        assert result.executed is True
+        assert result.errored is True
+        client.add_monitor_item.assert_called_once_with(
+            42, "domain", ["example.com", ""]
+        )
+        assert "items must not contain empty values" in capsys.readouterr().err
 
 
 class TestRunCommand:

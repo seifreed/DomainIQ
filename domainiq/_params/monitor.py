@@ -12,6 +12,8 @@ from domainiq.constants import (
 )
 from domainiq.exceptions import DomainIQValidationError
 
+from ._shared import require_non_empty
+
 if TYPE_CHECKING:
     from domainiq._models import MonitorItemType, MonitorReportType
 
@@ -79,6 +81,7 @@ def build_add_monitor_item_params(
     items: list[str],
     enabled: bool | None = None,
 ) -> dict[str, Any]:
+    require_non_empty("items", items)
     params: dict[str, Any] = {
         "service": "monitor",
         "action": "report_item_add",
