@@ -140,6 +140,14 @@ class TestUtilsUnit:
         assert not validate_email("notanemail")
         assert not validate_email("@domain.com")
         assert not validate_email("user@")
+        assert not validate_email("bad local@example.com")
+        assert not validate_email(" user@example.com")
+        assert not validate_email("user @example.com")
+        assert not validate_email("user\n@example.com")
+        assert not validate_email("user\t@example.com")
+        assert not validate_email(".user@example.com")
+        assert not validate_email("user.@example.com")
+        assert not validate_email("user..name@example.com")
 
 
 class TestModelsUnit:

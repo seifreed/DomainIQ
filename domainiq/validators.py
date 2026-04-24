@@ -17,6 +17,7 @@ IPV4_VERSION = 4
 IPV6_VERSION = 6
 
 _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
+_EMAIL_LOCAL_PATTERN = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
 
 
 def _validate_label(label: str) -> bool:
@@ -128,6 +129,13 @@ def validate_email(email: str) -> bool:
 
     local, domain = parts
     if not local or not domain:
+        return False
+    if (
+        not _EMAIL_LOCAL_PATTERN.fullmatch(local)
+        or local.startswith(".")
+        or local.endswith(".")
+        or ".." in local
+    ):
         return False
 
     return validate_domain(domain)
