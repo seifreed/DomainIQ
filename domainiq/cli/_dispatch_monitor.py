@@ -4,6 +4,7 @@ import argparse
 from collections.abc import Callable
 from functools import partial
 
+from domainiq.exceptions import DomainIQValidationError
 from domainiq.protocols import MonitorProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
@@ -58,19 +59,33 @@ def _create_monitor_report(
     return client.create_monitor_report(report_type, name, email_alert=args.email_alert)
 
 
+def _parse_int_arg(value: str, param_name: str) -> int:
+    try:
+        return int(value)
+    except ValueError as exc:
+        msg = f"{param_name} must be an integer, got {value!r}"
+        raise DomainIQValidationError(msg, param_name=param_name) from exc
+
+
 def _add_monitor_item(client: MonitorProtocol, args: argparse.Namespace) -> object:
     report_id, item_type, raw_items = args.add_monitor_item
     items = [item.strip() for item in raw_items.split(",")]
-    return client.add_monitor_item(int(report_id), item_type, items)
+    return client.add_monitor_item(
+        _parse_int_arg(report_id, "report_id"),
+        item_type,
+        items,
+    )
 
 
 def _enable_typos(client: MonitorProtocol, args: argparse.Namespace) -> object:
-    report_id, item_id = (int(value) for value in args.enable_typos)
+    report_id = _parse_int_arg(args.enable_typos[0], "report_id")
+    item_id = _parse_int_arg(args.enable_typos[1], "item_id")
     return client.enable_typos(report_id, item_id)
 
 
 def _disable_typos(client: MonitorProtocol, args: argparse.Namespace) -> object:
-    report_id, item_id = (int(value) for value in args.disable_typos)
+    report_id = _parse_int_arg(args.disable_typos[0], "report_id")
+    item_id = _parse_int_arg(args.disable_typos[1], "item_id")
     return client.disable_typos(report_id, item_id)
 
 
@@ -78,7 +93,9 @@ def _modify_typo_strength(
     client: MonitorProtocol,
     args: argparse.Namespace,
 ) -> object:
-    report_id, item_id, strength = (int(value) for value in args.modify_typo_strength)
+    report_id = _parse_int_arg(args.modify_typo_strength[0], "report_id")
+    item_id = _parse_int_arg(args.modify_typo_strength[1], "item_id")
+    strength = _parse_int_arg(args.modify_typo_strength[2], "strength")
     return client.modify_typo_strength(report_id, item_id, strength)
 
 

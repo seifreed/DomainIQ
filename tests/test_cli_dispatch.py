@@ -385,6 +385,45 @@ class TestDispatchMonitor:
         )
         assert "items must not contain empty values" in capsys.readouterr().err
 
+    def test_dispatch_command_reports_invalid_add_monitor_item_report_id(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        client = _mock_client()
+        args = _make_args(add_monitor_item=["abc", "domain", "example.com"])
+
+        result = _dispatch_command(client, args)
+
+        assert result == _EXIT_ERROR
+        client.add_monitor_item.assert_not_called()
+        captured = capsys.readouterr()
+        assert "report_id" in captured.err
+
+    def test_dispatch_command_reports_invalid_enable_typos_report_id(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        client = _mock_client()
+        args = _make_args(enable_typos=["abc", "7"])
+
+        result = _dispatch_command(client, args)
+
+        assert result == _EXIT_ERROR
+        client.enable_typos.assert_not_called()
+        captured = capsys.readouterr()
+        assert "report_id" in captured.err
+
+    def test_dispatch_command_reports_invalid_modify_typo_strength_item_id(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        client = _mock_client()
+        args = _make_args(modify_typo_strength=["42", "x", "10"])
+
+        result = _dispatch_command(client, args)
+
+        assert result == _EXIT_ERROR
+        client.modify_typo_strength.assert_not_called()
+        captured = capsys.readouterr()
+        assert "item_id" in captured.err
+
 
 class TestRunCommand:
     def test_returns_executed_true_no_errors_on_success(self) -> None:
