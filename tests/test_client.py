@@ -267,6 +267,26 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "AAAA"
         assert result.records[0].value == "2001:db8::1"
 
+    def test_dns_result_maps_mx_exchange_field(self):
+        data = {
+            "domain": "example.com",
+            "records": [
+                {
+                    "name": "example.com",
+                    "type": "MX",
+                    "exchange": "mail.example.com",
+                    "priority": 10,
+                }
+            ],
+        }
+
+        result = parse_dns_result(data)
+
+        assert len(result.records) == 1
+        assert result.records[0].type == "MX"
+        assert result.records[0].value == "mail.example.com"
+        assert result.records[0].priority == 10
+
     def test_format_api_params_serializes_nested_dicts_as_json(self):
         formatted = format_api_params({"payload": [{"a": 1}, {"b": 2}]})
         assert '"' in formatted["payload"]

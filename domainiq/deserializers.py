@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 _RECORD_VALUE_KEYS: dict[str, tuple[str, ...]] = {
     "A": ("ip", "value"),
     "AAAA": ("ip", "value"),
-    "MX": ("target", "value"),
+    "MX": ("exchange", "target", "value"),
     "CNAME": ("target", "value"),
     "TXT": ("txt", "value"),
     "NS": ("target", "value"),
@@ -55,7 +55,8 @@ def _extract_record_value(record_data: dict[str, Any], record_type: str) -> str:
     """Extract the record value from a DNS record dict.
 
     The DomainIQ API uses different field names per record type
-    (e.g. 'ip' for A/AAAA, 'target' for MX/CNAME). ``_RECORD_VALUE_KEYS``
+    (e.g. 'ip' for A/AAAA, 'exchange' for MX, 'target' for CNAME).
+    ``_RECORD_VALUE_KEYS``
     maps each type to its candidate fields; 'value' is the fallback for
     unknown types.
     """
