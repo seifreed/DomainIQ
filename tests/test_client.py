@@ -314,6 +314,12 @@ class TestLogicBugRegressions:
         parsed = _try_parse_date("1700000000.5")
         assert isinstance(parsed, datetime)
 
+    def test_try_parse_date_accepts_numeric_timestamp(self):
+        assert _try_parse_date(1704067200) == _try_parse_date("1704067200")
+
+    def test_try_parse_date_accepts_numeric_float_timestamp(self):
+        assert _try_parse_date(1704067200.5) == _try_parse_date("1704067200.5")
+
     def test_try_parse_date_still_parses_iso(self):
         parsed = _try_parse_date("2023-01-01T00:00:00")
         assert isinstance(parsed, datetime)
@@ -342,6 +348,13 @@ class TestLogicBugRegressions:
         assert result.creation_date.year == 2024
         assert result.creation_date.month == 1
         assert result.creation_date.day == 1
+
+    def test_whois_creation_date_accepts_numeric_timestamp(self):
+        result = parse_whois_result(
+            {"domain": "example.com", "creation_date": 1704067200}
+        )
+
+        assert result.creation_date == _try_parse_date("1704067200")
 
     def test_whois_emails_filter_whitespace_entries(self):
         data = {

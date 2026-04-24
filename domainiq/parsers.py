@@ -31,36 +31,62 @@ _DATE_FORMATS = (
 _TIMESTAMP_MIN_DIGITS = 10
 
 
-def try_parse_date(date_str: str | None) -> datetime | None:
-    """Parse a date string using a 4-stage fallback chain.
-
-    Tries in order:
-    1. ``datetime.fromisoformat()`` — ISO 8601 / RFC 3339
-    2. Unix timestamp — float string with '.' or >= 10 digits (avoids short
-       numeric strings like "2023" producing absurd 1970-era dates)
-    3. Six explicit strptime formats (see ``_DATE_FORMATS``)
-    4. Returns ``None`` if all stages fail
-    """
-    if not date_str:
+def _parse_numeric_timestamp(value: float, raw_value: object) -> datetime | None:
+    try:
+        return datetime.fromtimestamp(value)  # noqa: DTZ006 — API returns naive UTC epoch; naive datetime is the project-wide contract for parsed dates
+    except (OSError, OverflowError, ValueError):
+        logger.debug(
+            "try_parse_date: numeric timestamp parse failed for %r",
+            raw_value,
+        )
         return None
+
+
+def _parse_date_string(date_str: str) -> datetime | None:
     stripped = date_str.strip()
     if not stripped:
         return None
     try:
         return datetime.fromisoformat(stripped)
-    except (ValueError, AttributeError):
+    except ValueError:
         logger.debug("try_parse_date: fromisoformat failed for %r", date_str[:80])
+
     digits = stripped.lstrip("-")
     if "." in stripped or (digits.isdigit() and len(digits) >= _TIMESTAMP_MIN_DIGITS):
         try:
-            return datetime.fromtimestamp(float(stripped))  # noqa: DTZ006 — API returns naive UTC epoch; naive datetime is the project-wide contract for parsed dates
-        except (ValueError, TypeError, OSError):
+            timestamp = float(stripped)
+        except ValueError:
             logger.debug("try_parse_date: timestamp parse failed for %r", date_str[:80])
+        else:
+            parsed = _parse_numeric_timestamp(timestamp, date_str)
+            if parsed is not None:
+                return parsed
+
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(stripped, fmt)  # noqa: DTZ007 — same naive-datetime contract as DTZ006; API does not supply timezone in string formats
         except ValueError:
             continue
+    return None
+
+
+def try_parse_date(date_str: object) -> datetime | None:
+    """Parse a date value using a tolerant fallback chain.
+
+    Tries in order:
+    1. Numeric Unix timestamp
+    2. ``datetime.fromisoformat()`` — ISO 8601 / RFC 3339
+    3. Unix timestamp string — float string with '.' or >= 10 digits (avoids short
+       numeric strings like "2023" producing absurd 1970-era dates)
+    4. Six explicit strptime formats (see ``_DATE_FORMATS``)
+    5. Returns ``None`` if all stages fail
+    """
+    if date_str is None or isinstance(date_str, bool):
+        return None
+    if isinstance(date_str, int | float):
+        return _parse_numeric_timestamp(date_str, date_str)
+    if isinstance(date_str, str):
+        return _parse_date_string(date_str)
     return None
 
 

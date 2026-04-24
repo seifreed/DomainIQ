@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import datetime
 
 import pytest
 
@@ -54,6 +55,13 @@ class TestDomainSnapshotDeserializer:
         )
 
         assert result.raw_data is None
+
+    def test_numeric_timestamp_is_parsed(self) -> None:
+        result = parse_domain_snapshot(
+            {"domain": "example.com", "timestamp": 1704067200}
+        )
+
+        assert isinstance(result.timestamp, datetime)
 
 
 class TestDomainReportDeserializer:
@@ -152,6 +160,13 @@ class TestMonitorDeserializer:
         assert parse_bool(" yes ") is True
         assert parse_bool(" 1 ") is True
         assert parse_bool(" false ") is False
+
+    def test_numeric_created_date_is_parsed(self) -> None:
+        result = parse_monitor_report(
+            {"name": "brand-watch", "created_date": 1704067200}
+        )
+
+        assert isinstance(result.created_date, datetime)
 
     def test_parses_monitor_report_with_items_and_boolean_variants(self) -> None:
         result = parse_monitor_report(
