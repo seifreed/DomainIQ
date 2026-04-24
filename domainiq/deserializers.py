@@ -47,7 +47,9 @@ _RECORD_VALUE_KEYS: dict[str, tuple[str, ...]] = {
     "MX": ("exchange", "target", "value"),
     "CNAME": ("target", "value"),
     "TXT": ("txt", "value"),
-    "NS": ("target", "value"),
+    "NS": ("nameserver", "target", "value"),
+    "SOA": ("mname", "target", "value"),
+    "PTR": ("ptrdname", "target", "value"),
 }
 
 
