@@ -2,7 +2,7 @@
 
 import argparse
 
-from domainiq._models import ReverseMxSearchType
+from domainiq.models import ReverseMxSearchType
 
 
 def _positive_int(value: str) -> int:

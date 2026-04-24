@@ -2,8 +2,8 @@
 
 import argparse
 
-from domainiq._models import BulkWhoisType
-from domainiq._protocols import BulkProtocol
+from domainiq.models import BulkWhoisType
+from domainiq.protocols import BulkProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import argparse
 
-    from domainiq._models import DNSRecordType
+    from domainiq.models import DNSRecordType
 
 
 @dataclass(frozen=True)
