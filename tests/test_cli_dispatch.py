@@ -17,6 +17,7 @@ from domainiq.cli._dispatch_monitor import (
     _dispatch_monitor,
     _dispatch_monitor_management,
 )
+from domainiq.cli._dispatch_reports import _dispatch_reports
 from domainiq.cli._dispatch_search import _dispatch_search
 from domainiq.constants import (
     EXIT_ERROR as _EXIT_ERROR,
@@ -245,6 +246,60 @@ class TestDispatchBulk:
             ["example.org"], BulkWhoisType.CACHED
         )
         client.bulk_whois_ip.assert_called_once_with(["192.0.2.1"])
+
+
+class TestDispatchReports:
+    def test_dispatch_report_commands(self, capsys: pytest.CaptureFixture[str]) -> None:
+        client = _mock_client()
+        client.domain_report.return_value = {"domain": "example.com"}
+        client.name_report.return_value = {"name": "Alice"}
+        client.organization_report.return_value = {"organization": "Example Org"}
+        client.email_report.return_value = {"email": "admin@example.com"}
+        client.ip_report.return_value = {"ip": "192.0.2.1"}
+        args = _make_args(
+            domain_report="example.com",
+            name_report="Alice",
+            organization_report="Example Org",
+            email_report="admin@example.com",
+            ip_report="192.0.2.1",
+        )
+
+        result = _dispatch_reports(client, args)
+
+        assert result.executed is True
+        assert result.errored is False
+        client.domain_report.assert_called_once_with("example.com")
+        client.name_report.assert_called_once_with("Alice")
+        client.organization_report.assert_called_once_with("Example Org")
+        client.email_report.assert_called_once_with("admin@example.com")
+        client.ip_report.assert_called_once_with("192.0.2.1")
+        assert "example.com" in capsys.readouterr().out
+
+    def test_dispatch_reports_skips_when_no_report_args(self) -> None:
+        client = _mock_client()
+        args = _make_args()
+
+        result = _dispatch_reports(client, args)
+
+        assert result.executed is False
+        assert result.errored is False
+        client.domain_report.assert_not_called()
+
+    def test_dispatch_reports_aggregates_partial_errors(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        client = _mock_client()
+        client.domain_report.return_value = {"domain": "example.com"}
+        client.name_report.side_effect = DomainIQError("report failed")
+        args = _make_args(domain_report="example.com", name_report="Alice")
+
+        result = _dispatch_reports(client, args)
+
+        assert result.executed is True
+        assert result.errored is True
+        captured = capsys.readouterr()
+        assert "example.com" in captured.out
+        assert "report failed" in captured.err
 
 
 class TestDispatchMonitor:

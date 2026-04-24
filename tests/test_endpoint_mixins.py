@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from domainiq._models import BulkWhoisType, SnapshotOptions
+from domainiq._models import BulkWhoisType, DNSRecordType, SnapshotOptions
 
 from .conftest import (
     MockAsyncTransport,
@@ -68,6 +68,56 @@ class TestBulkMixins:
         assert dns[0]["domain"] == "example.com"
         assert whois[0]["status"] == "ok"
         assert whois_ip[0]["domain"] == "example.net"
+
+
+class TestDNSMixins:
+    def test_sync_dns_method_parses_records_and_forwards_types(
+        self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
+    ) -> None:
+        mock_transport.enqueue(
+            make_sync_response(
+                200,
+                (
+                    '{"domain": "example.com", "records": ['
+                    '{"name": "example.com", "type": "A", "value": "192.0.2.1"}'
+                    "]}"
+                )
+            )
+        )
+
+        result = mock_client.dns_lookup("example.com", [DNSRecordType.A, "MX"])
+
+        assert result.domain == "example.com"
+        assert result.records[0].value == "192.0.2.1"
+        assert mock_transport.calls[0]["params"]["service"] == "dns"
+        assert mock_transport.calls[0]["params"]["q"] == "example.com"
+        assert mock_transport.calls[0]["params"]["types"] == "A,MX"
+
+    @pytest.mark.asyncio
+    async def test_async_dns_method_parses_records_and_forwards_types(
+        self,
+        mock_async_transport: MockAsyncTransport,
+        mock_async_client: AsyncDomainIQClient,
+    ) -> None:
+        mock_async_transport.enqueue(
+            make_async_response(
+                200,
+                (
+                    '{"domain": "example.net", "records": ['
+                    '{"name": "example.net", "type": "MX", "value": "mail.example.net"}'
+                    "]}"
+                )
+            )
+        )
+
+        result = await mock_async_client.dns_lookup(
+            "example.net", [DNSRecordType.MX]
+        )
+
+        assert result.domain == "example.net"
+        assert result.records[0].type == "MX"
+        assert mock_async_transport.calls[0]["params"]["service"] == "dns"
+        assert mock_async_transport.calls[0]["params"]["types"] == "MX"
 
 
 class TestDomainAnalysisMixins:

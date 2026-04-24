@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+import domainiq.http._requests_transport as requests_transport_module
 from domainiq import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
@@ -20,6 +21,7 @@ from domainiq import (
     DomainIQTimeoutError,
 )
 from domainiq.cli._dispatch import _dispatch_dns, _dispatch_whois
+from domainiq.http import RequestsTransport, SyncResponse
 
 from .conftest import (
     MockAsyncTransport,
@@ -35,6 +37,119 @@ AIOHTTP_AVAILABLE = importlib.util.find_spec("aiohttp") is not None
 
 if AIOHTTP_AVAILABLE:
     pass
+
+
+class _FakeRequestsResponse:
+    def __init__(
+        self,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        text: str = "{}",
+    ) -> None:
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = text
+
+
+class _FakeRequestsSession:
+    def __init__(self, outcome: _FakeRequestsResponse | BaseException) -> None:
+        self.outcome = outcome
+        self.calls: list[dict[str, object]] = []
+        self.mount_prefixes: list[str] = []
+        self.closed = False
+
+    def mount(self, prefix: str, _adapter: object) -> None:
+        self.mount_prefixes.append(prefix)
+
+    def get(
+        self, url: str, params: dict[str, str], timeout: float
+    ) -> _FakeRequestsResponse:
+        self.calls.append({"url": url, "params": params, "timeout": timeout})
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _requests_transport_with_session(
+    monkeypatch: pytest.MonkeyPatch,
+    session: _FakeRequestsSession,
+) -> RequestsTransport:
+    monkeypatch.setattr(
+        requests_transport_module.requests,
+        "Session",
+        lambda: session,
+    )
+    return RequestsTransport()
+
+
+class TestRequestsTransport:
+    def test_successful_response_is_snapshotted(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        session = _FakeRequestsSession(
+            _FakeRequestsResponse(
+                status_code=202,
+                headers={"X-Test": "yes"},
+                text='{"ok": true}',
+            )
+        )
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        response = transport.get(
+            "https://api.example.test",
+            {"service": "whois"},
+            timeout=12,
+        )
+
+        assert isinstance(response, SyncResponse)
+        assert response.status_code == 202
+        assert response.headers == {"X-Test": "yes"}
+        assert response.text == '{"ok": true}'
+        assert session.mount_prefixes == ["https://"]
+        assert session.calls == [
+            {
+                "url": "https://api.example.test",
+                "params": {"service": "whois"},
+                "timeout": 12,
+            }
+        ]
+
+    def test_timeout_exception_is_normalized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        timeout_exc = requests_transport_module.requests.exceptions.Timeout("slow")
+        session = _FakeRequestsSession(timeout_exc)
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        with pytest.raises(TimeoutError, match="slow") as exc_info:
+            transport.get("https://api.example.test", {}, timeout=1)
+
+        assert exc_info.value.__cause__ is timeout_exc
+
+    def test_request_exception_is_normalized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        request_exc = requests_transport_module.requests.exceptions.RequestException(
+            "offline"
+        )
+        session = _FakeRequestsSession(request_exc)
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        with pytest.raises(OSError, match="offline") as exc_info:
+            transport.get("https://api.example.test", {}, timeout=1)
+
+        assert exc_info.value.__cause__ is request_exc
+
+    def test_close_closes_session(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        session = _FakeRequestsSession(_FakeRequestsResponse())
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        transport.close()
+
+        assert session.closed is True
 
 
 # ---------------------------------------------------------------------------
