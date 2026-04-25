@@ -659,6 +659,27 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "A"
         assert result.records[0].value == "192.0.2.1"
 
+    def test_dns_result_skips_non_dict_record_entries(self):
+        data = {
+            "domain": "example.com",
+            "records": [
+                {
+                    "name": "example.com",
+                    "type": "A",
+                    "ip": "192.0.2.1",
+                },
+                "bad-record",
+                None,
+            ],
+        }
+
+        result = parse_dns_result(data)
+
+        assert result.domain == "example.com"
+        assert len(result.records) == 1
+        assert result.records[0].type == "A"
+        assert result.records[0].value == "192.0.2.1"
+
     def test_dns_result_prefers_soa_record_name_for_domain(self):
         data = {
             "records": [

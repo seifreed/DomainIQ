@@ -80,6 +80,16 @@ def _parse_first_date(*values: object) -> datetime | None:
     return None
 
 
+def _normalize_dict_list(raw: object) -> list[dict[str, Any]]:
+    if isinstance(raw, dict):
+        return [cast("dict[str, Any]", raw)]
+    if isinstance(raw, list):
+        return [
+            cast("dict[str, Any]", item) for item in raw if isinstance(item, dict)
+        ]
+    return []
+
+
 def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
     """Parse a DomainIQ API WHOIS response dict into a WhoisResult."""
     result = unwrap_api_envelope(data, ("domain", "ip", "registrar"))
@@ -108,14 +118,9 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     """Parse a DomainIQ API DNS response dict into a DNSResult."""
     inner = unwrap_api_envelope(envelope, ("results", "records", "domain"))
     raw_results = inner.get("results") or inner.get("records")
-    if isinstance(raw_results, dict):
-        results = [raw_results]
-    elif isinstance(raw_results, list):
-        results = cast("list[dict[str, Any]]", raw_results)
-    else:
-        results = []
+    results = _normalize_dict_list(raw_results)
     domain = inner.get("domain", "")
-    if not domain and results and isinstance(results[0], dict):
+    if not domain and results:
         # Prefer SOA or NS records for domain extraction
         for rec in results:
             if rec.get("type") in ("SOA", "NS"):
@@ -213,12 +218,7 @@ def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
     """Parse a DomainIQ API monitor report response dict into a MonitorReport."""
     inner = unwrap_api_envelope(envelope, ("name", "items"))
     raw_items = inner.get("items")
-    if isinstance(raw_items, dict):
-        item_data_list = [raw_items]
-    elif isinstance(raw_items, list):
-        item_data_list = cast("list[dict[str, Any]]", raw_items)
-    else:
-        item_data_list = []
+    item_data_list = _normalize_dict_list(raw_items)
     items = [
         MonitorItem(
             id=item_data.get("id", 0),

@@ -229,6 +229,25 @@ class TestMonitorDeserializer:
         assert result.items[0].type == "domain"
         assert result.items[0].value == "example.com"
 
+    def test_parse_monitor_report_skips_non_dict_items(self) -> None:
+        result = parse_monitor_report(
+            {
+                "id": 42,
+                "name": "brand-watch",
+                "items": [
+                    {"id": 7, "type": "domain", "value": "example.com"},
+                    "bad-item",
+                    None,
+                ],
+            }
+        )
+
+        assert result.items is not None
+        assert len(result.items) == 1
+        assert result.items[0].id == 7
+        assert result.items[0].type == "domain"
+        assert result.items[0].value == "example.com"
+
     def test_passthrough_result_casts(self) -> None:
         action = {"ok": True}
         search = {"results": []}
