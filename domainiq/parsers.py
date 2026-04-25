@@ -42,12 +42,18 @@ def _parse_numeric_timestamp(value: float, raw_value: object) -> datetime | None
         return None
 
 
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
 def _parse_date_string(date_str: str) -> datetime | None:
     stripped = date_str.strip()
     if not stripped:
         return None
     try:
-        return datetime.fromisoformat(stripped)
+        return _normalize_datetime(datetime.fromisoformat(stripped))
     except ValueError:
         logger.debug("try_parse_date: fromisoformat failed for %r", date_str[:80])
 

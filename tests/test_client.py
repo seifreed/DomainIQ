@@ -354,6 +354,19 @@ class TestLogicBugRegressions:
         assert isinstance(parsed, datetime)
         assert parsed.year == 2023
 
+    def test_try_parse_date_normalizes_aware_iso_to_naive_utc(self):
+        expected = datetime(2024, 1, 1, 0, 0, 0)  # noqa: DTZ001
+
+        zulu = _try_parse_date("2024-01-01T00:00:00Z")
+        offset = _try_parse_date("2024-01-01T01:00:00+01:00")
+
+        assert zulu == expected
+        assert offset == expected
+        assert zulu is not None
+        assert offset is not None
+        assert zulu.tzinfo is None
+        assert offset.tzinfo is None
+
     def test_try_parse_date_strips_surrounding_whitespace(self):
         parsed = _try_parse_date(" 2024-01-01 ")
         assert isinstance(parsed, datetime)
