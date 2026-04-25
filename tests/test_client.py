@@ -78,6 +78,53 @@ class TestConfigUnit:
 
         assert "Timeout must be positive" in str(exc_info.value)
 
+    @pytest.mark.parametrize("timeout", ["abc", True, float("nan"), float("inf")])
+    def test_config_validation_rejects_invalid_timeout_types(self, timeout):
+        config = Config(api_key="test_key", timeout=timeout)
+
+        with pytest.raises(
+            DomainIQConfigurationError, match="Timeout must be a finite number"
+        ):
+            config.validate()
+
+    @pytest.mark.parametrize(
+        ("kwargs", "message"),
+        [
+            ({"max_retries": True}, "Max retries must be an integer"),
+            ({"max_retries": 1.5}, "Max retries must be an integer"),
+            ({"max_retries": "3"}, "Max retries must be an integer"),
+            ({"retry_delay": True}, "Retry delay must be an integer"),
+            ({"retry_delay": 1.5}, "Retry delay must be an integer"),
+            ({"retry_delay": "3"}, "Retry delay must be an integer"),
+            ({"connector_limit": True}, "Connector limit must be an integer"),
+            ({"connector_limit": 1.5}, "Connector limit must be an integer"),
+            ({"connector_limit": "3"}, "Connector limit must be an integer"),
+            (
+                {"connector_limit_per_host": True},
+                "Connector limit per host must be an integer",
+            ),
+            (
+                {"connector_limit_per_host": 1.5},
+                "Connector limit per host must be an integer",
+            ),
+            (
+                {"connector_limit_per_host": "3"},
+                "Connector limit per host must be an integer",
+            ),
+        ],
+    )
+    def test_config_validation_rejects_invalid_integer_types(self, kwargs, message):
+        config = Config(api_key="test_key", **kwargs)
+
+        with pytest.raises(DomainIQConfigurationError, match=message):
+            config.validate()
+
+    def test_client_initialization_reports_invalid_numeric_config(self):
+        with pytest.raises(
+            DomainIQConfigurationError, match="Timeout must be a finite number"
+        ):
+            DomainIQClient(api_key="test_key", timeout="abc")
+
     def test_config_validation_missing_api_key(self):
         config = Config(api_key="test_key")
         config.api_key = ""

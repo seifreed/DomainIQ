@@ -1,6 +1,7 @@
 """Passive configuration object for the DomainIQ SDK."""
 
 import logging
+import math
 import os
 from pathlib import Path
 from typing import TypedDict
@@ -45,6 +46,26 @@ def _env_int(name: str, default: int) -> int:
     except ValueError as exc:
         msg = f"Invalid {name}: expected an integer"
         raise DomainIQConfigurationError(msg) from exc
+
+
+def _ensure_finite_number(field_name: str, value: object) -> float | int:
+    """Validate numeric config values before range comparisons."""
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(value)
+    ):
+        msg = f"{field_name} must be a finite number"
+        raise DomainIQConfigurationError(msg)
+    return value
+
+
+def _ensure_int(field_name: str, value: object) -> int:
+    """Validate integer config values before range comparisons."""
+    if not isinstance(value, int) or isinstance(value, bool):
+        msg = f"{field_name} must be an integer"
+        raise DomainIQConfigurationError(msg)
+    return value
 
 
 class ConfigKwargs(TypedDict, total=False):
@@ -155,23 +176,31 @@ class Config:
             msg = "Base URL is required"
             raise DomainIQConfigurationError(msg)
 
-        if self.timeout <= 0:
+        timeout = _ensure_finite_number("Timeout", self.timeout)
+        if timeout <= 0:
             msg = "Timeout must be positive"
             raise DomainIQConfigurationError(msg)
 
-        if self.max_retries < 0:
+        max_retries = _ensure_int("Max retries", self.max_retries)
+        if max_retries < 0:
             msg = "Max retries cannot be negative"
             raise DomainIQConfigurationError(msg)
 
-        if self.retry_delay < 0:
+        retry_delay = _ensure_int("Retry delay", self.retry_delay)
+        if retry_delay < 0:
             msg = "Retry delay cannot be negative"
             raise DomainIQConfigurationError(msg)
 
-        if self.connector_limit <= 0:
+        connector_limit = _ensure_int("Connector limit", self.connector_limit)
+        if connector_limit <= 0:
             msg = "Connector limit must be positive"
             raise DomainIQConfigurationError(msg)
 
-        if self.connector_limit_per_host <= 0:
+        connector_limit_per_host = _ensure_int(
+            "Connector limit per host",
+            self.connector_limit_per_host,
+        )
+        if connector_limit_per_host <= 0:
             msg = "Connector limit per host must be positive"
             raise DomainIQConfigurationError(msg)
 
