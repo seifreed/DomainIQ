@@ -1,7 +1,7 @@
 """Primitive parsing utilities shared across model deserialization."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ _TIMESTAMP_MIN_DIGITS = 10
 
 def _parse_numeric_timestamp(value: float, raw_value: object) -> datetime | None:
     try:
-        return datetime.fromtimestamp(value)  # noqa: DTZ006 — API returns naive UTC epoch; naive datetime is the project-wide contract for parsed dates
+        return datetime.fromtimestamp(value, UTC).replace(tzinfo=None)
     except (OSError, OverflowError, ValueError):
         logger.debug(
             "try_parse_date: numeric timestamp parse failed for %r",

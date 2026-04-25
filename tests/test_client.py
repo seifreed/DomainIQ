@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -315,10 +316,36 @@ class TestLogicBugRegressions:
         assert isinstance(parsed, datetime)
 
     def test_try_parse_date_accepts_numeric_timestamp(self):
-        assert _try_parse_date(1704067200) == _try_parse_date("1704067200")
+        expected = datetime(2024, 1, 1, 0, 0, 0)  # noqa: DTZ001
+
+        assert _try_parse_date(1704067200) == expected
+        assert _try_parse_date("1704067200") == expected
 
     def test_try_parse_date_accepts_numeric_float_timestamp(self):
-        assert _try_parse_date(1704067200.5) == _try_parse_date("1704067200.5")
+        expected = datetime(2024, 1, 1, 0, 0, 0, 500000)  # noqa: DTZ001
+
+        assert _try_parse_date(1704067200.5) == expected
+        assert _try_parse_date("1704067200.5") == expected
+
+    def test_try_parse_date_timestamp_is_timezone_independent(self):
+        if not hasattr(time, "tzset"):
+            pytest.skip("time.tzset is unavailable on this platform")
+
+        expected = datetime(2024, 1, 1, 0, 0, 0)  # noqa: DTZ001
+        original_tz = os.environ.get("TZ")
+        try:
+            for tz_name in ("UTC", "Europe/Madrid", "America/New_York"):
+                os.environ["TZ"] = tz_name
+                time.tzset()
+
+                assert _try_parse_date("1704067200") == expected
+                assert _try_parse_date(1704067200) == expected
+        finally:
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            time.tzset()
 
     def test_try_parse_date_still_parses_iso(self):
         parsed = _try_parse_date("2023-01-01T00:00:00")
