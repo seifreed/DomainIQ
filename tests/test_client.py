@@ -544,6 +544,23 @@ class TestLogicBugRegressions:
         result = parse_dns_result(data)
         assert result.domain == "example.com"
 
+    def test_dns_result_accepts_single_record_dict(self):
+        data = {
+            "domain": "example.com",
+            "records": {
+                "name": "example.com",
+                "type": "A",
+                "ip": "192.0.2.1",
+            },
+        }
+
+        result = parse_dns_result(data)
+
+        assert result.domain == "example.com"
+        assert len(result.records) == 1
+        assert result.records[0].type == "A"
+        assert result.records[0].value == "192.0.2.1"
+
     def test_dns_result_prefers_soa_record_name_for_domain(self):
         data = {
             "records": [

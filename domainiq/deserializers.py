@@ -95,7 +95,13 @@ def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
 def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     """Parse a DomainIQ API DNS response dict into a DNSResult."""
     inner = unwrap_api_envelope(envelope, ("results", "records", "domain"))
-    results = inner.get("results") or inner.get("records") or []
+    raw_results = inner.get("results") or inner.get("records")
+    if isinstance(raw_results, dict):
+        results = [raw_results]
+    elif isinstance(raw_results, list):
+        results = cast("list[dict[str, Any]]", raw_results)
+    else:
+        results = []
     domain = inner.get("domain", "")
     if not domain and results and isinstance(results[0], dict):
         # Prefer SOA or NS records for domain extraction
@@ -109,9 +115,13 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     records = []
     for record_data in results:
         record_type = record_data.get("type", "")
+        record_name = cast(
+            "str",
+            record_data.get("host") or record_data.get("name", ""),
+        )
         records.append(
             DNSRecord(
-                name=record_data.get("host", record_data.get("name", "")),
+                name=record_name,
                 type=record_type,
                 value=_extract_record_value(record_data, record_type),
                 ttl=record_data.get("ttl"),
