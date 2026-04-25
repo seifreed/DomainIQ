@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from domainiq._models.enums import (
+    KeywordMatchType,
     ReverseIpSearchType,
     ReverseMatchType,
     ReverseMxSearchType,
@@ -21,11 +22,11 @@ from ._shared import require_non_empty
 if TYPE_CHECKING:
     from domainiq._models import (
         DomainSearchFilters,
-        KeywordMatchType,
     )
 
 logger = logging.getLogger(__name__)
 
+_KEYWORD_MATCH_TYPES = {member.value for member in KeywordMatchType}
 _REVERSE_SEARCH_TYPES = {member.value for member in ReverseSearchType}
 _REVERSE_MATCH_TYPES = {member.value for member in ReverseMatchType}
 _REVERSE_IP_TYPES = {member.value for member in ReverseIpSearchType}
@@ -87,14 +88,15 @@ def _validate_conditions(keywords: list[str], conditions: list[str]) -> None:
 def build_domain_search_params(
     keywords: list[str],
     conditions: list[str] | None,
-    match: KeywordMatchType,
+    match: KeywordMatchType | str,
     filters: DomainSearchFilters | None,
 ) -> dict[str, Any]:
     """Build parameters for the keyword search endpoint."""
     require_non_empty("keywords", keywords)
+    match_value = _validate_type_value(match, _KEYWORD_MATCH_TYPES, "match")
     params: dict[str, Any] = {
         "service": "domain_search",
-        "match": enum_value(match),
+        "match": match_value,
     }
     _add_indexed_params(params, "keyword", keywords)
     if conditions:

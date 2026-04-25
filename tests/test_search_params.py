@@ -95,6 +95,12 @@ class TestDomainSearchParams:
 
         assert exc_info.value.param_name == "conditions"
 
+    def test_invalid_match_type_raises_validation_error(self) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_domain_search_params(["brand"], None, "garbage", None)
+
+        assert exc_info.value.param_name == "match"
+
 
 class TestReverseSearchParams:
     def test_reverse_search_uses_enum_wire_values(self) -> None:
