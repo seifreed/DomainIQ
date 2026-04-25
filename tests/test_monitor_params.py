@@ -102,6 +102,12 @@ class TestMonitorMutationParams:
         assert enabled["type"] == MonitorReportType.DOMAIN
         assert disabled["email_alert"] == API_BOOL_FALSE
 
+    def test_create_report_rejects_invalid_report_type(self) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_create_monitor_report_params("garbage", "brand-watch", True)
+
+        assert exc_info.value.param_name == "report_type"
+
     def test_add_monitor_item_omits_enabled_when_unspecified(self) -> None:
         params = build_add_monitor_item_params(
             42,
@@ -121,6 +127,12 @@ class TestMonitorMutationParams:
         params = build_add_monitor_item_params(42, "domain", ["example.com"], False)
 
         assert params["enabled"] is False
+
+    def test_add_monitor_item_rejects_invalid_item_type(self) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_add_monitor_item_params(42, "garbage", ["example.com"])
+
+        assert exc_info.value.param_name == "item_type"
 
     @pytest.mark.parametrize(
         ("item_type", "items"),

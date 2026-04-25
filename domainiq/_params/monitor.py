@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from domainiq._models import MonitorItemType, MonitorReportType
 from domainiq.constants import (
     API_BOOL_FALSE,
     API_BOOL_TRUE,
@@ -16,8 +17,8 @@ from domainiq.validators import ensure_positive_int, is_ip_address, validate_dom
 
 from ._shared import require_non_empty
 
-if TYPE_CHECKING:
-    from domainiq._models import MonitorItemType, MonitorReportType
+_MONITOR_REPORT_TYPES = {member.value for member in MonitorReportType}
+_MONITOR_ITEM_TYPES = {member.value for member in MonitorItemType}
 
 
 def _validate_typo_strength(strength: int) -> None:
@@ -32,11 +33,27 @@ def _validate_positive_ids(**ids: int | None) -> None:
             ensure_positive_int(field_name, value)
 
 
+def _validate_type_value(
+    value: MonitorReportType | MonitorItemType | str,
+    valid_values: set[str],
+    param_name: str,
+) -> str:
+    wire_value = enum_value(value)
+    if not isinstance(wire_value, str) or wire_value not in valid_values:
+        msg = f"Invalid {param_name}: {wire_value}"
+        raise DomainIQValidationError(msg, param_name=param_name)
+    return wire_value
+
+
 def _validate_monitor_item_values(
     item_type: MonitorItemType | str,
     items: list[str],
-) -> None:
-    item_type_value = enum_value(item_type)
+) -> str:
+    item_type_value = _validate_type_value(
+        item_type,
+        _MONITOR_ITEM_TYPES,
+        "item_type",
+    )
     if item_type_value == "domain":
         for item in items:
             if not validate_domain(item):
@@ -47,6 +64,7 @@ def _validate_monitor_item_values(
             if not is_ip_address(item):
                 msg = f"Invalid IP address: {item}"
                 raise DomainIQValidationError(msg, param_name="items")
+    return item_type_value
 
 
 def build_monitor_list_params() -> dict[str, Any]:
@@ -98,10 +116,15 @@ def build_create_monitor_report_params(
     name: str,
     email_alert: bool,
 ) -> dict[str, Any]:
+    report_type_value = _validate_type_value(
+        report_type,
+        _MONITOR_REPORT_TYPES,
+        "report_type",
+    )
     return {
         "service": "monitor",
         "action": "report_create",
-        "type": report_type,
+        "type": report_type_value,
         "name": name,
         "email_alert": API_BOOL_TRUE if email_alert else API_BOOL_FALSE,
     }
@@ -115,12 +138,12 @@ def build_add_monitor_item_params(
 ) -> dict[str, Any]:
     _validate_positive_ids(report_id=report_id)
     require_non_empty("items", items)
-    _validate_monitor_item_values(item_type, items)
+    item_type_value = _validate_monitor_item_values(item_type, items)
     params: dict[str, Any] = {
         "service": "monitor",
         "action": "report_item_add",
         "report_id": report_id,
-        "type": item_type,
+        "type": item_type_value,
         "items": items,
     }
     if enabled is not None:
