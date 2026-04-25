@@ -155,6 +155,38 @@ class TestReverseSearchParams:
                 "search",
             ),
             (
+                lambda: build_reverse_search_params(
+                    ReverseSearchType.NAME,
+                    "",
+                    ReverseMatchType.CONTAINS,
+                ),
+                "search",
+            ),
+            (
+                lambda: build_reverse_search_params(
+                    ReverseSearchType.NAME,
+                    "   ",
+                    ReverseMatchType.CONTAINS,
+                ),
+                "search",
+            ),
+            (
+                lambda: build_reverse_search_params(
+                    ReverseSearchType.ORG,
+                    "",
+                    ReverseMatchType.CONTAINS,
+                ),
+                "search",
+            ),
+            (
+                lambda: build_reverse_search_params(
+                    ReverseSearchType.ORG,
+                    "   ",
+                    ReverseMatchType.CONTAINS,
+                ),
+                "search",
+            ),
+            (
                 lambda: build_reverse_ip_params(
                     ReverseIpSearchType.IP, "999.999.999.999"
                 ),
