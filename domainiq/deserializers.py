@@ -200,6 +200,13 @@ def parse_domain_report(envelope: dict[str, Any]) -> DomainReport:
 def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
     """Parse a DomainIQ API monitor report response dict into a MonitorReport."""
     inner = unwrap_api_envelope(envelope, ("name", "items"))
+    raw_items = inner.get("items")
+    if isinstance(raw_items, dict):
+        item_data_list = [raw_items]
+    elif isinstance(raw_items, list):
+        item_data_list = cast("list[dict[str, Any]]", raw_items)
+    else:
+        item_data_list = []
     items = [
         MonitorItem(
             id=item_data.get("id", 0),
@@ -209,7 +216,7 @@ def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
             typos_enabled=parse_bool(item_data.get("typos_enabled"), default=False),
             typo_strength=item_data.get("typo_strength"),
         )
-        for item_data in inner.get("items", []) or []
+        for item_data in item_data_list
     ]
     return MonitorReport(
         id=inner.get("id", 0),

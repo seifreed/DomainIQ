@@ -214,6 +214,21 @@ class TestMonitorDeserializer:
         assert result.items[0].enabled is True
         assert result.items[0].typos_enabled is True
 
+    def test_parses_monitor_report_with_single_item_dict(self) -> None:
+        result = parse_monitor_report(
+            {
+                "id": 42,
+                "name": "brand-watch",
+                "items": {"id": 7, "type": "domain", "value": "example.com"},
+            }
+        )
+
+        assert result.items is not None
+        assert len(result.items) == 1
+        assert result.items[0].id == 7
+        assert result.items[0].type == "domain"
+        assert result.items[0].value == "example.com"
+
     def test_passthrough_result_casts(self) -> None:
         action = {"ok": True}
         search = {"results": []}
