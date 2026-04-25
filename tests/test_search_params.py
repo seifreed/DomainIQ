@@ -172,6 +172,16 @@ class TestReverseSearchParams:
                 ),
                 "data",
             ),
+            (
+                lambda: build_reverse_search_params(
+                    "garbage",
+                    "admin@example.com",
+                    ReverseMatchType.CONTAINS,
+                ),
+                "type",
+            ),
+            (lambda: build_reverse_ip_params("garbage", "192.0.2.1"), "type"),
+            (lambda: build_reverse_mx_params("garbage", "example.com", False), "type"),
         ],
     )
     def test_reverse_params_reject_invalid_typed_values(
