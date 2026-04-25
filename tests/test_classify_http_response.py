@@ -88,6 +88,17 @@ class TestRateLimitError:
         delay = classify_http_response(429, "rate limited", _RETRY_HEADERS, 0, _POLICY)
         assert delay == 5.0
 
+    def test_429_honours_zero_retry_after_header(self) -> None:
+        delay = classify_http_response(
+            429,
+            "rate limited",
+            {"Retry-After": "0"},
+            0,
+            _POLICY,
+        )
+
+        assert delay == 0.0
+
     def test_429_honours_retry_after_http_date(self) -> None:
         retry_at = datetime.now(UTC) + timedelta(seconds=60)
         header = format_datetime(retry_at, usegmt=True)

@@ -49,7 +49,7 @@ def _compute_retry_delay(
 
     if status_code == HTTP_TOO_MANY_REQUESTS and attempt < policy.max_retries:
         if retry_after_secs is not None:
-            return float(max(retry_after_secs, 1))
+            return float(retry_after_secs)
         return compute_backoff(policy.retry_delay, attempt)
 
     return None
