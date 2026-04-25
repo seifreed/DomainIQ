@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from ._models import (
     DNSRecord,
@@ -35,6 +35,9 @@ from .parsers import (
     unwrap_api_envelope,
 )
 from .utils import assert_json_dict
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +72,14 @@ def _extract_record_value(record_data: dict[str, Any], record_type: str) -> str:
     return ""
 
 
+def _parse_first_date(*values: object) -> datetime | None:
+    for value in values:
+        parsed = try_parse_date(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
     """Parse a DomainIQ API WHOIS response dict into a WhoisResult."""
     result = unwrap_api_envelope(data, ("domain", "ip", "registrar"))
@@ -83,8 +94,9 @@ def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
         registrant_email=parse_emails(result),
         creation_date=try_parse_date(result.get("creation_date")),
         expiration_date=try_parse_date(result.get("expiration_date")),
-        updated_date=try_parse_date(
-            result.get("update_date") or result.get("updated_date")
+        updated_date=_parse_first_date(
+            result.get("update_date"),
+            result.get("updated_date"),
         ),
         nameservers=parse_nameservers(result),
         status=parse_statuses(result.get("status", [])),

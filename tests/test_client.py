@@ -458,6 +458,20 @@ class TestLogicBugRegressions:
 
         assert result.creation_date == _try_parse_date("1704067200")
 
+    @pytest.mark.parametrize("update_date", [" ", "not-a-date"])
+    def test_whois_updated_date_falls_back_after_unparseable_update_date(
+        self, update_date
+    ):
+        result = parse_whois_result(
+            {
+                "domain": "example.com",
+                "update_date": update_date,
+                "updated_date": "2024-01-01",
+            }
+        )
+
+        assert result.updated_date == datetime(2024, 1, 1)  # noqa: DTZ001
+
     def test_whois_emails_filter_whitespace_entries(self):
         data = {
             "domain": "example.com",
