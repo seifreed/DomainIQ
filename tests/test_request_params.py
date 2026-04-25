@@ -209,6 +209,12 @@ class TestBulkParams:
             "domains": ["example.com"],
         }
 
+    def test_bulk_whois_params_reject_invalid_lookup_type(self) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_bulk_whois_params(["example.com"], "garbage")
+
+        assert exc_info.value.param_name == "lookup_type"
+
     def test_bulk_whois_ip_params(self) -> None:
         assert build_bulk_whois_ip_params(["192.0.2.1"]) == {
             "service": "bulk_whois_ip",
