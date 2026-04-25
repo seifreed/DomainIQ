@@ -11,6 +11,11 @@ from domainiq._params.bulk import (
     build_bulk_whois_params,
 )
 from domainiq._params.dns import build_dns_params
+from domainiq._params.reports import (
+    build_domain_report_params,
+    build_email_report_params,
+    build_ip_report_params,
+)
 from domainiq._params.whois import build_whois_params
 from domainiq.constants import API_FLAG_ENABLED
 from domainiq.exceptions import DomainIQValidationError
@@ -80,6 +85,38 @@ class TestDnsParams:
             build_dns_params("example.com", record_types)
 
         assert exc_info.value.param_name == "record_types"
+
+
+class TestReportParams:
+    def test_report_params_accept_valid_targets(self) -> None:
+        assert build_domain_report_params("example.com") == {
+            "service": "domain_report",
+            "domain": "example.com",
+        }
+        assert build_email_report_params("admin@example.com") == {
+            "service": "email_report",
+            "email": "admin@example.com",
+        }
+        assert build_ip_report_params("192.0.2.1") == {
+            "service": "ip_report",
+            "ip": "192.0.2.1",
+        }
+
+    @pytest.mark.parametrize(
+        ("builder", "value", "param_name"),
+        [
+            (build_domain_report_params, "example..com", "domain"),
+            (build_email_report_params, "bad local@example.com", "email"),
+            (build_ip_report_params, "999.999.999.999", "ip"),
+        ],
+    )
+    def test_report_params_reject_invalid_targets(
+        self, builder, value: str, param_name: str
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            builder(value)
+
+        assert exc_info.value.param_name == param_name
 
 
 class TestAnalysisParams:
