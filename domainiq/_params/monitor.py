@@ -21,10 +21,12 @@ _MONITOR_REPORT_TYPES = {member.value for member in MonitorReportType}
 _MONITOR_ITEM_TYPES = {member.value for member in MonitorItemType}
 
 
-def _validate_typo_strength(strength: int) -> None:
-    if not (TYPO_STRENGTH_MIN <= strength <= TYPO_STRENGTH_MAX):
+def _validate_typo_strength(strength: object) -> int:
+    strength_value = ensure_positive_int("strength", strength)
+    if not (TYPO_STRENGTH_MIN <= strength_value <= TYPO_STRENGTH_MAX):
         msg = f"strength must be between {TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}"
         raise DomainIQValidationError(msg, param_name="strength")
+    return strength_value
 
 
 def _validate_positive_ids(**ids: int | None) -> None:
@@ -164,7 +166,7 @@ def build_enable_typos_params(
     strength: int,
 ) -> dict[str, Any]:
     _validate_positive_ids(report_id=report_id, item_id=item_id)
-    _validate_typo_strength(strength)
+    strength = _validate_typo_strength(strength)
     return {
         "service": "monitor",
         "action": "enable_typos",
@@ -190,7 +192,7 @@ def build_modify_typo_strength_params(
     strength: int,
 ) -> dict[str, Any]:
     _validate_positive_ids(report_id=report_id, item_id=item_id)
-    _validate_typo_strength(strength)
+    strength = _validate_typo_strength(strength)
     return {
         "service": "monitor",
         "action": "modify_typo_strength",

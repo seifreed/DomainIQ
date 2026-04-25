@@ -172,10 +172,28 @@ class TestMonitorMutationParams:
         assert build_enable_typos_params(42, 7, TYPO_STRENGTH_MAX)["strength"] == 41
         assert build_modify_typo_strength_params(42, 7, 5)["strength"] == 5
 
+    @pytest.mark.parametrize(
+        ("build_params", "param_name"),
+        [
+            (lambda: build_enable_typos_params(42, 7, 4), "strength"),
+            (lambda: build_enable_typos_params(42, 7, 42), "strength"),
+            (lambda: build_enable_typos_params(42, 7, 5.5), "strength"),
+            (lambda: build_enable_typos_params(42, 7, "7"), "strength"),
+            (lambda: build_enable_typos_params(42, 7, True), "strength"),
+            (lambda: build_modify_typo_strength_params(42, 7, 4), "strength"),
+            (lambda: build_modify_typo_strength_params(42, 7, 42), "strength"),
+            (lambda: build_modify_typo_strength_params(42, 7, 5.5), "strength"),
+            (lambda: build_modify_typo_strength_params(42, 7, "7"), "strength"),
+            (lambda: build_modify_typo_strength_params(42, 7, True), "strength"),
+        ],
+    )
+    def test_typo_actions_reject_invalid_strength(
+        self, build_params: Callable[[], object], param_name: str
+    ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
-            build_enable_typos_params(42, 7, 4)
+            build_params()
 
-        assert exc_info.value.param_name == "strength"
+        assert exc_info.value.param_name == param_name
 
     def test_disable_and_delete_params(self) -> None:
         assert build_disable_typos_params(42, 7) == {
