@@ -396,6 +396,42 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email is None
 
+    def test_whois_emails_empty_list_falls_back_to_registrant_email(self):
+        data = {
+            "domain": "example.com",
+            "emails": [],
+            "registrant_email": "admin@example.com",
+        }
+        result = parse_whois_result(data)
+        assert result.registrant_email == ["admin@example.com"]
+
+    def test_whois_emails_empty_string_falls_back_to_registrant_email(self):
+        data = {
+            "domain": "example.com",
+            "emails": "",
+            "registrant_email": "admin@example.com",
+        }
+        result = parse_whois_result(data)
+        assert result.registrant_email == ["admin@example.com"]
+
+    def test_whois_emails_normalized_empty_list_falls_back_to_registrant_email(self):
+        data = {
+            "domain": "example.com",
+            "emails": ["", "  ", None],
+            "registrant_email": "admin@example.com",
+        }
+        result = parse_whois_result(data)
+        assert result.registrant_email == ["admin@example.com"]
+
+    def test_whois_emails_non_empty_list_takes_priority_over_registrant_email(self):
+        data = {
+            "domain": "example.com",
+            "emails": ["primary@example.com"],
+            "registrant_email": "admin@example.com",
+        }
+        result = parse_whois_result(data)
+        assert result.registrant_email == ["primary@example.com"]
+
     def test_whois_statuses_filter_empty_comma_entries(self):
         data = {"domain": "example.com", "status": "active, "}
         result = parse_whois_result(data)

@@ -161,9 +161,7 @@ def parse_statuses(raw: object) -> list[str]:
     return [parsed] if parsed else []
 
 
-def parse_emails(result: dict[str, Any]) -> list[str] | None:
-    """Parse registrant emails from comma-separated string or list."""
-    raw_emails = result.get("emails") or result.get("registrant_email")
+def _normalize_email_values(raw_emails: object) -> list[str] | None:
     if isinstance(raw_emails, list):
         return [
             s for s in (str(e).strip() for e in raw_emails if e is not None) if s
@@ -171,3 +169,10 @@ def parse_emails(result: dict[str, Any]) -> list[str] | None:
     if isinstance(raw_emails, str):
         return [e.strip() for e in raw_emails.split(",") if e.strip()] or None
     return None
+
+
+def parse_emails(result: dict[str, Any]) -> list[str] | None:
+    """Parse registrant emails from comma-separated string or list."""
+    return _normalize_email_values(result.get("emails")) or _normalize_email_values(
+        result.get("registrant_email")
+    )
