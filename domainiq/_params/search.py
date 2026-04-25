@@ -61,7 +61,7 @@ def _validate_email_value(value: str, param_name: str) -> None:
 
 
 def _validate_search_term(value: str, param_name: str) -> None:
-    if not value.strip():
+    if not isinstance(value, str) or not value.strip():
         msg = f"Invalid reverse search term: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
 
@@ -144,6 +144,7 @@ def build_reverse_ip_params(
 ) -> dict[str, Any]:
     """Build parameters for the reverse-IP endpoint."""
     search_type_value = _validate_type_value(search_type, _REVERSE_IP_TYPES)
+    _validate_search_term(data, "data")
     if search_type_value == "ip":
         _validate_ip_value(data, "data")
     elif search_type_value == "domain":

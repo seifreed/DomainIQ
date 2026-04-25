@@ -198,6 +198,12 @@ class TestReverseSearchParams:
                 ),
                 "data",
             ),
+            (lambda: build_reverse_ip_params(ReverseIpSearchType.SUBNET, ""), "data"),
+            (
+                lambda: build_reverse_ip_params(ReverseIpSearchType.BLOCK, "   "),
+                "data",
+            ),
+            (lambda: build_reverse_ip_params(ReverseIpSearchType.RANGE, ""), "data"),
             (
                 lambda: build_reverse_mx_params(
                     ReverseMxSearchType.DOMAIN, "example..com", False
