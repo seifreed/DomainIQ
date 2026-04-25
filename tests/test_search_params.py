@@ -180,6 +180,14 @@ class TestReverseSearchParams:
                 ),
                 "type",
             ),
+            (
+                lambda: build_reverse_search_params(
+                    ReverseSearchType.EMAIL,
+                    "admin@example.com",
+                    "garbage",
+                ),
+                "match",
+            ),
             (lambda: build_reverse_ip_params("garbage", "192.0.2.1"), "type"),
             (lambda: build_reverse_mx_params("garbage", "example.com", False), "type"),
         ],

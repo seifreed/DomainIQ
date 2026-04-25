@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from domainiq._models.enums import (
     ReverseIpSearchType,
+    ReverseMatchType,
     ReverseMxSearchType,
     ReverseSearchType,
 )
@@ -21,12 +22,12 @@ if TYPE_CHECKING:
     from domainiq._models import (
         DomainSearchFilters,
         KeywordMatchType,
-        ReverseMatchType,
     )
 
 logger = logging.getLogger(__name__)
 
 _REVERSE_SEARCH_TYPES = {member.value for member in ReverseSearchType}
+_REVERSE_MATCH_TYPES = {member.value for member in ReverseMatchType}
 _REVERSE_IP_TYPES = {member.value for member in ReverseIpSearchType}
 _REVERSE_MX_TYPES = {member.value for member in ReverseMxSearchType}
 
@@ -111,13 +112,14 @@ def build_reverse_search_params(
 ) -> dict[str, Any]:
     """Build parameters for the reverse-search endpoint."""
     search_type_value = _validate_type_value(search_type, _REVERSE_SEARCH_TYPES)
+    match_value = _validate_type_value(match, _REVERSE_MATCH_TYPES, "match")
     if search_type_value == "email":
         _validate_email_value(search_term, "search")
     return {
         "service": "reverse_search",
         "type": search_type_value,
         "search": search_term,
-        "match": enum_value(match),
+        "match": match_value,
     }
 
 
