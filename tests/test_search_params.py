@@ -122,20 +122,28 @@ class TestReverseSearchParams:
         }
 
     def test_reverse_ip_params(self) -> None:
-        assert build_reverse_ip_params(ReverseIpSearchType.DOMAIN, "example.com") == {
+        params = build_reverse_ip_params(ReverseIpSearchType.DOMAIN, "example.com")
+
+        assert params == {
             "service": "reverse_ip",
-            "type": ReverseIpSearchType.DOMAIN,
+            "type": "domain",
             "data": "example.com",
         }
+        assert type(params["type"]) is str
 
     def test_reverse_mx_omits_recursive_when_false(self) -> None:
-        assert build_reverse_mx_params(
-            ReverseMxSearchType.DOMAIN, "example.com", False
-        ) == {
+        params = build_reverse_mx_params(
+            ReverseMxSearchType.DOMAIN,
+            "example.com",
+            False,
+        )
+
+        assert params == {
             "service": "reverse_mx",
-            "type": ReverseMxSearchType.DOMAIN,
+            "type": "domain",
             "data": "example.com",
         }
+        assert type(params["type"]) is str
 
     def test_reverse_mx_includes_recursive_flag_when_true(self) -> None:
         params = build_reverse_mx_params(ReverseMxSearchType.IP, "192.0.2.1", True)

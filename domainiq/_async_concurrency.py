@@ -69,6 +69,8 @@ async def _run_with_critical_cancel[T](
     DomainIQPartialResultsError with aligned partial results.
     """
     tasks: list[asyncio.Task[Any]] = [asyncio.create_task(coro) for coro in coros]
+    if not tasks:
+        return []
 
     try:
         await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)

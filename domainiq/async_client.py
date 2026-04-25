@@ -36,7 +36,7 @@ from .exceptions import (
     DomainIQTimeoutError,
 )
 from .http import AiohttpTransport, AsyncTransport
-from .validators import is_ip_address
+from .validators import ensure_positive_int, is_ip_address
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +167,7 @@ class AsyncDomainIQClient(
         result_type: type[_LT],
     ) -> list[_LT | None]:
         """Generic concurrent lookup with semaphore and critical-error cancellation."""
+        max_concurrent = ensure_positive_int("max_concurrent", max_concurrent)
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def _bounded(target: str) -> _LT | _LookupFailure:

@@ -17,6 +17,7 @@ from domainiq.exceptions import (
     DomainIQAuthenticationError,
     DomainIQPartialResultsError,
     DomainIQRateLimitError,
+    DomainIQValidationError,
 )
 from domainiq.models import DNSResult, WhoisResult
 
@@ -195,6 +196,47 @@ class TestConcurrentLookupCriticalCancel:
 @pytest.mark.asyncio
 class TestAsyncClientConcurrentLookup:
     """Unit tests for AsyncDomainIQClient concurrent lookup orchestration."""
+
+    async def test_concurrent_lookup_accepts_empty_targets(
+        self,
+        mock_async_client: AsyncDomainIQClient,
+    ) -> None:
+        async def lookup(_target: str) -> WhoisResult:
+            msg = "empty target list should not call lookup"
+            raise AssertionError(msg)
+
+        results = await mock_async_client._concurrent_lookup(
+            lookup,
+            [],
+            max_concurrent=2,
+            label="WHOIS",
+            result_type=WhoisResult,
+        )
+
+        assert results == []
+
+    @pytest.mark.parametrize("max_concurrent", [0, -1, True, 1.5, "2"])
+    async def test_concurrent_lookup_rejects_invalid_max_concurrent(
+        self,
+        mock_async_client: AsyncDomainIQClient,
+        max_concurrent: object,
+    ) -> None:
+        async def lookup(target: str) -> WhoisResult:
+            return WhoisResult(domain=target)
+
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            await asyncio.wait_for(
+                mock_async_client._concurrent_lookup(
+                    lookup,
+                    ["example.com"],
+                    max_concurrent,
+                    label="WHOIS",
+                    result_type=WhoisResult,
+                ),
+                timeout=0.1,
+            )
+
+        assert exc_info.value.param_name == "max_concurrent"
 
     async def test_noncritical_lookup_failures_become_none_and_warn(
         self,

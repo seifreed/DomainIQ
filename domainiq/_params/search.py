@@ -149,7 +149,7 @@ def build_reverse_ip_params(
         _validate_ip_value(data, "data")
     elif search_type_value == "domain":
         _validate_domain_value(data, "data")
-    return {"service": "reverse_ip", "type": search_type, "data": data}
+    return {"service": "reverse_ip", "type": search_type_value, "data": data}
 
 
 def build_reverse_mx_params(
@@ -165,7 +165,7 @@ def build_reverse_mx_params(
         _validate_domain_value(data, "data")
     params: dict[str, Any] = {
         "service": "reverse_mx",
-        "type": search_type,
+        "type": search_type_value,
         "data": data,
     }
     if recursive:
