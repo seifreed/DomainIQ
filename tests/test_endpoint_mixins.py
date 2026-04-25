@@ -56,13 +56,15 @@ class TestBulkMixins:
         mock_async_transport.enqueue(
             make_async_response(200, "domain,ip\nexample.com,192.0.2.1\n")
         )
-        mock_async_transport.enqueue(make_async_response(200, "domain,status\nx,ok\n"))
+        mock_async_transport.enqueue(
+            make_async_response(200, "domain,status\nexample.org,ok\n")
+        )
         mock_async_transport.enqueue(
             make_async_response(200, "domain,status\nexample.net,ok\n")
         )
 
         dns = await mock_async_client.bulk_dns(["example.com"])
-        whois = await mock_async_client.bulk_whois(["x"])
+        whois = await mock_async_client.bulk_whois(["example.org"])
         whois_ip = await mock_async_client.bulk_whois_ip(["example.net"])
 
         assert dns[0]["domain"] == "example.com"

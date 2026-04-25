@@ -249,3 +249,28 @@ class TestBulkParams:
             builder(values)
 
         assert exc_info.value.param_name == param_name
+
+    @pytest.mark.parametrize(
+        ("builder", "values", "param_name"),
+        [
+            (build_bulk_dns_params, ["example..com"], "domains"),
+            (build_bulk_dns_params, ["example.com", "invalid"], "domains"),
+            (
+                lambda vals: build_bulk_whois_params(vals, BulkWhoisType.LIVE),
+                ["example..com"],
+                "items",
+            ),
+            (
+                lambda vals: build_bulk_whois_params(vals, BulkWhoisType.LIVE),
+                ["example.com", "invalid"],
+                "items",
+            ),
+        ],
+    )
+    def test_bulk_domain_params_reject_invalid_domains(
+        self, builder, values: list[str], param_name: str
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            builder(values)
+
+        assert exc_info.value.param_name == param_name
