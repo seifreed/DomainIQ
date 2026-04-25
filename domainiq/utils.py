@@ -59,7 +59,7 @@ def parse_retry_after(headers: Mapping[str, str]) -> int | None:
             break
     if value:
         try:
-            return int(value)
+            seconds = int(value)
         except (ValueError, TypeError):
             try:
                 retry_at = parsedate_to_datetime(value)
@@ -70,6 +70,8 @@ def parse_retry_after(headers: Mapping[str, str]) -> int | None:
                 retry_at = retry_at.replace(tzinfo=UTC)
             seconds = ceil((retry_at - datetime.now(UTC)).total_seconds())
             return seconds if seconds > 0 else None
+        else:
+            return seconds if seconds >= 0 else None
     return None
 
 

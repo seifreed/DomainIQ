@@ -293,6 +293,19 @@ class TestRateLimitHandling:
 
         assert exc_info.value.retry_after is None
 
+    def test_exhausted_429_with_negative_retry_after_ignores_header(
+        self, mock_transport: MockSyncTransport, mock_client: DomainIQClient
+    ) -> None:
+        for _ in range(4):
+            mock_transport.enqueue(
+                make_sync_response(429, "{}", headers={"Retry-After": "-5"})
+            )
+
+        with pytest.raises(DomainIQRateLimitError) as exc_info:
+            mock_client.whois_lookup(domain="example.com")
+
+        assert exc_info.value.retry_after is None
+
 
 # ---------------------------------------------------------------------------
 # Sync: Timeout handling

@@ -46,6 +46,8 @@ class TestRetryAndCsvHelpers:
 
     def test_parse_retry_after(self) -> None:
         assert parse_retry_after({"Retry-After": "10"}) == 10
+        assert parse_retry_after({"Retry-After": "0"}) == 0
+        assert parse_retry_after({"Retry-After": "-5"}) is None
         assert parse_retry_after({"retry-after": "10"}) == 10
         assert parse_retry_after({"RETRY-AFTER": "10"}) == 10
         assert parse_retry_after({"Retry-After": "soon"}) is None
