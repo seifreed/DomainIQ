@@ -135,3 +135,49 @@ class TestReverseSearchParams:
         params = build_reverse_mx_params(ReverseMxSearchType.IP, "192.0.2.1", True)
 
         assert params["recursive"] == API_FLAG_ENABLED
+
+    @pytest.mark.parametrize(
+        ("build_params", "param_name"),
+        [
+            (lambda: build_reverse_dns_params("example..com"), "domain"),
+            (
+                lambda: build_reverse_search_params(
+                    ReverseSearchType.EMAIL,
+                    "bad local@example.com",
+                    ReverseMatchType.CONTAINS,
+                ),
+                "search",
+            ),
+            (
+                lambda: build_reverse_ip_params(
+                    ReverseIpSearchType.IP, "999.999.999.999"
+                ),
+                "data",
+            ),
+            (
+                lambda: build_reverse_ip_params(
+                    ReverseIpSearchType.DOMAIN, "example..com"
+                ),
+                "data",
+            ),
+            (
+                lambda: build_reverse_mx_params(
+                    ReverseMxSearchType.DOMAIN, "example..com", False
+                ),
+                "data",
+            ),
+            (
+                lambda: build_reverse_mx_params(
+                    ReverseMxSearchType.IP, "999.999.999.999", False
+                ),
+                "data",
+            ),
+        ],
+    )
+    def test_reverse_params_reject_invalid_typed_values(
+        self, build_params, param_name: str
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_params()
+
+        assert exc_info.value.param_name == param_name
