@@ -56,6 +56,8 @@ class TestWhoisParams:
             ("example.com", "192.0.2.1", "domain"),
             ("invalid", None, "domain"),
             ("example..com", None, "domain"),
+            ("192.0.2.1", None, "domain"),
+            ("999.999.999.999", None, "domain"),
             (None, "999.999.999.999", "ip"),
             (None, "not.an.ip", "ip"),
         ],
@@ -129,6 +131,8 @@ class TestReportParams:
         ("builder", "value", "param_name"),
         [
             (build_domain_report_params, "example..com", "domain"),
+            (build_domain_report_params, "192.0.2.1", "domain"),
+            (build_domain_report_params, "999.999.999.999", "domain"),
             (build_email_report_params, "bad local@example.com", "email"),
             (build_ip_report_params, "999.999.999.999", "ip"),
         ],

@@ -18,6 +18,16 @@ IPV6_VERSION = 6
 
 _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
 _EMAIL_LOCAL_PATTERN = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
+_IPV4_DOTTED_QUAD_PATTERN = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
+
+
+def _is_ip_like_domain(value: str) -> bool:
+    """Return True when a domain-shaped value is actually an IP literal."""
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return bool(_IPV4_DOTTED_QUAD_PATTERN.fullmatch(value))
+    return True
 
 
 def _validate_label(label: str) -> bool:
@@ -51,6 +61,8 @@ def validate_domain(domain: str) -> bool:
     if not domain or not isinstance(domain, str):
         return False
     if len(domain) > MAX_DOMAIN_LENGTH:
+        return False
+    if _is_ip_like_domain(domain):
         return False
     if domain.startswith(".") or domain.endswith(".") or ".." in domain:
         return False

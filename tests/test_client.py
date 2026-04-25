@@ -213,6 +213,8 @@ class TestUtilsUnit:
         assert not validate_domain("example..com")
         assert not validate_domain("example\n.com")
         assert not validate_domain("example.com\n")
+        assert not validate_domain("192.0.2.1")
+        assert not validate_domain("999.999.999.999")
         assert not validate_domain("a" * 64 + ".com")
 
     def test_validate_ipv4_valid(self):
