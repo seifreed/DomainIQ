@@ -19,6 +19,8 @@ from domainiq._params.reports import (
     build_domain_report_params,
     build_email_report_params,
     build_ip_report_params,
+    build_name_report_params,
+    build_organization_report_params,
 )
 from domainiq._params.whois import build_whois_params
 from domainiq.constants import API_FLAG_ENABLED
@@ -133,6 +135,10 @@ class TestReportParams:
             (build_domain_report_params, "example..com", "domain"),
             (build_domain_report_params, "192.0.2.1", "domain"),
             (build_domain_report_params, "999.999.999.999", "domain"),
+            (build_name_report_params, "", "name"),
+            (build_name_report_params, "   ", "name"),
+            (build_organization_report_params, "", "organization"),
+            (build_organization_report_params, "   ", "organization"),
             (build_email_report_params, "bad local@example.com", "email"),
             (build_ip_report_params, "999.999.999.999", "ip"),
         ],
