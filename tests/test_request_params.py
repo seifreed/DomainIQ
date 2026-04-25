@@ -83,6 +83,12 @@ class TestDnsParams:
             "types": "A,MX",
         }
 
+    def test_dns_rejects_invalid_query(self) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_dns_params("example..com", None)
+
+        assert exc_info.value.param_name == "query"
+
     @pytest.mark.parametrize("record_types", [[""], ["  "], ["A", ""]])
     def test_dns_rejects_empty_record_types(self, record_types: list[str]) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:

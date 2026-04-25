@@ -6,6 +6,7 @@ from typing import Any
 
 from domainiq._models import DNSRecordType
 from domainiq.exceptions import DomainIQValidationError
+from domainiq.validators import validate_domain
 
 
 def build_dns_params(
@@ -13,6 +14,10 @@ def build_dns_params(
     record_types: list[str | DNSRecordType] | None,
 ) -> dict[str, Any]:
     """Build parameters for the DNS endpoint."""
+    if not validate_domain(query):
+        msg = f"Invalid query: {query}"
+        raise DomainIQValidationError(msg, param_name="query")
+
     params: dict[str, Any] = {"service": "dns", "q": query}
     if record_types:
         type_values = [
