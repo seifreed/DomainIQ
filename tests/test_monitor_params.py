@@ -69,6 +69,9 @@ class TestMonitorReadParams:
         ("build_params", "param_name"),
         [
             (lambda: build_monitor_report_items_params(0), "report_id"),
+            (lambda: build_monitor_report_items_params(True), "report_id"),
+            (lambda: build_monitor_report_items_params(1.5), "report_id"),
+            (lambda: build_monitor_report_items_params("3"), "report_id"),
             (lambda: build_monitor_report_summary_params(-1, None, None), "report_id"),
             (lambda: build_monitor_report_summary_params(42, 0, None), "item_id"),
             (lambda: build_monitor_report_summary_params(42, None, 0), "days_range"),

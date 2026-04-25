@@ -190,8 +190,11 @@ def validate_whois_target(
     return domain, ip
 
 
-def ensure_positive_int(field_name: str, value: int) -> int:
+def ensure_positive_int(field_name: str, value: object) -> int:
     """Raise DomainIQValidationError if value is not a positive integer."""
+    if not isinstance(value, int) or isinstance(value, bool):
+        msg = f"{field_name} must be a positive integer, got {value!r}"
+        raise DomainIQValidationError(msg, param_name=field_name)
     if value <= 0:
         msg = f"{field_name} must be positive, got {value}"
         raise DomainIQValidationError(msg, param_name=field_name)

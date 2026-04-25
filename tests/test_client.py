@@ -18,13 +18,19 @@ from domainiq import (
     DomainIQClient,
     DomainIQConfigurationError,
     DomainIQError,
+    DomainIQValidationError,
 )
 from domainiq.cli import create_parser
 from domainiq.config import Config
 from domainiq.deserializers import parse_dns_result, parse_whois_result
 from domainiq.formatters import format_api_params
 from domainiq.parsers import try_parse_date as _try_parse_date
-from domainiq.validators import validate_domain, validate_email, validate_ipv4
+from domainiq.validators import (
+    ensure_positive_int,
+    validate_domain,
+    validate_email,
+    validate_ipv4,
+)
 
 
 class TestDomainIQClientUnit:
@@ -247,6 +253,13 @@ class TestUtilsUnit:
         assert not validate_email(".user@example.com")
         assert not validate_email("user.@example.com")
         assert not validate_email("user..name@example.com")
+
+    @pytest.mark.parametrize("value", [True, False, 1.5, "3"])
+    def test_ensure_positive_int_rejects_non_int_values(self, value):
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            ensure_positive_int("report_id", value)
+
+        assert exc_info.value.param_name == "report_id"
 
 
 class TestModelsUnit:

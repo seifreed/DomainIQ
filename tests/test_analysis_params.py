@@ -56,6 +56,9 @@ class TestDomainSnapshotParams:
         ("options", "param_name"),
         [
             (SnapshotOptions(width=0, height=480), "SnapshotOptions.width"),
+            (SnapshotOptions(width=True, height=480), "SnapshotOptions.width"),
+            (SnapshotOptions(width=1.5, height=480), "SnapshotOptions.width"),
+            (SnapshotOptions(width="640", height=480), "SnapshotOptions.width"),
             (SnapshotOptions(width=640, height=0), "SnapshotOptions.height"),
         ],
     )
@@ -93,4 +96,3 @@ class TestDomainSnapshotHistoryParams:
             build_domain_snapshot_history_params("example.com", width, height, limit)
 
         assert exc_info.value.param_name == param_name
-
