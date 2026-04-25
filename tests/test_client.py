@@ -464,6 +464,15 @@ class TestLogicBugRegressions:
             "ns5.example.com",
         ]
 
+    def test_whois_nameservers_empty_indexed_values_fall_back_to_nameservers(self):
+        data = {
+            "domain": "example.com",
+            "ns_1": "",
+            "nameservers": ["ns1.example.com"],
+        }
+        result = parse_whois_result(data)
+        assert result.nameservers == ["ns1.example.com"]
+
     def test_whois_nameservers_accept_single_host_dict(self):
         data = {
             "domain": "example.com",

@@ -120,6 +120,15 @@ def _normalize_nameserver_value(ns: object) -> str | None:
     return normalized or None
 
 
+def _normalize_nameserver_values(nameservers: list[Any]) -> list[str]:
+    normalized: list[str] = []
+    for ns in nameservers:
+        normalized_name = _normalize_nameserver_value(ns)
+        if normalized_name:
+            normalized.append(normalized_name)
+    return normalized
+
+
 def parse_nameservers(result: dict[str, Any]) -> list[str]:
     """Extract nameservers ordered by index, tolerating gaps in numbering."""
     ns_indexed: list[tuple[int, Any]] = []
@@ -129,23 +138,18 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
             if suffix.isdigit():
                 ns_indexed.append((int(suffix), value))
     ns_indexed.sort(key=lambda kv: kv[0])
-    nameservers: list[Any] = [ns for _, ns in ns_indexed]
+    indexed_nameservers = _normalize_nameserver_values([ns for _, ns in ns_indexed])
+    if indexed_nameservers:
+        return indexed_nameservers
 
-    if not nameservers:
-        raw_ns = result.get("nameservers", []) or []
-        if isinstance(raw_ns, str):
-            nameservers = raw_ns.split(",")
-        elif isinstance(raw_ns, dict):
-            nameservers = [raw_ns]
-        else:
-            nameservers = list(raw_ns)
-
-    normalized: list[str] = []
-    for ns in nameservers:
-        normalized_name = _normalize_nameserver_value(ns)
-        if normalized_name:
-            normalized.append(normalized_name)
-    return normalized
+    raw_ns = result.get("nameservers", []) or []
+    if isinstance(raw_ns, str):
+        nameservers: list[Any] = raw_ns.split(",")
+    elif isinstance(raw_ns, dict):
+        nameservers = [raw_ns]
+    else:
+        nameservers = list(raw_ns)
+    return _normalize_nameserver_values(nameservers)
 
 
 def parse_statuses(raw: object) -> list[str]:
