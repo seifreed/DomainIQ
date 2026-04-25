@@ -83,6 +83,13 @@ class TestDnsParams:
             "types": "A,MX",
         }
 
+    def test_dns_normalizes_string_record_types(self) -> None:
+        assert build_dns_params("example.com", [" a ", "mx"]) == {
+            "service": "dns",
+            "q": "example.com",
+            "types": "A,MX",
+        }
+
     def test_dns_rejects_invalid_query(self) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             build_dns_params("example..com", None)
@@ -93,6 +100,12 @@ class TestDnsParams:
     def test_dns_rejects_empty_record_types(self, record_types: list[str]) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             build_dns_params("example.com", record_types)
+
+        assert exc_info.value.param_name == "record_types"
+
+    def test_dns_rejects_invalid_record_types(self) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_dns_params("example.com", ["A", "BOGUS"])
 
         assert exc_info.value.param_name == "record_types"
 

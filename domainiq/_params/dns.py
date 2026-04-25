@@ -8,6 +8,23 @@ from domainiq._models import DNSRecordType
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.validators import validate_domain
 
+_DNS_RECORD_TYPES = {record.value for record in DNSRecordType}
+
+
+def _normalize_record_type(record_type: str | DNSRecordType) -> str:
+    value = (
+        record_type.value
+        if isinstance(record_type, DNSRecordType)
+        else str(record_type).strip().upper()
+    )
+    if not value:
+        msg = "record_types must not contain empty values"
+        raise DomainIQValidationError(msg, param_name="record_types")
+    if value not in _DNS_RECORD_TYPES:
+        msg = f"Invalid record type: {value}"
+        raise DomainIQValidationError(msg, param_name="record_types")
+    return value
+
 
 def build_dns_params(
     query: str,
@@ -20,12 +37,6 @@ def build_dns_params(
 
     params: dict[str, Any] = {"service": "dns", "q": query}
     if record_types:
-        type_values = [
-            record.value if isinstance(record, DNSRecordType) else str(record).strip()
-            for record in record_types
-        ]
-        if any(not record_type for record_type in type_values):
-            msg = "record_types must not contain empty values"
-            raise DomainIQValidationError(msg, param_name="record_types")
+        type_values = [_normalize_record_type(record) for record in record_types]
         params["types"] = ",".join(type_values)
     return params
