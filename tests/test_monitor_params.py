@@ -108,6 +108,13 @@ class TestMonitorMutationParams:
 
         assert exc_info.value.param_name == "report_type"
 
+    @pytest.mark.parametrize("name", ["", "   "])
+    def test_create_report_rejects_empty_name(self, name: str) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_create_monitor_report_params(MonitorReportType.DOMAIN, name, True)
+
+        assert exc_info.value.param_name == "name"
+
     def test_add_monitor_item_omits_enabled_when_unspecified(self) -> None:
         params = build_add_monitor_item_params(
             42,

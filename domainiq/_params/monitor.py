@@ -45,6 +45,12 @@ def _validate_type_value(
     return wire_value
 
 
+def _validate_required_string(value: str, param_name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        msg = f"{param_name} must not be empty or whitespace-only"
+        raise DomainIQValidationError(msg, param_name=param_name)
+
+
 def _validate_monitor_item_values(
     item_type: MonitorItemType | str,
     items: list[str],
@@ -121,6 +127,7 @@ def build_create_monitor_report_params(
         _MONITOR_REPORT_TYPES,
         "report_type",
     )
+    _validate_required_string(name, "name")
     return {
         "service": "monitor",
         "action": "report_create",
