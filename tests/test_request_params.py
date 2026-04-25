@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from domainiq._params.analysis import build_domain_categorize_params
+from domainiq._params.analysis import (
+    build_domain_categorize_params,
+    build_domain_snapshot_history_params,
+    build_domain_snapshot_params,
+)
 from domainiq._params.bulk import (
     build_bulk_dns_params,
     build_bulk_whois_ip_params,
@@ -19,7 +23,7 @@ from domainiq._params.reports import (
 from domainiq._params.whois import build_whois_params
 from domainiq.constants import API_FLAG_ENABLED
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.models import BulkWhoisType, DNSRecordType
+from domainiq.models import BulkWhoisType, DNSRecordType, SnapshotOptions
 
 
 class TestWhoisParams:
@@ -126,6 +130,26 @@ class TestAnalysisParams:
             "domains": "example.com,example.net",
         }
 
+    def test_domain_snapshot_params(self) -> None:
+        params = build_domain_snapshot_params("example.com", SnapshotOptions(raw=True))
+
+        assert params == {
+            "service": "snapshot",
+            "domain": "example.com",
+            "width": 250,
+            "height": 125,
+            "raw": API_FLAG_ENABLED,
+        }
+
+    def test_domain_snapshot_history_params(self) -> None:
+        assert build_domain_snapshot_history_params("example.com", 1024, 768, 10) == {
+            "service": "snapshot_history",
+            "domain": "example.com",
+            "width": 1024,
+            "height": 768,
+            "limit": 10,
+        }
+
     @pytest.mark.parametrize("domains", [[""], ["  "], ["example.com", ""]])
     def test_domain_categorize_rejects_empty_domain_values(
         self, domains: list[str]
@@ -134,6 +158,28 @@ class TestAnalysisParams:
             build_domain_categorize_params(domains)
 
         assert exc_info.value.param_name == "domains"
+
+    @pytest.mark.parametrize("domains", [["example..com"], ["example.com", "invalid"]])
+    def test_domain_categorize_rejects_invalid_domains(
+        self, domains: list[str]
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_domain_categorize_params(domains)
+
+        assert exc_info.value.param_name == "domains"
+
+    @pytest.mark.parametrize(
+        "builder",
+        [
+            lambda domain: build_domain_snapshot_params(domain, SnapshotOptions()),
+            lambda domain: build_domain_snapshot_history_params(domain, 1024, 768, 10),
+        ],
+    )
+    def test_snapshot_params_reject_invalid_domain(self, builder) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            builder("example..com")
+
+        assert exc_info.value.param_name == "domain"
 
 
 class TestBulkParams:
