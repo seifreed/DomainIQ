@@ -122,6 +122,23 @@ class TestMonitorMutationParams:
 
         assert params["enabled"] is False
 
+    @pytest.mark.parametrize(
+        ("item_type", "items"),
+        [
+            (MonitorItemType.DOMAIN, ["example..com"]),
+            (MonitorItemType.IP, ["999.999.999.999"]),
+        ],
+    )
+    def test_add_monitor_item_rejects_invalid_typed_items(
+        self,
+        item_type: MonitorItemType,
+        items: list[str],
+    ) -> None:
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_add_monitor_item_params(42, item_type, items)
+
+        assert exc_info.value.param_name == "items"
+
     @pytest.mark.parametrize("items", [[], [""], ["  "], ["example.com", ""]])
     def test_add_monitor_item_rejects_empty_items(self, items: list[str]) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:

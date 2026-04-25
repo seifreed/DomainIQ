@@ -385,9 +385,11 @@ class TestMonitorMixins:
         assert await mock_async_client.monitor_report_summary(1) == {"summary": True}
         assert await mock_async_client.monitor_report_changes(1, 3) == {"changes": []}
         assert (await mock_async_client.create_monitor_report("domain", "new")).id == 2
-        assert await mock_async_client.add_monitor_item(1, "domain", ["x"]) == {
-            "added": True
-        }
+        assert await mock_async_client.add_monitor_item(
+            1,
+            "domain",
+            ["example.com"],
+        ) == {"added": True}
         assert await mock_async_client.enable_typos(1, 2) == {"enabled": True}
         assert await mock_async_client.disable_typos(1, 2) == {"disabled": True}
         assert await mock_async_client.modify_typo_strength(1, 2, 10) == {

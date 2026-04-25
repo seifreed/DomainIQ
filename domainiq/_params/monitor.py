@@ -11,7 +11,8 @@ from domainiq.constants import (
     TYPO_STRENGTH_MIN,
 )
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.validators import ensure_positive_int
+from domainiq.utils import enum_value
+from domainiq.validators import ensure_positive_int, is_ip_address, validate_domain
 
 from ._shared import require_non_empty
 
@@ -29,6 +30,23 @@ def _validate_positive_ids(**ids: int | None) -> None:
     for field_name, value in ids.items():
         if value is not None:
             ensure_positive_int(field_name, value)
+
+
+def _validate_monitor_item_values(
+    item_type: MonitorItemType | str,
+    items: list[str],
+) -> None:
+    item_type_value = enum_value(item_type)
+    if item_type_value == "domain":
+        for item in items:
+            if not validate_domain(item):
+                msg = f"Invalid domain: {item}"
+                raise DomainIQValidationError(msg, param_name="items")
+    elif item_type_value == "ip":
+        for item in items:
+            if not is_ip_address(item):
+                msg = f"Invalid IP address: {item}"
+                raise DomainIQValidationError(msg, param_name="items")
 
 
 def build_monitor_list_params() -> dict[str, Any]:
@@ -97,6 +115,7 @@ def build_add_monitor_item_params(
 ) -> dict[str, Any]:
     _validate_positive_ids(report_id=report_id)
     require_non_empty("items", items)
+    _validate_monitor_item_values(item_type, items)
     params: dict[str, Any] = {
         "service": "monitor",
         "action": "report_item_add",
