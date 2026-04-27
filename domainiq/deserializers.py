@@ -34,7 +34,29 @@ from .parsers import (
     try_parse_date,
     unwrap_api_envelope,
 )
-from .utils import assert_json_dict
+from .utils import assert_json_dict, validate_api_dict
+
+
+def _to_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -67,8 +89,8 @@ def _extract_record_value(record_data: dict[str, Any], record_type: str) -> str:
     """
     keys = _RECORD_VALUE_KEYS.get(record_type, ("value", "ip", "target"))
     for key in keys:
-        if val := record_data.get(key):
-            return str(val)
+        if key in record_data:
+            return str(record_data[key])
     return ""
 
 
@@ -90,6 +112,11 @@ def _normalize_dict_list(raw: object) -> list[dict[str, Any]]:
     return []
 
 
+def _coalesce(primary: Any, fallback: Any) -> Any:
+    """Return primary if it is not None, otherwise fallback."""
+    return primary if primary is not None else fallback
+
+
 def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
     """Parse a DomainIQ API WHOIS response dict into a WhoisResult."""
     result = unwrap_api_envelope(data, ("domain", "ip", "registrar"))
@@ -97,9 +124,11 @@ def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
         domain=result.get("domain"),
         ip=result.get("ip"),
         registrar=result.get("registrar"),
-        registrant_name=result.get("registrant_name") or result.get("registrant"),
-        registrant_organization=(
-            result.get("registrant_organization") or result.get("org")
+        registrant_name=_coalesce(
+            result.get("registrant_name"), result.get("registrant")
+        ),
+        registrant_organization=_coalesce(
+            result.get("registrant_organization"), result.get("org")
         ),
         registrant_email=parse_emails(result),
         creation_date=try_parse_date(result.get("creation_date")),
@@ -117,7 +146,11 @@ def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
 def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     """Parse a DomainIQ API DNS response dict into a DNSResult."""
     inner = unwrap_api_envelope(envelope, ("results", "records", "domain"))
-    raw_results = inner.get("results") or inner.get("records")
+    raw_results = (
+        inner["results"]
+        if "results" in inner and inner["results"] is not None
+        else inner.get("records")
+    )
     results = _normalize_dict_list(raw_results)
     domain = inner.get("domain", "")
     if not domain and results:
@@ -125,24 +158,23 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
         for rec in results:
             if rec.get("type") in ("SOA", "NS"):
                 domain = rec.get("host") or rec.get("name", "")
-            if domain:
-                break
+                if domain:
+                    break
         else:
             domain = results[0].get("host") or results[0].get("name", "")
     records = []
     for record_data in results:
         record_type = record_data.get("type", "")
-        record_name = cast(
-            "str",
-            record_data.get("host") or record_data.get("name", ""),
-        )
+        record_name = str(record_data.get("host") or record_data.get("name") or "")
         records.append(
             DNSRecord(
                 name=record_name,
                 type=record_type,
                 value=_extract_record_value(record_data, record_type),
-                ttl=record_data.get("ttl"),
-                priority=record_data.get("pri", record_data.get("priority")),
+                ttl=_to_int(record_data.get("ttl")),
+                priority=_to_int(
+                    record_data.get("pri", record_data.get("priority"))
+                ),
             )
         )
     return DNSResult(domain=domain, records=records)
@@ -169,7 +201,7 @@ def parse_domain_category(envelope: dict[str, Any]) -> DomainCategory:
     return DomainCategory(
         domain=inner.get("domain", ""),
         categories=_normalize_string_list(inner.get("categories")),
-        confidence_score=inner.get("confidence_score"),
+        confidence_score=_to_float(inner.get("confidence_score")),
     )
 
 
@@ -182,13 +214,13 @@ def parse_domain_snapshot(envelope: dict[str, Any]) -> DomainSnapshot:
         try:
             raw_bytes = base64.b64decode(raw_str, validate=True)
         except binascii.Error:
-            logger.debug("Failed to base64-decode raw_data field: %r", raw_str[:50])
+            logger.warning("Failed to base64-decode raw_data field: %r", raw_str[:50])
     return DomainSnapshot(
         domain=inner.get("domain", ""),
         screenshot_url=inner.get("screenshot_url"),
         timestamp=try_parse_date(inner.get("timestamp")),
-        width=inner.get("width"),
-        height=inner.get("height"),
+        width=_to_int(inner.get("width")),
+        height=_to_int(inner.get("height")),
         raw_data=raw_bytes,
     )
 
@@ -221,17 +253,17 @@ def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
     item_data_list = _normalize_dict_list(raw_items)
     items = [
         MonitorItem(
-            id=item_data.get("id", 0),
+            id=_to_int(item_data.get("id")) or 0,
             type=item_data.get("type", ""),
             value=item_data.get("value", ""),
             enabled=parse_bool(item_data.get("enabled"), default=True),
             typos_enabled=parse_bool(item_data.get("typos_enabled"), default=False),
-            typo_strength=item_data.get("typo_strength"),
+            typo_strength=_to_int(item_data.get("typo_strength")),
         )
         for item_data in item_data_list
     ]
     return MonitorReport(
-        id=inner.get("id", 0),
+        id=_to_int(inner.get("id", 0)) or 0,
         name=inner.get("name", ""),
         type=inner.get("type", ""),
         email_alerts=parse_bool(inner.get("email_alerts"), default=False),
@@ -242,19 +274,31 @@ def parse_monitor_report(envelope: dict[str, Any]) -> MonitorReport:
 
 def parse_monitor_action_result(data: dict[str, Any]) -> MonitorActionResult:
     """Validate and cast a monitor action/read response."""
-    return cast("MonitorActionResult", data)
+    return cast(
+        "MonitorActionResult",
+        validate_api_dict(assert_json_dict(data), "MonitorActionResult"),
+    )
 
 
 def parse_search_result(data: dict[str, Any]) -> SearchResult:
     """Wrap raw API dict as a SearchResult."""
-    return cast("SearchResult", data)
+    return cast(
+        "SearchResult",
+        validate_api_dict(assert_json_dict(data), "SearchResult"),
+    )
 
 
 def parse_reverse_search_result(data: dict[str, Any]) -> ReverseSearchResult:
     """Wrap raw API dict as ReverseSearchResult."""
-    return cast("ReverseSearchResult", data)
+    return cast(
+        "ReverseSearchResult",
+        validate_api_dict(assert_json_dict(data), "ReverseSearchResult"),
+    )
 
 
 def parse_ip_report_result(raw: dict[str, Any] | list[Any] | str) -> IpReportResult:
     """Validate and cast a raw API response to IpReportResult."""
-    return cast("IpReportResult", assert_json_dict(raw))
+    return cast(
+        "IpReportResult",
+        validate_api_dict(assert_json_dict(raw), "IpReportResult"),
+    )

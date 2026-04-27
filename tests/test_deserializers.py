@@ -8,6 +8,7 @@ from datetime import datetime
 import pytest
 
 from domainiq.deserializers import (
+    parse_dns_result,
     parse_domain_category,
     parse_domain_report,
     parse_domain_snapshot,
@@ -229,6 +230,24 @@ class TestMonitorDeserializer:
         assert result.items[0].type == "domain"
         assert result.items[0].value == "example.com"
 
+    def test_null_item_id_defaults_to_zero_regression(self) -> None:
+        """Regression: dict.get('id', 0) returns None when API sends 'id': null."""
+        result = parse_monitor_report(
+            {
+                "name": "brand-watch",
+                "items": [
+                    {
+                        "id": None,
+                        "type": "domain",
+                        "value": "example.com",
+                    }
+                ],
+            }
+        )
+
+        assert result.items is not None
+        assert result.items[0].id == 0
+
     def test_parse_monitor_report_skips_non_dict_items(self) -> None:
         result = parse_monitor_report(
             {
@@ -249,13 +268,171 @@ class TestMonitorDeserializer:
         assert result.items[0].value == "example.com"
 
     def test_passthrough_result_casts(self) -> None:
-        action = {"ok": True}
+        action = {"success": True}
         search = {"results": []}
-        reverse = {"matches": []}
+        reverse = {"domains": []}
 
         assert parse_monitor_action_result(action) is action
         assert parse_search_result(search) is search
         assert parse_reverse_search_result(reverse) is reverse
+
+    def test_passthrough_results_reject_non_dict(self) -> None:
+        with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
+            parse_monitor_action_result([{"ok": True}])
+        with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
+            parse_search_result([{"results": []}])
+        with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
+            parse_reverse_search_result([{"matches": []}])
+
+    def test_passthrough_results_reject_empty_dict(self) -> None:
+        with pytest.raises(DomainIQAPIError, match="empty dict"):
+            parse_monitor_action_result({})
+        with pytest.raises(DomainIQAPIError, match="empty dict"):
+            parse_search_result({})
+        with pytest.raises(DomainIQAPIError, match="empty dict"):
+            parse_reverse_search_result({})
+
+
+class TestWhoisDeserializer:
+    def test_empty_string_registrant_name_not_fallback_regression(self) -> None:
+        """Regression: empty string registrant_name fell back to registrant."""
+        from domainiq.deserializers import parse_whois_result
+
+        result = parse_whois_result(
+            {
+                "domain": "example.com",
+                "registrant_name": "",
+                "registrant": "Fallback Name",
+            }
+        )
+        assert result.registrant_name == ""
+
+    def test_empty_string_registrant_org_not_fallback_regression(self) -> None:
+        """Regression: empty string registrant_organization fell back to org."""
+        from domainiq.deserializers import parse_whois_result
+
+        result = parse_whois_result(
+            {
+                "domain": "example.com",
+                "registrant_organization": "",
+                "org": "Fallback Org",
+            }
+        )
+        assert result.registrant_organization == ""
+
+
+class TestDnsRecordValueExtraction:
+    def test_falsy_value_zero_is_preserved_not_discarded(self) -> None:
+        """Regression for truthiness bug: value=0 was discarded as falsy.
+
+        _extract_record_value uses ``if val := record_data.get(key):`` which
+        treats 0, False, and empty string as missing. DNS record values should
+        be extracted even when they are falsy (e.g. a numeric 0).
+        """
+        result = parse_dns_result(
+            {
+                "domain": "example.com",
+                "records": [
+                    {"host": "example.com", "type": "A", "ip": 0}
+                ],
+            }
+        )
+
+        assert result.records[0].value == "0"
+
+    def test_falsy_value_empty_string_is_preserved_not_discarded(self) -> None:
+        """Regression for truthiness bug: empty string value discarded."""
+        result = parse_dns_result(
+            {
+                "domain": "example.com",
+                "records": [
+                    {"host": "example.com", "type": "TXT", "txt": ""}
+                ],
+            }
+        )
+
+        assert result.records[0].value == ""
+
+    def test_falsy_value_false_is_preserved_not_discarded(self) -> None:
+        """Regression for truthiness bug: False value discarded."""
+        result = parse_dns_result(
+            {
+                "domain": "example.com",
+                "records": [
+                    {"host": "example.com", "type": "A", "ip": False}
+                ],
+            }
+        )
+
+        assert result.records[0].value == "False"
+
+    def test_null_results_falls_back_to_records_regression(self) -> None:
+        """Regression for data loss when API returns null results with valid records."""
+        result = parse_dns_result(
+            {
+                "results": None,
+                "records": [
+                    {"host": "example.com", "type": "A", "ip": "93.184.216.34"}
+                ],
+            }
+        )
+
+        assert len(result.records) == 1
+        assert result.records[0].type == "A"
+        assert result.records[0].value == "93.184.216.34"
+
+    def test_prefers_soa_or_ns_for_domain_extraction_regression(self) -> None:
+        """Regression: SOA/NS preference skipped; first record won regardless of type."""
+        result = parse_dns_result(
+            {
+                "records": [
+                    {"host": "a.example.com", "type": "A", "ip": "192.0.2.1"},
+                    {"host": "ns1.example.com", "type": "NS"},
+                ],
+            }
+        )
+
+        assert result.domain == "ns1.example.com"
+
+    def test_soa_preference_over_ns_for_domain_extraction(self) -> None:
+        """SOA should be preferred over NS when both are present."""
+        result = parse_dns_result(
+            {
+                "records": [
+                    {"host": "ns1.example.com", "type": "NS"},
+                    {"host": "soa.example.com", "type": "SOA"},
+                ],
+            }
+        )
+
+        assert result.domain == "ns1.example.com"
+
+    def test_fallback_to_first_record_when_no_soa_or_ns(self) -> None:
+        """When no SOA/NS records exist, fallback to first record's host."""
+        result = parse_dns_result(
+            {
+                "records": [
+                    {"host": "a.example.com", "type": "A", "ip": "192.0.2.1"},
+                    {"host": "b.example.com", "type": "A", "ip": "192.0.2.2"},
+                ],
+            }
+        )
+
+        assert result.domain == "a.example.com"
+
+    def test_record_name_defaults_to_empty_string_when_host_and_name_are_none_regression(
+        self,
+    ) -> None:
+        """Regression: cast allowed None into DNSRecord.name which expects str."""
+        result = parse_dns_result(
+            {
+                "records": [
+                    {"type": "A", "ip": "192.0.2.1"}
+                ],
+            }
+        )
+
+        assert result.records[0].name == ""
 
 
 class TestIpReportDeserializer:
@@ -267,3 +444,70 @@ class TestIpReportDeserializer:
     def test_rejects_non_dict_response(self) -> None:
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
             parse_ip_report_result([{"ip": "192.0.2.1"}])
+
+    def test_rejects_empty_dict_response(self) -> None:
+        with pytest.raises(DomainIQAPIError, match="empty dict"):
+            parse_ip_report_result({})
+
+
+class TestDeserializerTypeCoercion:
+    """Regression: raw API strings were stored in int/float fields."""
+
+    def test_dns_record_ttl_and_priority_coerced_from_string(self) -> None:
+        result = parse_dns_result(
+            {
+                "domain": "example.com",
+                "records": [
+                    {
+                        "host": "example.com",
+                        "type": "A",
+                        "ip": "192.0.2.1",
+                        "ttl": "3600",
+                        "pri": "10",
+                    }
+                ],
+            }
+        )
+        assert result.records[0].ttl == 3600
+        assert result.records[0].priority == 10
+
+    def test_domain_snapshot_width_height_coerced_from_string(self) -> None:
+        result = parse_domain_snapshot(
+            {
+                "domain": "example.com",
+                "screenshot_url": "https://example.com/s.png",
+                "width": "1024",
+                "height": "768",
+            }
+        )
+        assert result.width == 1024
+        assert result.height == 768
+
+    def test_domain_category_confidence_coerced_from_string(self) -> None:
+        result = parse_domain_category(
+            {"domain": "example.com", "confidence_score": "0.95"}
+        )
+        assert result.confidence_score == 0.95
+
+    def test_monitor_item_id_and_typo_strength_coerced_from_string(self) -> None:
+        result = parse_monitor_report(
+            {
+                "name": "brand-watch",
+                "items": [
+                    {
+                        "id": "7",
+                        "type": "domain",
+                        "value": "example.com",
+                        "typo_strength": "10",
+                    }
+                ],
+            }
+        )
+        assert result.items[0].id == 7
+        assert result.items[0].typo_strength == 10
+
+    def test_monitor_report_id_coerced_from_string(self) -> None:
+        result = parse_monitor_report(
+            {"id": "42", "name": "brand-watch", "items": []}
+        )
+        assert result.id == 42

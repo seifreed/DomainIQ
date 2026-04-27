@@ -35,7 +35,7 @@ def _parse_numeric_timestamp(value: float, raw_value: object) -> datetime | None
     try:
         return datetime.fromtimestamp(value, UTC).replace(tzinfo=None)
     except (OSError, OverflowError, ValueError):
-        logger.debug(
+        logger.warning(
             "try_parse_date: numeric timestamp parse failed for %r",
             raw_value,
         )
@@ -55,14 +55,28 @@ def _parse_date_string(date_str: str) -> datetime | None:
     try:
         return _normalize_datetime(datetime.fromisoformat(stripped))
     except ValueError:
-        logger.debug("try_parse_date: fromisoformat failed for %r", date_str[:80])
+        logger.warning("try_parse_date: fromisoformat failed for %r", date_str[:80])
 
     digits = stripped.lstrip("-")
-    if "." in stripped or (digits.isdigit() and len(digits) >= _TIMESTAMP_MIN_DIGITS):
+    is_numeric_timestamp = False
+    if digits.isdigit() and len(digits) >= _TIMESTAMP_MIN_DIGITS:
+        is_numeric_timestamp = True
+    elif "." in stripped:
+        without_dot = stripped.replace(".", "", 1)
+        if (
+            without_dot.lstrip("-").isdigit()
+            and len(without_dot) >= _TIMESTAMP_MIN_DIGITS
+        ):
+            is_numeric_timestamp = True
+
+    if is_numeric_timestamp:
         try:
             timestamp = float(stripped)
         except ValueError:
-            logger.debug("try_parse_date: timestamp parse failed for %r", date_str[:80])
+            logger.warning(
+                "try_parse_date: timestamp parse failed for %r",
+                date_str[:80],
+            )
         else:
             parsed = _parse_numeric_timestamp(timestamp, date_str)
             if parsed is not None:
@@ -103,7 +117,12 @@ def parse_bool(value: object, default: bool = False) -> bool:
     if isinstance(value, int):
         return value != 0
     if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes")
+        lowered = value.strip().lower()
+        if lowered in ("1", "2", "true", "yes"):
+            return True
+        if lowered in ("0", "false", "no", ""):
+            return False
+        return default
     return default
 
 
@@ -111,6 +130,9 @@ def unwrap_api_envelope(
     data: dict[str, Any], exclude_keys: tuple[str, ...]
 ) -> dict[str, Any]:
     """Unwrap {'result': {...}} top-level API envelope when present."""
+    from domainiq.utils import assert_json_dict
+
+    data = assert_json_dict(data)
     result = data.get("result")
     if isinstance(result, dict) and not any(k in data for k in exclude_keys):
         return result
@@ -120,7 +142,7 @@ def unwrap_api_envelope(
 def _normalize_nameserver_value(ns: object) -> str | None:
     if isinstance(ns, dict) and "host" in ns:
         ns = ns["host"]
-    if ns is None:
+    if ns is None or ns is False or ns == 0:
         return None
     normalized = str(ns).strip()
     return normalized or None
@@ -148,13 +170,17 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
     if indexed_nameservers:
         return indexed_nameservers
 
-    raw_ns = result.get("nameservers", []) or []
+    raw_ns = result.get("nameservers", [])
+    if raw_ns is None:
+        return []
     if isinstance(raw_ns, str):
         nameservers: list[Any] = raw_ns.split(",")
     elif isinstance(raw_ns, dict):
         nameservers = [raw_ns]
-    else:
+    elif isinstance(raw_ns, (list, tuple)):
         nameservers = list(raw_ns)
+    else:
+        nameservers = []
     return _normalize_nameserver_values(nameservers)
 
 
@@ -165,7 +191,13 @@ def parse_statuses(raw: object) -> list[str]:
         return [s for s in (part.strip() for part in status.split(",")) if s]
     if isinstance(status, list):
         return [
-            s for s in (str(part).strip() for part in status if part is not None) if s
+            s
+            for s in (
+                str(part).strip()
+                for part in status
+                if part is not None and part is not False and part != 0
+            )
+            if s
         ]
     parsed = str(status).strip()
     return [parsed] if parsed else []
@@ -174,7 +206,13 @@ def parse_statuses(raw: object) -> list[str]:
 def _normalize_email_values(raw_emails: object) -> list[str] | None:
     if isinstance(raw_emails, list):
         return [
-            s for s in (str(e).strip() for e in raw_emails if e is not None) if s
+            s
+            for s in (
+                str(e).strip()
+                for e in raw_emails
+                if e is not None and e is not False and e != 0
+            )
+            if s
         ] or None
     if isinstance(raw_emails, str):
         return [e.strip() for e in raw_emails.split(",") if e.strip()] or None

@@ -5,10 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from .constants import RETRY_EXHAUSTED_MSG
-from .exceptions import DomainIQAPIError
 from .request_policy import (
     RequestPolicy,
     classify_http_response,
@@ -33,6 +31,40 @@ async def _async_sleep(delay: float) -> None:
     await asyncio.sleep(delay)
 
 
+def _handle_request_error(
+    exc: TimeoutError | OSError,
+    attempt: int,
+    policy: RequestPolicy,
+) -> float:
+    """Map a network exception to its retry delay."""
+    if isinstance(exc, TimeoutError):
+        return on_timeout_error(exc, attempt, policy)
+    return on_os_error(exc, attempt, policy)
+
+
+_RequestResult = dict[str, Any] | list[Any] | str
+
+
+def _process_response(
+    response: Any,  # noqa: ANN401
+    attempt: int,
+    policy: RequestPolicy,
+    output_format: str,
+) -> tuple[Literal["retry"], float] | tuple[Literal["success"], _RequestResult]:
+    """Classify an HTTP response and return either a retry delay or parsed body."""
+    logger.debug("API response status: %s", response.status_code)
+    retry_delay = classify_http_response(
+        response.status_code,
+        response.text,
+        dict(response.headers),
+        attempt,
+        policy,
+    )
+    if retry_delay is not None:
+        return ("retry", retry_delay)
+    return ("success", parse_response_body(response, output_format))
+
+
 def execute_sync_request(
     transport: SyncTransport,
     request_params: dict[str, str],
@@ -47,29 +79,33 @@ def execute_sync_request(
                 request_params,
                 policy.timeout,
             )
-        except TimeoutError as exc:
-            _sync_sleep(on_timeout_error(exc, attempt, policy))
+        except (TimeoutError, OSError) as exc:
+            _sync_sleep(_handle_request_error(exc, attempt, policy))
             continue
-        except OSError as exc:
-            _sync_sleep(on_os_error(exc, attempt, policy))
+        except UnicodeDecodeError as exc:
+            logger.warning("Unicode decode error on attempt %s: %s", attempt, exc)
+            _os_error = OSError(f"Response decoding failed: {exc}")
+            _os_error.__cause__ = exc
+            _sync_sleep(_handle_request_error(_os_error, attempt, policy))
             continue
+        except RuntimeError as exc:
+            _msg = str(exc).lower()
+            if any(k in _msg for k in ("closed", "shut", "terminated")):
+                logger.warning("Transport closed on attempt %s: %s", attempt, exc)
+                _os_error = OSError(f"Transport closed: {exc}")
+                _os_error.__cause__ = exc
+                _sync_sleep(_handle_request_error(_os_error, attempt, policy))
+                continue
+            raise
 
-        logger.debug("API response status: %s", response.status_code)
-
-        retry_delay = classify_http_response(
-            response.status_code,
-            response.text,
-            dict(response.headers),
-            attempt,
-            policy,
-        )
-        if retry_delay is not None:
-            _sync_sleep(retry_delay)
+        decision = _process_response(response, attempt, policy, output_format)
+        if decision[0] == "retry":
+            _sync_sleep(decision[1])
             continue
+        return decision[1]
 
-        return parse_response_body(response, output_format)
-
-    raise DomainIQAPIError(RETRY_EXHAUSTED_MSG)
+    _unreachable = "unreachable"
+    raise AssertionError(_unreachable)  # pragma: no cover
 
 
 async def execute_async_request(
@@ -86,29 +122,33 @@ async def execute_async_request(
                 request_params,
                 policy.timeout,
             )
-        except TimeoutError as exc:
-            await _async_sleep(on_timeout_error(exc, attempt, policy))
+        except (TimeoutError, OSError) as exc:
+            await _async_sleep(_handle_request_error(exc, attempt, policy))
             continue
-        except OSError as exc:
-            await _async_sleep(on_os_error(exc, attempt, policy))
+        except UnicodeDecodeError as exc:
+            logger.warning("Unicode decode error on attempt %s: %s", attempt, exc)
+            _os_error = OSError(f"Response decoding failed: {exc}")
+            _os_error.__cause__ = exc
+            await _async_sleep(_handle_request_error(_os_error, attempt, policy))
             continue
+        except RuntimeError as exc:
+            _msg = str(exc).lower()
+            if any(k in _msg for k in ("closed", "shut", "terminated")):
+                logger.warning("Transport closed on attempt %s: %s", attempt, exc)
+                _os_error = OSError(f"Transport closed: {exc}")
+                _os_error.__cause__ = exc
+                await _async_sleep(_handle_request_error(_os_error, attempt, policy))
+                continue
+            raise
 
-        logger.debug("API response status: %s", response.status_code)
-
-        retry_delay = classify_http_response(
-            response.status_code,
-            response.text,
-            dict(response.headers),
-            attempt,
-            policy,
-        )
-        if retry_delay is not None:
-            await _async_sleep(retry_delay)
+        decision = _process_response(response, attempt, policy, output_format)
+        if decision[0] == "retry":
+            await _async_sleep(decision[1])
             continue
+        return decision[1]
 
-        return parse_response_body(response, output_format)
-
-    raise DomainIQAPIError(RETRY_EXHAUSTED_MSG)
+    _unreachable = "unreachable"
+    raise AssertionError(_unreachable)  # pragma: no cover
 
 
 __all__ = [

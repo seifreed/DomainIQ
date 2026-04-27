@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
 
 from domainiq.cli._dispatch import (
     _dispatch_command,
@@ -31,11 +33,8 @@ from domainiq.constants import (
 from domainiq.constants import (
     EXIT_SUCCESS as _EXIT_SUCCESS,
 )
-from domainiq.exceptions import DomainIQError, DomainIQValidationError
+from domainiq.exceptions import DomainIQError
 from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def _make_args(**kwargs: Any) -> argparse.Namespace:
@@ -168,6 +167,15 @@ class TestDispatch:
     def test_dispatch_validation_error_returns_exit_error(self) -> None:
         client = _mock_client()
         args = _make_args(reverse_search="foo")  # missing reverse_search_type
+        result = _dispatch_command(client, args)
+        assert result == _EXIT_ERROR
+
+    def test_dispatch_validation_catches_whitespace_only_strings_regression(
+        self,
+    ) -> None:
+        """Regression: whitespace-only values bypassed empty-string check."""
+        client = _mock_client()
+        args = _make_args(whois_lookup="   ")
         result = _dispatch_command(client, args)
         assert result == _EXIT_ERROR
 
@@ -366,24 +374,20 @@ class TestDispatchMonitor:
         client.delete_monitor_item.assert_called_once_with(7)
         client.delete_monitor_report.assert_called_once_with(42)
 
-    def test_dispatch_monitor_management_reports_empty_add_item_value(
-        self, capsys: pytest.CaptureFixture[str]
+    def test_dispatch_monitor_management_filters_empty_add_item_values(
+        self,
     ) -> None:
         client = _mock_client()
-        client.add_monitor_item.side_effect = DomainIQValidationError(
-            "items must not contain empty values",
-            param_name="items",
-        )
+        client.add_monitor_item.return_value = {}
         args = _make_args(add_monitor_item=["42", "domain", "example.com,"])
 
         result = _dispatch_monitor_management(client, args)
 
         assert result.executed is True
-        assert result.errored is True
+        assert result.errored is False
         client.add_monitor_item.assert_called_once_with(
-            42, "domain", ["example.com", ""]
+            42, "domain", ["example.com"]
         )
-        assert "items must not contain empty values" in capsys.readouterr().err
 
     def test_dispatch_command_reports_invalid_add_monitor_item_report_id(
         self, capsys: pytest.CaptureFixture[str]
@@ -438,6 +442,64 @@ class TestRunCommand:
 
         def _raise() -> None:
             raise DomainIQError(msg)
+
+        executed, had_errors = _run_command(_raise)
+        assert executed is True
+        assert had_errors is True
+        captured = capsys.readouterr()
+        assert msg in captured.err
+
+    def test_returns_had_errors_on_value_error(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        msg = "bad value"
+
+        def _raise() -> None:
+            raise ValueError(msg)
+
+        executed, had_errors = _run_command(_raise)
+        assert executed is True
+        assert had_errors is True
+        captured = capsys.readouterr()
+        assert msg in captured.err
+
+    def test_returns_had_errors_on_oserror(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        msg = "network down"
+
+        def _raise() -> None:
+            raise OSError(msg)
+
+        executed, had_errors = _run_command(_raise)
+        assert executed is True
+        assert had_errors is True
+        captured = capsys.readouterr()
+        assert msg in captured.err
+
+    def test_type_error_is_caught_regression(self,
+        capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Regression: TypeError leaked raw traceback to stderr."""
+        msg = "unexpected type mismatch"
+
+        def _raise() -> None:
+            raise TypeError(msg)
+
+        executed, had_errors = _run_command(_raise)
+        assert executed is True
+        assert had_errors is True
+        captured = capsys.readouterr()
+        assert msg in captured.err
+
+    def test_runtime_error_is_caught_regression(self,
+        capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Regression: RuntimeError leaked raw traceback to stderr."""
+        msg = "internal failure"
+
+        def _raise() -> None:
+            raise RuntimeError(msg)
 
         executed, had_errors = _run_command(_raise)
         assert executed is True

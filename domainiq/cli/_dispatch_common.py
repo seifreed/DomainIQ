@@ -17,11 +17,11 @@ _DispatchFn = Callable[[Any, argparse.Namespace], _CommandResult]
 
 
 def _run_command(fn: Callable[[], None]) -> _CommandResult:
-    """Run fn and return (executed=True, had_errors). Catches DomainIQError."""
+    """Run fn and return (executed=True, had_errors). Catches all expected errors."""
     try:
         fn()
         return _CommandResult(executed=True, errored=False)
-    except DomainIQError as e:
+    except (DomainIQError, ValueError, OSError, TypeError, RuntimeError) as e:
         sys.stderr.write(f"Error: {e}\n")
         return _CommandResult(executed=True, errored=True)
 
