@@ -6,8 +6,8 @@ import argparse
 import base64
 import json
 from dataclasses import dataclass
-from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -40,6 +40,10 @@ from tests.conftest import StubClient
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
+
+    from domainiq.cli import ClientFactory
+    from domainiq.cli._types import SnapshotArgs
+    from domainiq.protocols import DNSProtocol, SearchProtocol, WhoisProtocol
 
 
 def _mock_client() -> StubClient:
@@ -91,7 +95,7 @@ def _client_factory(client: StubClient) -> Callable[[object], StubClient]:
 
 class TestSerialize:
     def test_datetime_to_iso(self) -> None:
-        dt = datetime(2024, 1, 15, 12, 0, 0)  # noqa: DTZ001
+        dt = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC).replace(tzinfo=None)
         assert _serialize(dt) == "2024-01-15T12:00:00"
 
     def test_bytes_to_base64(self) -> None:
@@ -100,12 +104,12 @@ class TestSerialize:
         assert result == base64.b64encode(b"hello").decode("ascii")
 
     def test_dict_recursion(self) -> None:
-        dt = datetime(2024, 1, 1)  # noqa: DTZ001
+        dt = datetime(2024, 1, 1, tzinfo=UTC).replace(tzinfo=None)
         result = _serialize({"ts": dt, "val": 42})
         assert result == {"ts": "2024-01-01T00:00:00", "val": 42}
 
     def test_list_recursion(self) -> None:
-        result = _serialize([1, b"x", "y"])
+        result = cast("list[object]", _serialize([1, b"x", "y"]))
         assert result[0] == 1
         assert isinstance(result[1], str)
         assert result[2] == "y"
@@ -164,7 +168,7 @@ class TestBuildSnapshotOptions:
             width=1024,
             height=768,
         )
-        options = build_snapshot_options(args)
+        options = build_snapshot_options(cast("SnapshotArgs", args))
         assert options.width == 1024
         assert options.height == 768
         assert options.full is True
@@ -177,7 +181,7 @@ class TestBuildSnapshotOptions:
             width=None,
             height=None,
         )
-        options = build_snapshot_options(args)
+        options = build_snapshot_options(cast("SnapshotArgs", args))
         assert options.width == 250
         assert options.height == 125
 
@@ -190,7 +194,7 @@ class TestBuildSnapshotOptions:
             height=None,
         )
         with pytest.raises(DomainIQValidationError) as exc_info:
-            build_snapshot_options(args)
+            build_snapshot_options(cast("SnapshotArgs", args))
         assert exc_info.value.param_name == "width"
 
     def test_rejects_negative_height(self) -> None:
@@ -202,7 +206,7 @@ class TestBuildSnapshotOptions:
             height=-1,
         )
         with pytest.raises(DomainIQValidationError) as exc_info:
-            build_snapshot_options(args)
+            build_snapshot_options(cast("SnapshotArgs", args))
         assert exc_info.value.param_name == "height"
 
 
@@ -210,7 +214,7 @@ class TestHandleWhoisLookup:
     def test_domain_target_calls_whois_with_domain(self) -> None:
         client = _mock_client()
         args = WhoisArgs(query="example.com", full=False, current_only=False)
-        handle_whois_lookup(client, args)
+        handle_whois_lookup(cast("WhoisProtocol", client), args)
         calls = client.calls_to("whois_lookup")
         assert len(calls) == 1
         assert calls[0].args == ()
@@ -224,7 +228,7 @@ class TestHandleWhoisLookup:
     def test_ip_target_calls_whois_with_ip(self) -> None:
         client = _mock_client()
         args = WhoisArgs(query="8.8.8.8", full=False, current_only=False)
-        handle_whois_lookup(client, args)
+        handle_whois_lookup(cast("WhoisProtocol", client), args)
         calls = client.calls_to("whois_lookup")
         assert len(calls) == 1
         assert calls[0].args == ()
@@ -238,7 +242,7 @@ class TestHandleWhoisLookup:
     def test_full_flag_forwarded(self) -> None:
         client = _mock_client()
         args = WhoisArgs(query="example.com", full=True, current_only=False)
-        handle_whois_lookup(client, args)
+        handle_whois_lookup(cast("WhoisProtocol", client), args)
         call_kwargs = client.calls_to("whois_lookup")[-1].kwargs
         assert call_kwargs["full"] is True
 
@@ -247,7 +251,7 @@ class TestHandleDnsLookup:
     def test_no_types_passes_none(self) -> None:
         client = _mock_client()
         args = DnsArgs(query="example.com", types=None)
-        handle_dns_lookup(client, args)
+        handle_dns_lookup(cast("DNSProtocol", client), args)
         calls = client.calls_to("dns_lookup")
         assert len(calls) == 1
         assert calls[0].args == ("example.com",)
@@ -256,7 +260,7 @@ class TestHandleDnsLookup:
     def test_types_split_by_comma(self) -> None:
         client = _mock_client()
         args = DnsArgs(query="example.com", types=["A", "MX", "TXT"])
-        handle_dns_lookup(client, args)
+        handle_dns_lookup(cast("DNSProtocol", client), args)
         calls = client.calls_to("dns_lookup")
         assert len(calls) == 1
         assert calls[0].args == ("example.com",)
@@ -285,7 +289,7 @@ class TestHandleDomainSearch:
     def test_basic_search_no_filters(self) -> None:
         client = _mock_client()
         args = self._search_args(keywords=["kw"])
-        handle_domain_search(client, args)
+        handle_domain_search(cast("SearchProtocol", client), args)
         calls = client.calls_to("domain_search")
         assert len(calls) == 1
         call_kwargs = calls[-1].kwargs
@@ -295,24 +299,27 @@ class TestHandleDomainSearch:
     def test_exclude_dashed_sets_filter(self) -> None:
         client = _mock_client()
         args = self._search_args(exclude_dashed=True)
-        handle_domain_search(client, args)
+        handle_domain_search(cast("SearchProtocol", client), args)
         call_kwargs = client.calls_to("domain_search")[-1].kwargs
-        assert call_kwargs["filters"]["exclude_dashed"] is True
+        filters = cast("dict[str, object]", call_kwargs["filters"])
+        assert filters["exclude_dashed"] is True
 
     def test_count_only_sets_filter(self) -> None:
         client = _mock_client()
         args = self._search_args(count_only=True)
-        handle_domain_search(client, args)
+        handle_domain_search(cast("SearchProtocol", client), args)
         call_kwargs = client.calls_to("domain_search")[-1].kwargs
-        assert call_kwargs["filters"]["count_only"] == 1
+        filters = cast("dict[str, object]", call_kwargs["filters"])
+        assert filters["count_only"] == 1
 
     def test_min_max_length(self) -> None:
         client = _mock_client()
         args = self._search_args(min_length=5, max_length=15)
-        handle_domain_search(client, args)
+        handle_domain_search(cast("SearchProtocol", client), args)
         call_kwargs = client.calls_to("domain_search")[-1].kwargs
-        assert call_kwargs["filters"]["min_length"] == 5
-        assert call_kwargs["filters"]["max_length"] == 15
+        filters = cast("dict[str, object]", call_kwargs["filters"])
+        assert filters["min_length"] == 5
+        assert filters["max_length"] == 15
 
 
 class TestCliCredentials:
@@ -340,7 +347,7 @@ class TestCliCredentials:
 
 
 class TestMain:
-    def test_build_config_uses_direct_cli_args(self, tmp_path) -> None:
+    def test_build_config_uses_direct_cli_args(self, tmp_path: Path) -> None:
         config_file = tmp_path / "domainiq.key"
         args = argparse.Namespace(
             api_key="direct-key",
@@ -364,7 +371,7 @@ class TestMain:
 
         config = cli_module._build_config(
             args,
-            config_factory=config_factory,
+            config_factory=cast("Callable[..., Config]", config_factory),
             prompt=lambda _path: "prompted",
         )
 
@@ -387,7 +394,11 @@ class TestMain:
         prompt = _RecordingCallable()
 
         with pytest.raises(DomainIQConfigurationError, match="DOMAINIQ_MAX_RETRIES"):
-            cli_module._build_config(args, config_factory=config_factory, prompt=prompt)
+            cli_module._build_config(
+                args,
+                config_factory=cast("Callable[..., Config]", config_factory),
+                prompt=cast("Callable[[str | None], str]", prompt),
+            )
 
         assert prompt.calls == []
 
@@ -415,7 +426,9 @@ class TestMain:
         print_exc = _RecordingCallable()
 
         code = cli_module._handle_cli_error(
-            OSError("disk failed"), debug=True, print_exc=print_exc
+            OSError("disk failed"),
+            debug=True,
+            print_exc=cast("Callable[[], None]", print_exc),
         )
 
         assert code == 1
@@ -428,7 +441,7 @@ class TestMain:
     def test_main_no_command_exits_no_command(self) -> None:
         code = main(
             ["--api-key", "key"],
-            client_factory=_client_factory(StubClient()),
+            client_factory=cast("ClientFactory", _client_factory(StubClient())),
         )
         assert code == _EXIT_NO_COMMAND
 
@@ -438,14 +451,17 @@ class TestMain:
 
         code = main(
             ["--api-key", "key", "--whois-lookup", "example.com"],
-            client_factory=_client_factory(client),
+            client_factory=cast("ClientFactory", _client_factory(client)),
         )
         assert code == 1
 
     def test_main_keyboard_interrupt_exits_130(self) -> None:
         code = main(
             ["--api-key", "key"],
-            client_factory=lambda _config: _RaisingContext(KeyboardInterrupt()),
+            client_factory=cast(
+                "ClientFactory",
+                lambda _config: _RaisingContext(KeyboardInterrupt()),
+            ),
         )
         assert code == 130
 
@@ -455,7 +471,7 @@ class TestMain:
         code = main(
             ["--whois-lookup", "example.com"],
             build_config=lambda _args: config,
-            client_factory=_client_factory(StubClient()),
+            client_factory=cast("ClientFactory", _client_factory(StubClient())),
         )
 
         assert code == _EXIT_SUCCESS

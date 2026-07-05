@@ -11,6 +11,7 @@ import warnings
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import TypedDict, cast
 
 import pytest
 
@@ -38,10 +39,27 @@ from domainiq.validators import (
 )
 
 
+class _ConfigKwargs(TypedDict, total=False):
+    """Config keyword arguments used when unpacking test-supplied kwargs.
+
+    Fields mirror the real ``Config`` parameter types so that ``**`` unpacking
+    of a cast dict type-checks; the tests deliberately feed invalid *values*
+    (never invalid keys) through the cast to exercise validation errors.
+    """
+
+    base_url: str
+    timeout: float | None
+    max_retries: int | None
+    retry_delay: int | None
+    config_file: str | Path | None
+    connector_limit: int | None
+    connector_limit_per_host: int | None
+
+
 class TestDomainIQClientUnit:
     """Unit tests that don't require API access."""
 
-    def test_client_initialization_with_kwargs(self):
+    def test_client_initialization_with_kwargs(self) -> None:
         """Test client initialization with keyword arguments."""
         client = DomainIQClient(api_key="test_key_456", timeout=60)
         assert client.config.api_key == "test_key_456"
@@ -49,7 +67,7 @@ class TestDomainIQClientUnit:
         assert client.config.base_url == "https://www.domainiq.com/api"
         client.close()
 
-    def test_whois_lookup_missing_parameters(self):
+    def test_whois_lookup_missing_parameters(self) -> None:
         """Test WHOIS lookup with missing parameters."""
         client = DomainIQClient(api_key="test_key")
 
@@ -59,7 +77,7 @@ class TestDomainIQClientUnit:
         assert "Either domain or ip must be provided" in str(exc_info.value)
         client.close()
 
-    def test_context_manager(self):
+    def test_context_manager(self) -> None:
         """Test client as context manager."""
         with DomainIQClient(api_key="test_key") as client:
             assert client.config.api_key == "test_key"
@@ -106,24 +124,26 @@ class TestDomainIQClientUnit:
 class TestConfigUnit:
     """Unit tests for Config."""
 
-    def test_config_initialization(self):
+    def test_config_initialization(self) -> None:
         config = Config(api_key="test_key", timeout=60)
         assert config.api_key == "test_key"
         assert config.timeout == 60
         assert config.base_url == "https://www.domainiq.com/api"
 
-    def test_config_validation_invalid_timeout(self):
+    def test_config_validation_invalid_timeout(self) -> None:
         with pytest.raises(DomainIQConfigurationError) as exc_info:
             Config(api_key="test_key", timeout=-1)
 
         assert "Timeout must be positive" in str(exc_info.value)
 
     @pytest.mark.parametrize("timeout", ["abc", True, float("nan"), float("inf")])
-    def test_config_validation_rejects_invalid_timeout_types(self, timeout):
+    def test_config_validation_rejects_invalid_timeout_types(
+        self, timeout: object
+    ) -> None:
         with pytest.raises(
             DomainIQConfigurationError, match="Timeout must be a finite number"
         ):
-            Config(api_key="test_key", timeout=timeout)
+            Config(api_key="test_key", timeout=cast("float", timeout))
 
     @pytest.mark.parametrize(
         ("kwargs", "message"),
@@ -151,17 +171,19 @@ class TestConfigUnit:
             ),
         ],
     )
-    def test_config_validation_rejects_invalid_integer_types(self, kwargs, message):
+    def test_config_validation_rejects_invalid_integer_types(
+        self, kwargs: dict[str, object], message: str
+    ) -> None:
         with pytest.raises(DomainIQConfigurationError, match=message):
-            Config(api_key="test_key", **kwargs)
+            Config(api_key="test_key", **cast("_ConfigKwargs", kwargs))
 
-    def test_client_initialization_reports_invalid_numeric_config(self):
+    def test_client_initialization_reports_invalid_numeric_config(self) -> None:
         with pytest.raises(
             DomainIQConfigurationError, match="Timeout must be a finite number"
         ):
-            DomainIQClient(api_key="test_key", timeout="abc")
+            DomainIQClient(api_key="test_key", timeout=cast("float", "abc"))
 
-    def test_config_validation_missing_api_key(self):
+    def test_config_validation_missing_api_key(self) -> None:
         config = Config(api_key="test_key")
         config.api_key = ""
 
@@ -170,7 +192,7 @@ class TestConfigUnit:
 
         assert "API key is required" in str(exc_info.value)
 
-    def test_config_validation_rejects_whitespace_only_api_key(self):
+    def test_config_validation_rejects_whitespace_only_api_key(self) -> None:
         config = Config(api_key="test_key")
         config.api_key = "   "
 
@@ -179,7 +201,9 @@ class TestConfigUnit:
 
         assert "API key is required" in str(exc_info.value)
 
-    def test_config_validation_rejects_whitespace_only_base_url_regression(self):
+    def test_config_validation_rejects_whitespace_only_base_url_regression(
+        self,
+    ) -> None:
         """Regression: whitespace-only base_url passed validation.
 
         A blank base_url previously slipped through and produced malformed requests.
@@ -215,7 +239,7 @@ class TestConfigUnit:
         )
         assert config.api_key == "env_key_123"
 
-    def test_config_module_import_ignores_invalid_numeric_environment(self):
+    def test_config_module_import_ignores_invalid_numeric_environment(self) -> None:
         env = os.environ | {"DOMAINIQ_MAX_RETRIES": "abc"}
 
         completed = subprocess.run(
@@ -279,7 +303,11 @@ class TestConfigUnit:
         kwarg: str,
         value: float,
     ) -> None:
-        config = Config(api_key="test_key", env={env_name: "abc"}, **{kwarg: value})
+        config = Config(
+            api_key="test_key",
+            env={env_name: "abc"},
+            **cast("_ConfigKwargs", {kwarg: value}),
+        )
 
         assert getattr(config, kwarg) == value
 
@@ -293,11 +321,13 @@ class TestConfigUnit:
             ),
         ],
     )
-    def test_config_validation_invalid_connector_limits(self, kwargs, message):
+    def test_config_validation_invalid_connector_limits(
+        self, kwargs: dict[str, int], message: str
+    ) -> None:
         with pytest.raises(DomainIQConfigurationError, match=message):
-            Config(api_key="test_key", **kwargs)
+            Config(api_key="test_key", **cast("_ConfigKwargs", kwargs))
 
-    def test_set_config_path_reloads_key_from_new_file(self, tmp_path):
+    def test_set_config_path_reloads_key_from_new_file(self, tmp_path: Path) -> None:
         initial = tmp_path / "initial"
         target = tmp_path / "new_config"
         initial.write_text("initial_key")
@@ -313,12 +343,12 @@ class TestConfigUnit:
 class TestUtilsUnit:
     """Unit tests for utility functions."""
 
-    def test_validate_domain_valid(self):
+    def test_validate_domain_valid(self) -> None:
         assert validate_domain("example.com")
         assert validate_domain("subdomain.example.com")
         assert validate_domain("test-domain.co.uk")
 
-    def test_validate_domain_invalid(self):
+    def test_validate_domain_invalid(self) -> None:
         assert not validate_domain("")
         assert not validate_domain("invalid")
         assert not validate_domain(".example.com")
@@ -329,22 +359,22 @@ class TestUtilsUnit:
         assert not validate_domain("192.0.2.1")
         assert not validate_domain("a" * 64 + ".com")
 
-    def test_validate_ipv4_valid(self):
+    def test_validate_ipv4_valid(self) -> None:
         assert validate_ipv4("192.168.1.1")
         assert validate_ipv4("8.8.8.8")
         assert validate_ipv4("127.0.0.1")
 
-    def test_validate_ipv4_invalid(self):
+    def test_validate_ipv4_invalid(self) -> None:
         assert not validate_ipv4("")
         assert not validate_ipv4("192.168.1")
         assert not validate_ipv4("192.168.1.256")
         assert not validate_ipv4("not.an.ip.address")
 
-    def test_validate_email_valid(self):
+    def test_validate_email_valid(self) -> None:
         assert validate_email("user@example.com")
         assert validate_email("test.email@domain.co.uk")
 
-    def test_validate_email_invalid(self):
+    def test_validate_email_invalid(self) -> None:
         assert not validate_email("")
         assert not validate_email("notanemail")
         assert not validate_email("@domain.com")
@@ -360,11 +390,11 @@ class TestUtilsUnit:
         assert not validate_email("user.@example.com")
         assert not validate_email("user..name@example.com")
 
-    def test_validate_date_string_valid(self):
+    def test_validate_date_string_valid(self) -> None:
         assert validate_date_string("2023-01-01") == "2023-01-01"
         assert validate_date_string("2024-12-31") == "2024-12-31"
 
-    def test_validate_date_string_invalid(self):
+    def test_validate_date_string_invalid(self) -> None:
         with pytest.raises(DomainIQValidationError):
             validate_date_string("")
         with pytest.raises(DomainIQValidationError):
@@ -374,12 +404,12 @@ class TestUtilsUnit:
         with pytest.raises(DomainIQValidationError):
             validate_date_string("23-01-01")
 
-    def test_validate_date_string_strips_whitespace_regression(self):
+    def test_validate_date_string_strips_whitespace_regression(self) -> None:
         assert validate_date_string(" 2023-01-01 ") == "2023-01-01"
         assert validate_date_string("2024-12-31\t") == "2024-12-31"
 
     @pytest.mark.parametrize("value", [True, False, 1.5, "3"])
-    def test_ensure_positive_int_rejects_non_int_values(self, value):
+    def test_ensure_positive_int_rejects_non_int_values(self, value: object) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             ensure_positive_int("report_id", value)
 
@@ -410,19 +440,19 @@ class TestUtilsUnit:
     def test_validate_date_string_raises_for_non_string_input(self) -> None:
         """Regression: passing an int or datetime raises DomainIQValidationError."""
         with pytest.raises(DomainIQValidationError):
-            validate_date_string(123)
+            validate_date_string(cast("str", 123))
         with pytest.raises(DomainIQValidationError):
-            validate_date_string(datetime.now(tz=UTC))
+            validate_date_string(cast("str", datetime.now(tz=UTC)))
 
 
 class TestModelsUnit:
     """Unit tests for data models."""
 
-    def test_parse_helpers_are_not_root_exports(self):
+    def test_parse_helpers_are_not_root_exports(self) -> None:
         assert "parse_whois_result" not in domainiq.__all__
         assert not hasattr(domainiq, "parse_whois_result")
 
-    def test_whois_result_from_dict(self):
+    def test_whois_result_from_dict(self) -> None:
         data = {
             "domain": "example.com",
             "registrar": "Test Registrar",
@@ -438,7 +468,7 @@ class TestModelsUnit:
         assert result.creation_date is not None
         assert isinstance(result.creation_date, datetime)
 
-    def test_dns_result_from_dict(self):
+    def test_dns_result_from_dict(self) -> None:
         data = {
             "domain": "example.com",
             "records": [
@@ -470,36 +500,38 @@ class TestModelsUnit:
 class TestLogicBugRegressions:
     """Regression tests for previously identified logic bugs."""
 
-    def test_try_parse_date_rejects_short_numeric_string(self):
+    def test_try_parse_date_rejects_short_numeric_string(self) -> None:
         assert _try_parse_date("2023") is None
         assert _try_parse_date("123") is None
 
-    def test_try_parse_date_accepts_plausible_timestamp(self):
+    def test_try_parse_date_accepts_plausible_timestamp(self) -> None:
         parsed = _try_parse_date("1700000000")
         assert isinstance(parsed, datetime)
         assert parsed.year >= 2020
 
-    def test_try_parse_date_accepts_float_timestamp(self):
+    def test_try_parse_date_accepts_float_timestamp(self) -> None:
         parsed = _try_parse_date("1700000000.5")
         assert isinstance(parsed, datetime)
 
-    def test_try_parse_date_accepts_numeric_timestamp(self):
-        expected = datetime(2024, 1, 1, 0, 0, 0)  # noqa: DTZ001
+    def test_try_parse_date_accepts_numeric_timestamp(self) -> None:
+        expected = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC).replace(tzinfo=None)
 
         assert _try_parse_date(1704067200) == expected
         assert _try_parse_date("1704067200") == expected
 
-    def test_try_parse_date_accepts_numeric_float_timestamp(self):
-        expected = datetime(2024, 1, 1, 0, 0, 0, 500000)  # noqa: DTZ001
+    def test_try_parse_date_accepts_numeric_float_timestamp(self) -> None:
+        expected = datetime(2024, 1, 1, 0, 0, 0, 500000, tzinfo=UTC).replace(
+            tzinfo=None
+        )
 
         assert _try_parse_date(1704067200.5) == expected
         assert _try_parse_date("1704067200.5") == expected
 
-    def test_try_parse_date_timestamp_is_timezone_independent(self):
+    def test_try_parse_date_timestamp_is_timezone_independent(self) -> None:
         if not hasattr(time, "tzset"):
             pytest.skip("time.tzset is unavailable on this platform")
 
-        expected = datetime(2024, 1, 1, 0, 0, 0)  # noqa: DTZ001
+        expected = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC).replace(tzinfo=None)
         original_tz = os.environ.get("TZ")
         try:
             for tz_name in ("UTC", "Europe/Madrid", "America/New_York"):
@@ -515,13 +547,13 @@ class TestLogicBugRegressions:
                 os.environ["TZ"] = original_tz
             time.tzset()
 
-    def test_try_parse_date_still_parses_iso(self):
+    def test_try_parse_date_still_parses_iso(self) -> None:
         parsed = _try_parse_date("2023-01-01T00:00:00")
         assert isinstance(parsed, datetime)
         assert parsed.year == 2023
 
-    def test_try_parse_date_normalizes_aware_iso_to_naive_utc(self):
-        expected = datetime(2024, 1, 1, 0, 0, 0)  # noqa: DTZ001
+    def test_try_parse_date_normalizes_aware_iso_to_naive_utc(self) -> None:
+        expected = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC).replace(tzinfo=None)
 
         zulu = _try_parse_date("2024-01-01T00:00:00Z")
         offset = _try_parse_date("2024-01-01T01:00:00+01:00")
@@ -533,22 +565,24 @@ class TestLogicBugRegressions:
         assert zulu.tzinfo is None
         assert offset.tzinfo is None
 
-    def test_try_parse_date_strips_surrounding_whitespace(self):
+    def test_try_parse_date_strips_surrounding_whitespace(self) -> None:
         parsed = _try_parse_date(" 2024-01-01 ")
         assert isinstance(parsed, datetime)
         assert parsed.year == 2024
         assert parsed.month == 1
         assert parsed.day == 1
 
-    def test_try_parse_date_strips_surrounding_whitespace_for_iso_datetime(self):
+    def test_try_parse_date_strips_surrounding_whitespace_for_iso_datetime(
+        self,
+    ) -> None:
         parsed = _try_parse_date(" 2023-01-01T00:00:00 ")
         assert isinstance(parsed, datetime)
         assert parsed.year == 2023
 
-    def test_try_parse_date_whitespace_only_returns_none(self):
+    def test_try_parse_date_whitespace_only_returns_none(self) -> None:
         assert _try_parse_date("   ") is None
 
-    def test_whois_creation_date_strips_surrounding_whitespace(self):
+    def test_whois_creation_date_strips_surrounding_whitespace(self) -> None:
         result = parse_whois_result(
             {"domain": "example.com", "creation_date": " 2024-01-01 "}
         )
@@ -557,7 +591,7 @@ class TestLogicBugRegressions:
         assert result.creation_date.month == 1
         assert result.creation_date.day == 1
 
-    def test_whois_creation_date_accepts_numeric_timestamp(self):
+    def test_whois_creation_date_accepts_numeric_timestamp(self) -> None:
         result = parse_whois_result(
             {"domain": "example.com", "creation_date": 1704067200}
         )
@@ -566,8 +600,8 @@ class TestLogicBugRegressions:
 
     @pytest.mark.parametrize("update_date", [" ", "not-a-date"])
     def test_whois_updated_date_falls_back_after_unparseable_update_date(
-        self, update_date
-    ):
+        self, update_date: str
+    ) -> None:
         result = parse_whois_result(
             {
                 "domain": "example.com",
@@ -576,9 +610,11 @@ class TestLogicBugRegressions:
             }
         )
 
-        assert result.updated_date == datetime(2024, 1, 1)  # noqa: DTZ001
+        assert result.updated_date == datetime(2024, 1, 1, tzinfo=UTC).replace(
+            tzinfo=None
+        )
 
-    def test_whois_emails_filter_whitespace_entries(self):
+    def test_whois_emails_filter_whitespace_entries(self) -> None:
         data = {
             "domain": "example.com",
             "emails": ["a@b.com", "  ", "", None, "  c@d.com "],
@@ -586,12 +622,12 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email == ["a@b.com", "c@d.com"]
 
-    def test_whois_emails_all_empty_returns_none(self):
+    def test_whois_emails_all_empty_returns_none(self) -> None:
         data = {"domain": "example.com", "emails": ["", "  ", None]}
         result = parse_whois_result(data)
         assert result.registrant_email is None
 
-    def test_whois_emails_empty_list_falls_back_to_registrant_email(self):
+    def test_whois_emails_empty_list_falls_back_to_registrant_email(self) -> None:
         data = {
             "domain": "example.com",
             "emails": [],
@@ -600,7 +636,7 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email == ["admin@example.com"]
 
-    def test_whois_emails_empty_string_falls_back_to_registrant_email(self):
+    def test_whois_emails_empty_string_falls_back_to_registrant_email(self) -> None:
         data = {
             "domain": "example.com",
             "emails": "",
@@ -609,7 +645,9 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email == ["admin@example.com"]
 
-    def test_whois_emails_normalized_empty_list_falls_back_to_registrant_email(self):
+    def test_whois_emails_normalized_empty_list_falls_back_to_registrant_email(
+        self,
+    ) -> None:
         data = {
             "domain": "example.com",
             "emails": ["", "  ", None],
@@ -618,7 +656,9 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email == ["admin@example.com"]
 
-    def test_whois_emails_non_empty_list_takes_priority_over_registrant_email(self):
+    def test_whois_emails_non_empty_list_takes_priority_over_registrant_email(
+        self,
+    ) -> None:
         data = {
             "domain": "example.com",
             "emails": ["primary@example.com"],
@@ -627,12 +667,12 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.registrant_email == ["primary@example.com"]
 
-    def test_whois_statuses_filter_empty_comma_entries(self):
+    def test_whois_statuses_filter_empty_comma_entries(self) -> None:
         data = {"domain": "example.com", "status": "active, "}
         result = parse_whois_result(data)
         assert result.status == ["active"]
 
-    def test_whois_statuses_strip_and_filter_list_entries(self):
+    def test_whois_statuses_strip_and_filter_list_entries(self) -> None:
         data = {
             "domain": "example.com",
             "status": [" active ", " ", None, "clientHold"],
@@ -640,12 +680,12 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.status == ["active", "clientHold"]
 
-    def test_whois_empty_status_string_returns_empty_list(self):
+    def test_whois_empty_status_string_returns_empty_list(self) -> None:
         data = {"domain": "example.com", "status": " "}
         result = parse_whois_result(data)
         assert result.status == []
 
-    def test_whois_nameservers_tolerate_gaps(self):
+    def test_whois_nameservers_tolerate_gaps(self) -> None:
         data = {
             "domain": "example.com",
             "ns_1": "ns1.example.com",
@@ -659,7 +699,9 @@ class TestLogicBugRegressions:
             "ns5.example.com",
         ]
 
-    def test_whois_nameservers_empty_indexed_values_fall_back_to_nameservers(self):
+    def test_whois_nameservers_empty_indexed_values_fall_back_to_nameservers(
+        self,
+    ) -> None:
         data = {
             "domain": "example.com",
             "ns_1": "",
@@ -668,7 +710,7 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == ["ns1.example.com"]
 
-    def test_whois_nameservers_accept_single_host_dict(self):
+    def test_whois_nameservers_accept_single_host_dict(self) -> None:
         data = {
             "domain": "example.com",
             "nameservers": {"host": "ns1.example.com"},
@@ -676,7 +718,7 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == ["ns1.example.com"]
 
-    def test_whois_nameservers_accept_list_of_host_dicts(self):
+    def test_whois_nameservers_accept_list_of_host_dicts(self) -> None:
         data = {
             "domain": "example.com",
             "nameservers": [{"host": "ns1.example.com"}],
@@ -684,7 +726,7 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == ["ns1.example.com"]
 
-    def test_whois_nameservers_strip_and_filter_empty_values(self):
+    def test_whois_nameservers_strip_and_filter_empty_values(self) -> None:
         data = {
             "domain": "example.com",
             "nameservers": [
@@ -697,7 +739,7 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == ["ns1.example.com", "ns2.example.com"]
 
-    def test_whois_nameservers_split_comma_separated_string(self):
+    def test_whois_nameservers_split_comma_separated_string(self) -> None:
         data = {
             "domain": "example.com",
             "nameservers": "ns1.example.com, ns2.example.com",
@@ -705,31 +747,31 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == ["ns1.example.com", "ns2.example.com"]
 
-    def test_whois_nameservers_whitespace_string_returns_empty_list(self):
+    def test_whois_nameservers_whitespace_string_returns_empty_list(self) -> None:
         data = {"domain": "example.com", "nameservers": " "}
         result = parse_whois_result(data)
         assert result.nameservers == []
 
-    def test_validate_ipv4_rejects_signed_octets(self):
+    def test_validate_ipv4_rejects_signed_octets(self) -> None:
         assert not validate_ipv4("-0.0.0.0")
         assert not validate_ipv4("+1.2.3.4")
         assert not validate_ipv4("1.-1.0.0")
         assert not validate_ipv4("1.+1.0.0")
 
-    def test_validate_ipv4_rejects_empty_octet(self):
+    def test_validate_ipv4_rejects_empty_octet(self) -> None:
         assert not validate_ipv4("1..2.3")
         assert not validate_ipv4(".1.2.3")
 
-    def test_is_ip_like_domain_rejects_invalid_dotted_quad(self):
+    def test_is_ip_like_domain_rejects_invalid_dotted_quad(self) -> None:
         assert not _is_ip_like_domain("999.999.999.999")
         assert not _is_ip_like_domain("256.1.2.3")
 
-    def test_validate_label_rejects_invalid_unicode(self):
+    def test_validate_label_rejects_invalid_unicode(self) -> None:
         assert not _validate_label("hello world")
         assert not _validate_label("test\x00")
         assert not _validate_label("test\n")
 
-    def test_dns_result_maps_aaaa_from_ip_field(self):
+    def test_dns_result_maps_aaaa_from_ip_field(self) -> None:
         data = {
             "results": [
                 {
@@ -744,7 +786,7 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "AAAA"
         assert result.records[0].value == "2001:db8::1"
 
-    def test_dns_result_infers_domain_from_record_name(self):
+    def test_dns_result_infers_domain_from_record_name(self) -> None:
         data = {
             "records": [
                 {
@@ -757,7 +799,7 @@ class TestLogicBugRegressions:
         result = parse_dns_result(data)
         assert result.domain == "example.com"
 
-    def test_dns_result_accepts_single_record_dict(self):
+    def test_dns_result_accepts_single_record_dict(self) -> None:
         data = {
             "domain": "example.com",
             "records": {
@@ -774,7 +816,7 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "A"
         assert result.records[0].value == "192.0.2.1"
 
-    def test_dns_result_skips_non_dict_record_entries(self):
+    def test_dns_result_skips_non_dict_record_entries(self) -> None:
         data = {
             "domain": "example.com",
             "records": [
@@ -795,7 +837,7 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "A"
         assert result.records[0].value == "192.0.2.1"
 
-    def test_dns_result_empty_results_list_falls_back_to_records(self):
+    def test_dns_result_empty_results_list_falls_back_to_records(self) -> None:
         data = {
             "results": [],
             "records": [{"name": "fallback.com", "type": "A", "ip": "192.0.2.1"}],
@@ -807,7 +849,7 @@ class TestLogicBugRegressions:
         assert len(result.records) == 1
         assert result.records[0].type == "A"
 
-    def test_dns_result_prefers_soa_record_name_for_domain(self):
+    def test_dns_result_prefers_soa_record_name_for_domain(self) -> None:
         data = {
             "records": [
                 {
@@ -825,7 +867,7 @@ class TestLogicBugRegressions:
         result = parse_dns_result(data)
         assert result.domain == "example.com"
 
-    def test_dns_result_maps_soa_mname_field(self):
+    def test_dns_result_maps_soa_mname_field(self) -> None:
         data = {
             "domain": "example.com",
             "records": [
@@ -843,7 +885,7 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "SOA"
         assert result.records[0].value == "ns1.example.com"
 
-    def test_dns_result_maps_ptr_ptrdname_field(self):
+    def test_dns_result_maps_ptr_ptrdname_field(self) -> None:
         data = {
             "domain": "example.com",
             "records": [
@@ -861,7 +903,7 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "PTR"
         assert result.records[0].value == "host.example.com"
 
-    def test_dns_result_maps_ns_nameserver_field(self):
+    def test_dns_result_maps_ns_nameserver_field(self) -> None:
         data = {
             "domain": "example.com",
             "records": [
@@ -879,7 +921,7 @@ class TestLogicBugRegressions:
         assert result.records[0].type == "NS"
         assert result.records[0].value == "ns1.example.com"
 
-    def test_dns_result_maps_mx_exchange_field(self):
+    def test_dns_result_maps_mx_exchange_field(self) -> None:
         data = {
             "domain": "example.com",
             "records": [
@@ -899,24 +941,24 @@ class TestLogicBugRegressions:
         assert result.records[0].value == "mail.example.com"
         assert result.records[0].priority == 10
 
-    def test_format_api_params_serializes_nested_dicts_as_json(self):
+    def test_format_api_params_serializes_nested_dicts_as_json(self) -> None:
         formatted = format_api_params({"payload": [{"a": 1}, {"b": 2}]})
         assert '"' in formatted["payload"]
         assert "'" not in formatted["payload"]
         assert json.loads(formatted["payload"]) == [{"a": 1}, {"b": 2}]
 
-    def test_format_api_params_dict_with_datetime_uses_default_str(self):
+    def test_format_api_params_dict_with_datetime_uses_default_str(self) -> None:
         formatted = format_api_params(
             {"filter": {"date": datetime(2024, 1, 1, tzinfo=UTC)}}
         )
         assert "2024-01-01" in formatted["filter"]
 
-    def test_cli_email_alert_default_is_true(self):
+    def test_cli_email_alert_default_is_true(self) -> None:
         parser = create_parser()
         args = parser.parse_args([])
         assert args.email_alert is True
 
-    def test_cli_no_email_alert_flag_disables(self):
+    def test_cli_no_email_alert_flag_disables(self) -> None:
         parser = create_parser()
         args = parser.parse_args(["--no-email-alert"])
         assert args.email_alert is False

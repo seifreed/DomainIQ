@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -36,6 +36,17 @@ from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQError
 from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
 from tests.conftest import StubClient
+
+if TYPE_CHECKING:
+    from domainiq.protocols import (
+        BulkProtocol,
+        DNSProtocol,
+        DomainIQClientProtocol,
+        MonitorProtocol,
+        ReportProtocol,
+        SearchProtocol,
+        WhoisProtocol,
+    )
 
 
 def _make_args(**kwargs: Any) -> argparse.Namespace:
@@ -119,53 +130,53 @@ class TestDispatch:
         client = _mock_client()
         client.set_result("whois_lookup", {"domain": "example.com"})
         args = _make_args(whois_lookup="example.com")
-        executed, had_errors = _dispatch_whois(client, args)
+        executed, had_errors = _dispatch_whois(cast("WhoisProtocol", client), args)
         assert executed is True
         assert had_errors is False
 
     def test_dispatch_whois_not_triggered_when_absent(self) -> None:
         client = _mock_client()
         args = _make_args()
-        executed, had_errors = _dispatch_whois(client, args)
+        executed, had_errors = _dispatch_whois(cast("WhoisProtocol", client), args)
         assert executed is False
         assert had_errors is False
 
     def test_dispatch_dns_returns_executed_true(self) -> None:
         client = _mock_client()
         args = _make_args(dns_lookup="example.com")
-        executed, _had_errors = _dispatch_dns(client, args)
+        executed, _had_errors = _dispatch_dns(cast("DNSProtocol", client), args)
         assert executed is True
 
     def test_dispatch_command_no_command_returns_exit_no_command(self) -> None:
         client = _mock_client()
         args = _make_args()
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_NO_COMMAND
 
     def test_dispatch_command_success(self) -> None:
         client = _mock_client()
         args = _make_args(whois_lookup="example.com")
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_SUCCESS
 
     def test_dispatch_command_error_on_domainiq_error(self) -> None:
         client = _mock_client()
         client.set_error("whois_lookup", DomainIQError("API failure"))
         args = _make_args(whois_lookup="example.com")
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_ERROR
 
     def test_dispatch_command_partial_on_mixed_results(self) -> None:
         client = _mock_client()
         client.set_error("dns_lookup", DomainIQError("DNS failure"))
         args = _make_args(whois_lookup="example.com", dns_lookup="example.com")
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_PARTIAL
 
     def test_dispatch_validation_error_returns_exit_error(self) -> None:
         client = _mock_client()
         args = _make_args(reverse_search="foo")  # missing reverse_search_type
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_ERROR
 
     def test_dispatch_validation_catches_whitespace_only_strings_regression(
@@ -174,7 +185,7 @@ class TestDispatch:
         """Regression: whitespace-only values bypassed empty-string check."""
         client = _mock_client()
         args = _make_args(whois_lookup="   ")
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_ERROR
 
 
@@ -188,7 +199,7 @@ class TestDispatchSearch:
             max_length=12,
         )
 
-        result = _dispatch_search(client, args)
+        result = _dispatch_search(cast("SearchProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -211,7 +222,7 @@ class TestDispatchSearch:
             recursive=True,
         )
 
-        result = _dispatch_search(client, args)
+        result = _dispatch_search(cast("SearchProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -243,7 +254,7 @@ class TestDispatchBulk:
             bulk_whois_ip=["192.0.2.1"],
         )
 
-        result = _dispatch_bulk(client, args)
+        result = _dispatch_bulk(cast("BulkProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -277,7 +288,7 @@ class TestDispatchReports:
             ip_report="192.0.2.1",
         )
 
-        result = _dispatch_reports(client, args)
+        result = _dispatch_reports(cast("ReportProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -307,7 +318,7 @@ class TestDispatchReports:
         client = _mock_client()
         args = _make_args()
 
-        result = _dispatch_reports(client, args)
+        result = _dispatch_reports(cast("ReportProtocol", client), args)
 
         assert result.executed is False
         assert result.errored is False
@@ -321,7 +332,7 @@ class TestDispatchReports:
         client.set_error("name_report", DomainIQError("report failed"))
         args = _make_args(domain_report="example.com", name_report="Alice")
 
-        result = _dispatch_reports(client, args)
+        result = _dispatch_reports(cast("ReportProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is True
@@ -343,7 +354,7 @@ class TestDispatchMonitor:
             monitor_change=99,
         )
 
-        result = _dispatch_monitor(client, args)
+        result = _dispatch_monitor(cast("MonitorProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -377,7 +388,7 @@ class TestDispatchMonitor:
             delete_monitor_report=42,
         )
 
-        result = _dispatch_monitor_management(client, args)
+        result = _dispatch_monitor_management(cast("MonitorProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -416,7 +427,7 @@ class TestDispatchMonitor:
         client = _mock_client()
         args = _make_args(add_monitor_item=["42", "domain", "example.com,"])
 
-        result = _dispatch_monitor_management(client, args)
+        result = _dispatch_monitor_management(cast("MonitorProtocol", client), args)
 
         assert result.executed is True
         assert result.errored is False
@@ -431,7 +442,7 @@ class TestDispatchMonitor:
         client = _mock_client()
         args = _make_args(add_monitor_item=["abc", "domain", "example.com"])
 
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
         assert result == _EXIT_ERROR
         assert client.calls_to("add_monitor_item") == []
@@ -444,7 +455,7 @@ class TestDispatchMonitor:
         client = _mock_client()
         args = _make_args(enable_typos=["abc", "7"])
 
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
         assert result == _EXIT_ERROR
         assert client.calls_to("enable_typos") == []
@@ -457,7 +468,7 @@ class TestDispatchMonitor:
         client = _mock_client()
         args = _make_args(modify_typo_strength=["42", "x", "10"])
 
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
         assert result == _EXIT_ERROR
         assert client.calls_to("modify_typo_strength") == []
@@ -471,7 +482,7 @@ class TestDispatchMonitor:
         client = _mock_client()
         args = _make_args(modify_typo_strength=["42", "7", str(TYPO_STRENGTH_MIN - 1)])
 
-        result = _dispatch_command(client, args)
+        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
         assert result == _EXIT_ERROR
         assert client.calls_to("modify_typo_strength") == []

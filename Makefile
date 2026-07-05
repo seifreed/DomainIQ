@@ -48,7 +48,7 @@ format-check:  ## Check if code is formatted correctly
 
 type-check:  ## Run type checking with MyPy
 	@echo "🔬 Running MyPy type checking..."
-	mypy domainiq/ --show-error-codes --pretty
+	mypy domainiq/ tests/ --show-error-codes --pretty
 	@echo "✅ Type checking completed"
 
 security:  ## Run security checks with Bandit

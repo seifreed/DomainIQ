@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -22,6 +23,9 @@ from domainiq.models import (
     ReverseMxSearchType,
     ReverseSearchType,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class TestDomainSearchParams:
@@ -236,7 +240,7 @@ class TestReverseSearchParams:
                 lambda: build_reverse_search_params(
                     ReverseSearchType.EMAIL,
                     "admin@example.com",
-                    "garbage",
+                    cast("ReverseMatchType", "garbage"),
                 ),
                 "match",
             ),
@@ -245,7 +249,7 @@ class TestReverseSearchParams:
         ],
     )
     def test_reverse_params_reject_invalid_typed_values(
-        self, build_params, param_name: str
+        self, build_params: Callable[[], object], param_name: str
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             build_params()

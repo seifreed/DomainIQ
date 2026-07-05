@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from domainiq._params.analysis import (
@@ -57,8 +59,14 @@ class TestDomainSnapshotParams:
         [
             (SnapshotOptions(width=0, height=480), "SnapshotOptions.width"),
             (SnapshotOptions(width=True, height=480), "SnapshotOptions.width"),
-            (SnapshotOptions(width=1.5, height=480), "SnapshotOptions.width"),
-            (SnapshotOptions(width="640", height=480), "SnapshotOptions.width"),
+            (
+                SnapshotOptions(width=cast("int", 1.5), height=480),
+                "SnapshotOptions.width",
+            ),
+            (
+                SnapshotOptions(width=cast("int", "640"), height=480),
+                "SnapshotOptions.width",
+            ),
             (SnapshotOptions(width=640, height=0), "SnapshotOptions.height"),
         ],
     )

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -70,8 +70,8 @@ class TestMonitorReadParams:
         [
             (lambda: build_monitor_report_items_params(0), "report_id"),
             (lambda: build_monitor_report_items_params(True), "report_id"),
-            (lambda: build_monitor_report_items_params(1.5), "report_id"),
-            (lambda: build_monitor_report_items_params("3"), "report_id"),
+            (lambda: build_monitor_report_items_params(cast("int", 1.5)), "report_id"),
+            (lambda: build_monitor_report_items_params(cast("int", "3")), "report_id"),
             (lambda: build_monitor_report_summary_params(-1, None, None), "report_id"),
             (lambda: build_monitor_report_summary_params(42, 0, None), "item_id"),
             (lambda: build_monitor_report_summary_params(42, None, 0), "days_range"),
@@ -177,13 +177,19 @@ class TestMonitorMutationParams:
         [
             (lambda: build_enable_typos_params(42, 7, 4), "strength"),
             (lambda: build_enable_typos_params(42, 7, 42), "strength"),
-            (lambda: build_enable_typos_params(42, 7, 5.5), "strength"),
-            (lambda: build_enable_typos_params(42, 7, "7"), "strength"),
+            (lambda: build_enable_typos_params(42, 7, cast("int", 5.5)), "strength"),
+            (lambda: build_enable_typos_params(42, 7, cast("int", "7")), "strength"),
             (lambda: build_enable_typos_params(42, 7, True), "strength"),
             (lambda: build_modify_typo_strength_params(42, 7, 4), "strength"),
             (lambda: build_modify_typo_strength_params(42, 7, 42), "strength"),
-            (lambda: build_modify_typo_strength_params(42, 7, 5.5), "strength"),
-            (lambda: build_modify_typo_strength_params(42, 7, "7"), "strength"),
+            (
+                lambda: build_modify_typo_strength_params(42, 7, cast("int", 5.5)),
+                "strength",
+            ),
+            (
+                lambda: build_modify_typo_strength_params(42, 7, cast("int", "7")),
+                "strength",
+            ),
             (lambda: build_modify_typo_strength_params(42, 7, True), "strength"),
         ],
     )

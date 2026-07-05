@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, NoReturn
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 import pytest
 
@@ -88,12 +88,15 @@ class FakeAiohttpModule:
         self.sessions: list[FakeSession] = []
         self.session_error: BaseException | None = None
 
-    def ClientSession(self, connector: FakeConnector) -> FakeSession:  # noqa: N802
+    def _open_session(self, connector: FakeConnector) -> FakeSession:
         if self.session_error is not None:
             raise self.session_error
         session = FakeSession(connector)
         self.sessions.append(session)
         return session
+
+    # aiohttp exposes ClientSession as a callable; alias the impl to match.
+    ClientSession = _open_session
 
 
 def _patch_aiohttp(monkeypatch: pytest.MonkeyPatch) -> FakeAiohttpModule:
@@ -147,7 +150,7 @@ class TestAiohttpTransport:
     ) -> None:
         fake_module = _patch_aiohttp(monkeypatch)
         transport = AiohttpTransport(timeout=10)
-        session = await transport._get_session()
+        session = cast("FakeSession", await transport._get_session())
         session.error = FakeClientError("boom")
 
         with pytest.raises(OSError, match="boom"):

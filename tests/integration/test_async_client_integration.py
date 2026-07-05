@@ -17,6 +17,7 @@ AIOHTTP_AVAILABLE = importlib.util.find_spec("aiohttp") is not None
 
 if AIOHTTP_AVAILABLE:
     from domainiq.async_client import AsyncDomainIQClient
+    from domainiq.http._aiohttp_transport import AiohttpTransport
 
 pytestmark = pytest.mark.integration
 
@@ -32,13 +33,13 @@ class TestAsyncDomainIQClientIntegration:
     config: Config | None = None
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(cls) -> None:
         try:
             cls.config = Config()
         except DomainIQConfigurationError:
             pytest.skip("No API key available for integration tests")
 
-    async def test_async_whois_lookup_domain(self):
+    async def test_async_whois_lookup_domain(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -53,7 +54,7 @@ class TestAsyncDomainIQClientIntegration:
             if result.creation_date:
                 assert isinstance(result.creation_date, datetime)
 
-    async def test_async_whois_lookup_ip(self):
+    async def test_async_whois_lookup_ip(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -64,7 +65,7 @@ class TestAsyncDomainIQClientIntegration:
             assert isinstance(result, WhoisResult)
             assert result.ip == TEST_IP or result.ip is None
 
-    async def test_async_dns_lookup_basic(self):
+    async def test_async_dns_lookup_basic(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -76,7 +77,7 @@ class TestAsyncDomainIQClientIntegration:
             assert isinstance(result.domain, str)
             assert isinstance(result.records, list)
 
-    async def test_async_dns_lookup_with_types(self):
+    async def test_async_dns_lookup_with_types(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -91,7 +92,7 @@ class TestAsyncDomainIQClientIntegration:
             record_types = [record.type for record in result.records]
             assert any(record_type in ["A", "MX"] for record_type in record_types)
 
-    async def test_concurrent_whois_lookups(self):
+    async def test_concurrent_whois_lookups(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -115,7 +116,7 @@ class TestAsyncDomainIQClientIntegration:
             for result in concurrent_results:
                 assert result is None or isinstance(result, WhoisResult)
 
-    async def test_concurrent_dns_lookups(self):
+    async def test_concurrent_dns_lookups(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -130,7 +131,7 @@ class TestAsyncDomainIQClientIntegration:
             for result in concurrent_results:
                 assert result is None or isinstance(result, DNSResult)
 
-    async def test_async_domain_categorize(self):
+    async def test_async_domain_categorize(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -143,7 +144,7 @@ class TestAsyncDomainIQClientIntegration:
                 assert hasattr(result[0], "domain")
                 assert hasattr(result[0], "categories")
 
-    async def test_async_domain_snapshot(self):
+    async def test_async_domain_snapshot(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -154,7 +155,7 @@ class TestAsyncDomainIQClientIntegration:
             assert hasattr(result, "domain")
             assert isinstance(result.domain, str)
 
-    async def test_async_bulk_dns_lookup(self):
+    async def test_async_bulk_dns_lookup(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -166,7 +167,7 @@ class TestAsyncDomainIQClientIntegration:
             if result:
                 assert isinstance(result[0], dict)
 
-    async def test_async_bulk_whois(self):
+    async def test_async_bulk_whois(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -178,7 +179,7 @@ class TestAsyncDomainIQClientIntegration:
             if result:
                 assert isinstance(result[0], dict)
 
-    async def test_async_domain_report(self):
+    async def test_async_domain_report(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -189,7 +190,7 @@ class TestAsyncDomainIQClientIntegration:
             assert hasattr(result, "domain")
             assert isinstance(result.domain, str)
 
-    async def test_async_reverse_search(self):
+    async def test_async_reverse_search(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -199,7 +200,7 @@ class TestAsyncDomainIQClientIntegration:
                 pytest.skip("API returned None for reverse search")
             assert isinstance(result, dict)
 
-    async def test_async_monitor_list(self):
+    async def test_async_monitor_list(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -210,7 +211,7 @@ class TestAsyncDomainIQClientIntegration:
 
             assert isinstance(result, list)
 
-    async def test_async_context_manager(self):
+    async def test_async_context_manager(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -218,19 +219,22 @@ class TestAsyncDomainIQClientIntegration:
             result = await client.whois_lookup(domain="example.com")
             assert result is None or isinstance(result, WhoisResult)
 
-    async def test_session_handling(self):
+    async def test_session_handling(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         client = AsyncDomainIQClient(self.config)
 
         await client.whois_lookup(domain="example.com")
-        assert client._transport._session is not None
-        assert not client._transport._session.closed
+        transport = client._transport
+        assert isinstance(transport, AiohttpTransport)
+        session = transport._session
+        assert session is not None
+        assert not session.closed
 
         await client.close()
-        assert client._transport._session.closed
+        assert session.closed
 
-    async def test_multiple_concurrent_operations(self):
+    async def test_multiple_concurrent_operations(self) -> None:
         if self.config is None:
             pytest.skip("No config available")
         async with AsyncDomainIQClient(self.config) as client:
@@ -263,7 +267,7 @@ class TestAsyncDomainIQClientIntegration:
 
 @pytest.mark.skipif(not AIOHTTP_AVAILABLE, reason="aiohttp not available")
 @pytest.mark.asyncio
-async def test_async_performance_comparison():
+async def test_async_performance_comparison() -> None:
     """Compare performance between sequential and concurrent async lookups."""
     try:
         config = Config()

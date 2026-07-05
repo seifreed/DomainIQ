@@ -136,7 +136,7 @@ def parse_bool(value: object, default: bool = False) -> bool:
 
 
 def unwrap_api_envelope(
-    data: dict[str, Any], exclude_keys: tuple[str, ...]
+    data: dict[str, Any] | list[Any] | str, exclude_keys: tuple[str, ...]
 ) -> dict[str, Any]:
     """Unwrap {'result': {...}} top-level API envelope when present."""
     data = assert_json_dict(data)

@@ -61,8 +61,9 @@ class TestSerializeResult:
         deeply_nested: dict[str, object] = {}
         current = deeply_nested
         for _ in range(101):
-            current["child"] = {}
-            current = current["child"]
+            child: dict[str, object] = {}
+            current["child"] = child
+            current = child
         with pytest.raises(DomainIQError):
             serialize_result(deeply_nested)
 

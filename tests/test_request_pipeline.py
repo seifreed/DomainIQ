@@ -6,7 +6,7 @@ import pytest
 
 from domainiq._request_pipeline import execute_async_request, execute_sync_request
 from domainiq.exceptions import DomainIQAPIError
-from domainiq.http._responses import SyncResponse
+from domainiq.http._responses import AsyncResponse, SyncResponse
 from domainiq.request_policy import RequestPolicy
 
 
@@ -22,20 +22,34 @@ class _FakeSyncTransport:
             raise outcome
         return outcome
 
+    @property
+    def is_open(self) -> bool:
+        return True
+
+    def close(self) -> None:
+        pass
+
 
 class _FakeAsyncTransport:
-    def __init__(self, outcomes: list[SyncResponse | BaseException]) -> None:
+    def __init__(self, outcomes: list[AsyncResponse | BaseException]) -> None:
         self._outcomes = outcomes
         self._index = 0
 
     async def get(
         self, _url: str, _params: dict[str, str], _timeout: float
-    ) -> SyncResponse:
+    ) -> AsyncResponse:
         outcome = self._outcomes[self._index]
         self._index += 1
         if isinstance(outcome, BaseException):
             raise outcome
         return outcome
+
+    @property
+    def is_open(self) -> bool:
+        return True
+
+    async def close(self) -> None:
+        pass
 
 
 def _policy(max_retries: int = 2) -> RequestPolicy:
@@ -51,11 +65,15 @@ def _ok_response(text: str = '{"ok": true}') -> SyncResponse:
     return SyncResponse(status_code=200, headers={}, text=text)
 
 
+def _ok_async_response(text: str = '{"ok": true}') -> AsyncResponse:
+    return AsyncResponse(status=200, headers={}, _body=text)
+
+
 class TestExecuteSyncRequest:
     def test_success_on_first_attempt(self) -> None:
         transport = _FakeSyncTransport([_ok_response()])
         result = execute_sync_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=0),
@@ -68,7 +86,7 @@ class TestExecuteSyncRequest:
         )
         with pytest.raises(DomainIQAPIError):
             execute_sync_request(
-                transport,  # type: ignore[arg-type]
+                transport,
                 {"service": "whois"},
                 "json",
                 _policy(max_retries=3),
@@ -82,7 +100,7 @@ class TestExecuteSyncRequest:
             ]
         )
         result = execute_sync_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=1),
@@ -98,7 +116,7 @@ class TestExecuteSyncRequest:
             ]
         )
         result = execute_sync_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=1),
@@ -113,7 +131,7 @@ class TestExecuteSyncRequest:
         )
         with pytest.raises(RuntimeError, match="Something else"):
             execute_sync_request(
-                transport,  # type: ignore[arg-type]
+                transport,
                 {"service": "whois"},
                 "json",
                 _policy(max_retries=1),
@@ -123,9 +141,9 @@ class TestExecuteSyncRequest:
 @pytest.mark.asyncio
 class TestExecuteAsyncRequest:
     async def test_success_on_first_attempt(self) -> None:
-        transport = _FakeAsyncTransport([_ok_response()])
+        transport = _FakeAsyncTransport([_ok_async_response()])
         result = await execute_async_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=0),
@@ -138,7 +156,7 @@ class TestExecuteAsyncRequest:
         )
         with pytest.raises(DomainIQAPIError):
             await execute_async_request(
-                transport,  # type: ignore[arg-type]
+                transport,
                 {"service": "whois"},
                 "json",
                 _policy(max_retries=3),
@@ -148,11 +166,11 @@ class TestExecuteAsyncRequest:
         transport = _FakeAsyncTransport(
             [
                 RuntimeError("Session is closed"),
-                _ok_response(),
+                _ok_async_response(),
             ]
         )
         result = await execute_async_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=1),
@@ -166,11 +184,11 @@ class TestExecuteAsyncRequest:
         transport = _FakeAsyncTransport(
             [
                 RuntimeError("Transport connection shut unexpectedly"),
-                _ok_response(),
+                _ok_async_response(),
             ]
         )
         result = await execute_async_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=1),
@@ -185,12 +203,14 @@ class TestExecuteAsyncRequest:
         )
         with pytest.raises(RuntimeError, match="Something else"):
             await execute_async_request(
-                transport,  # type: ignore[arg-type]
+                transport,
                 {"service": "whois"},
                 "json",
                 _policy(max_retries=1),
             )
 
+
+class TestSyncPipelineRegressions:
     def test_negative_max_retries_raises_value_error_regression(self) -> None:
         """Regression: negative max_retries reached unreachable AssertionError."""
         with pytest.raises(ValueError, match="max_retries must be non-negative"):
@@ -207,7 +227,7 @@ class TestExecuteAsyncRequest:
         transport = _FakeSyncTransport([original])
         with pytest.raises(DomainIQAPIError) as exc_info:
             execute_sync_request(
-                transport,  # type: ignore[arg-type]
+                transport,
                 {"service": "whois"},
                 "json",
                 _policy(max_retries=3),
@@ -219,7 +239,7 @@ class TestExecuteAsyncRequest:
         original = RuntimeError("Session is closed")
         transport = _FakeSyncTransport([original, _ok_response()])
         execute_sync_request(
-            transport,  # type: ignore[arg-type]
+            transport,
             {"service": "whois"},
             "json",
             _policy(max_retries=1),

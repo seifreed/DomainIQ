@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import pytest
+import requests
 
-import domainiq.http._requests_transport as requests_transport_module
 from domainiq import (
     DomainIQAPIError,
     DomainIQAuthenticationError,
@@ -78,7 +78,7 @@ def _requests_transport_with_session(
     session: _FakeRequestsSession,
 ) -> RequestsTransport:
     monkeypatch.setattr(
-        requests_transport_module.requests,
+        requests,
         "Session",
         lambda: session,
     )
@@ -120,7 +120,7 @@ class TestRequestsTransport:
     def test_timeout_exception_is_normalized(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        timeout_exc = requests_transport_module.requests.exceptions.Timeout("slow")
+        timeout_exc = requests.exceptions.Timeout("slow")
         session = _FakeRequestsSession(timeout_exc)
         transport = _requests_transport_with_session(monkeypatch, session)
 
@@ -132,9 +132,7 @@ class TestRequestsTransport:
     def test_request_exception_is_normalized(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        request_exc = requests_transport_module.requests.exceptions.RequestException(
-            "offline"
-        )
+        request_exc = requests.exceptions.RequestException("offline")
         session = _FakeRequestsSession(request_exc)
         transport = _requests_transport_with_session(monkeypatch, session)
 
@@ -146,9 +144,7 @@ class TestRequestsTransport:
     def test_http_error_is_mapped_to_oserror(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        http_exc = requests_transport_module.requests.exceptions.HTTPError(
-            "401 Client Error"
-        )
+        http_exc = requests.exceptions.HTTPError("401 Client Error")
         session = _FakeRequestsSession(http_exc)
         transport = _requests_transport_with_session(monkeypatch, session)
 
@@ -157,7 +153,7 @@ class TestRequestsTransport:
 
         assert isinstance(
             exc_info.value.__cause__,
-            requests_transport_module.requests.exceptions.HTTPError,
+            requests.exceptions.HTTPError,
         )
 
     def test_close_closes_session(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,7 +190,9 @@ class TestRequestsTransport:
                 msg = "corrupted"
                 raise AttributeError(msg)
 
-        session = _FakeRequestsSession(_BadTextResponse())
+        session = _FakeRequestsSession(
+            cast("_FakeRequestsResponse", _BadTextResponse())
+        )
         transport = _requests_transport_with_session(monkeypatch, session)
 
         with pytest.raises(AttributeError, match="corrupted"):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -68,7 +68,7 @@ class TestBulkMixins:
         whois_ip = await mock_async_client.bulk_whois_ip(["example.net"])
 
         assert dns[0]["domain"] == "example.com"
-        assert whois[0]["status"] == "ok"
+        assert cast("dict[str, str]", whois[0])["status"] == "ok"
         assert whois_ip[0]["domain"] == "example.net"
 
 
@@ -198,13 +198,21 @@ class TestSearchMixins:
         ):
             mock_transport.enqueue(make_sync_response(200, body))
 
-        domain = mock_client.domain_search(
-            ["brand"], filters={"count_only": 1}, exclude_dashed=True
+        domain = cast(
+            "dict[str, Any]",
+            mock_client.domain_search(
+                ["brand"], filters={"count_only": 1}, exclude_dashed=True
+            ),
         )
-        reverse = mock_client.reverse_search("email", "admin@example.com")
-        dns = mock_client.reverse_dns("example.com")
-        ip = mock_client.reverse_ip("ip", "192.0.2.1")
-        mx = mock_client.reverse_mx("domain", "example.com", recursive=True)
+        reverse = cast(
+            "dict[str, Any]", mock_client.reverse_search("email", "admin@example.com")
+        )
+        dns = cast("dict[str, Any]", mock_client.reverse_dns("example.com"))
+        ip = cast("dict[str, Any]", mock_client.reverse_ip("ip", "192.0.2.1"))
+        mx = cast(
+            "dict[str, Any]",
+            mock_client.reverse_mx("domain", "example.com", recursive=True),
+        )
 
         assert domain["results"] == ["example.com"]
         assert reverse["matches"][0]["email"] == "admin@example.com"
@@ -230,16 +238,19 @@ class TestSearchMixins:
             mock_async_transport.enqueue(make_async_response(200, body))
 
         assert await mock_async_client.domain_search(["brand"]) == {"results": []}
-        assert await mock_async_client.reverse_search("email", "admin") == {
-            "reverse": "search"
-        }
-        assert await mock_async_client.reverse_dns("example.com") == {"reverse": "dns"}
-        assert await mock_async_client.reverse_ip("ip", "192.0.2.1") == {
-            "reverse": "ip"
-        }
-        assert await mock_async_client.reverse_mx("domain", "example.com") == {
-            "reverse": "mx"
-        }
+        assert cast(
+            "dict[str, Any]", await mock_async_client.reverse_search("email", "admin")
+        ) == {"reverse": "search"}
+        assert cast(
+            "dict[str, Any]", await mock_async_client.reverse_dns("example.com")
+        ) == {"reverse": "dns"}
+        assert cast(
+            "dict[str, Any]", await mock_async_client.reverse_ip("ip", "192.0.2.1")
+        ) == {"reverse": "ip"}
+        assert cast(
+            "dict[str, Any]",
+            await mock_async_client.reverse_mx("domain", "example.com"),
+        ) == {"reverse": "mx"}
 
 
 class TestReportMixins:
@@ -334,16 +345,22 @@ class TestMonitorMixins:
             mock_transport.enqueue(make_sync_response(200, body))
 
         reports = mock_client.monitor_list()
-        items = mock_client.monitor_report_items(1)
-        summary = mock_client.monitor_report_summary(1, item_id=2, days_range=7)
-        changes = mock_client.monitor_report_changes(1, 3)
+        items = cast("dict[str, Any]", mock_client.monitor_report_items(1))
+        summary = cast(
+            "dict[str, Any]",
+            mock_client.monitor_report_summary(1, item_id=2, days_range=7),
+        )
+        changes = cast("dict[str, Any]", mock_client.monitor_report_changes(1, 3))
         created = mock_client.create_monitor_report("domain", "new")
-        added = mock_client.add_monitor_item(1, "domain", ["example.com"], enabled=True)
-        enabled = mock_client.enable_typos(1, 2)
-        disabled = mock_client.disable_typos(1, 2)
-        strength = mock_client.modify_typo_strength(1, 2, 10)
-        deleted_item = mock_client.delete_monitor_item(2)
-        deleted_report = mock_client.delete_monitor_report(1)
+        added = cast(
+            "dict[str, Any]",
+            mock_client.add_monitor_item(1, "domain", ["example.com"], enabled=True),
+        )
+        enabled = cast("dict[str, Any]", mock_client.enable_typos(1, 2))
+        disabled = cast("dict[str, Any]", mock_client.disable_typos(1, 2))
+        strength = cast("dict[str, Any]", mock_client.modify_typo_strength(1, 2, 10))
+        deleted_item = cast("dict[str, Any]", mock_client.delete_monitor_item(2))
+        deleted_report = cast("dict[str, Any]", mock_client.delete_monitor_report(1))
 
         assert reports[0].name == "watch"
         assert items["items"][0]["value"] == "example.com"
@@ -379,9 +396,13 @@ class TestMonitorMixins:
             mock_async_transport.enqueue(make_async_response(200, body))
 
         assert (await mock_async_client.monitor_list())[0].name == "watch"
-        assert await mock_async_client.monitor_report_items(1) == {"items": []}
+        assert cast(
+            "dict[str, Any]", await mock_async_client.monitor_report_items(1)
+        ) == {"items": []}
         assert await mock_async_client.monitor_report_summary(1) == {"summary": True}
-        assert await mock_async_client.monitor_report_changes(1, 3) == {"changes": []}
+        assert cast(
+            "dict[str, Any]", await mock_async_client.monitor_report_changes(1, 3)
+        ) == {"changes": []}
         assert (await mock_async_client.create_monitor_report("domain", "new")).id == 2
         assert await mock_async_client.add_monitor_item(
             1,

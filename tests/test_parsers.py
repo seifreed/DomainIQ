@@ -77,12 +77,12 @@ class TestUnwrapApiEnvelopeEdgeCases:
     def test_non_dict_input_raises_clean_error_regression(self) -> None:
         """Regression: list input caused AttributeError instead of clean error."""
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
-            unwrap_api_envelope([{"result": "ok"}], ("domain",))  # type: ignore[arg-type]
+            unwrap_api_envelope([{"result": "ok"}], ("domain",))
 
     def test_scalar_input_raises_clean_error_regression(self) -> None:
         """Regression: scalar string input caused AttributeError."""
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
-            unwrap_api_envelope("invalid", ("domain",))  # type: ignore[arg-type]
+            unwrap_api_envelope("invalid", ("domain",))
 
 
 class TestParseNameserversEdgeCases:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime
+from typing import Any, cast
 
 import pytest
 
@@ -267,9 +268,9 @@ class TestMonitorDeserializer:
         assert result.items[0].value == "example.com"
 
     def test_passthrough_result_casts(self) -> None:
-        action = {"success": True}
-        search = {"results": []}
-        reverse = {"domains": []}
+        action: dict[str, Any] = {"success": True}
+        search: dict[str, Any] = {"results": []}
+        reverse: dict[str, Any] = {"domains": []}
 
         assert parse_monitor_action_result(action) is action
         assert parse_search_result(search) is search
@@ -277,11 +278,11 @@ class TestMonitorDeserializer:
 
     def test_passthrough_results_reject_non_dict(self) -> None:
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
-            parse_monitor_action_result([{"ok": True}])
+            parse_monitor_action_result(cast("dict[str, Any]", [{"ok": True}]))
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
-            parse_search_result([{"results": []}])
+            parse_search_result(cast("dict[str, Any]", [{"results": []}]))
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
-            parse_reverse_search_result([{"matches": []}])
+            parse_reverse_search_result(cast("dict[str, Any]", [{"matches": []}]))
 
     def test_passthrough_results_reject_empty_dict(self) -> None:
         with pytest.raises(DomainIQAPIError, match="empty dict"):
@@ -490,6 +491,7 @@ class TestDeserializerTypeCoercion:
                 ],
             }
         )
+        assert result.items is not None
         assert result.items[0].id == 7
         assert result.items[0].typo_strength == 10
 

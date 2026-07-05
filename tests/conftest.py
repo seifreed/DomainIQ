@@ -174,6 +174,10 @@ class MockSyncTransport:
             raise item
         return item
 
+    @property
+    def is_open(self) -> bool:
+        return True
+
     def close(self) -> None:
         pass
 
@@ -219,6 +223,10 @@ class MockAsyncTransport:
         if isinstance(item, BaseException):
             raise item
         return item
+
+    @property
+    def is_open(self) -> bool:
+        return True
 
     async def close(self) -> None:
         pass

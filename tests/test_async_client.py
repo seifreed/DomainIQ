@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import warnings
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 import domainiq.async_client as async_client_module
 from domainiq import DomainIQError
-from domainiq.async_client import AsyncDomainIQClient, _run_with_critical_cancel
+from domainiq._async_concurrency import _run_with_critical_cancel
+from domainiq.async_client import AsyncDomainIQClient
 from domainiq.config import Config
 from domainiq.exceptions import (
     DomainIQAPIError,
@@ -20,6 +22,9 @@ from domainiq.exceptions import (
     DomainIQValidationError,
 )
 from domainiq.models import DNSResult, WhoisResult
+
+if TYPE_CHECKING:
+    from domainiq.http._responses import AsyncResponse
 
 AIOHTTP_AVAILABLE = importlib.util.find_spec("aiohttp") is not None
 
@@ -33,8 +38,9 @@ class LifecycleAsyncTransport:
         self.closed = False
 
     async def get(
-        self, _url: str, _params: dict[str, str], _request_timeout: float
-    ) -> object:
+        self, url: str, params: dict[str, str], request_timeout: float
+    ) -> AsyncResponse:
+        _ = (url, params, request_timeout)
         msg = "Lifecycle transport should not issue requests"
         raise AssertionError(msg)
 
@@ -47,10 +53,10 @@ class TestAsyncClientUnit:
     """Unit tests that do not require real API access."""
 
     @pytest.mark.skipif(not AIOHTTP_AVAILABLE, reason="aiohttp not available")
-    def test_async_client_requires_aiohttp(self):
+    def test_async_client_requires_aiohttp(self) -> None:
         assert AiohttpAsyncDomainIQClient is not None
 
-    def test_async_client_import_error_without_aiohttp(self):
+    def test_async_client_import_error_without_aiohttp(self) -> None:
         if AIOHTTP_AVAILABLE:
             pytest.skip("aiohttp is available")
 
@@ -85,6 +91,7 @@ class TestAsyncClientUnit:
 
         transport = async_client_module._make_default_async_transport(config)
 
+        assert isinstance(transport, FakeAiohttpTransport)
         assert transport.timeout == 7
         assert transport.connector_limit == 11
         assert transport.connector_limit_per_host == 3
@@ -156,7 +163,7 @@ class TestAsyncClientUnit:
 class TestConcurrentLookupCriticalCancel:
     """Regression for critical errors cancelling concurrent work."""
 
-    async def test_critical_error_attaches_partial_results(self):
+    async def test_critical_error_attaches_partial_results(self) -> None:
         async def ok() -> WhoisResult:
             await asyncio.sleep(0)
             return WhoisResult(domain="ok.com")
@@ -181,7 +188,7 @@ class TestConcurrentLookupCriticalCancel:
         assert partial[2] is None
         assert any(isinstance(result, WhoisResult) for result in partial)
 
-    async def test_all_success_returns_ordered_results(self):
+    async def test_all_success_returns_ordered_results(self) -> None:
         async def make(name: str) -> WhoisResult:
             await asyncio.sleep(0)
             return WhoisResult(domain=name)
@@ -190,9 +197,13 @@ class TestConcurrentLookupCriticalCancel:
             [make("a"), make("b"), make("c")],
             WhoisResult,
         )
-        assert [result.domain for result in results] == ["a", "b", "c"]
+        assert [result.domain for result in results if result is not None] == [
+            "a",
+            "b",
+            "c",
+        ]
 
-    async def test_base_exception_is_critical_regression(self):
+    async def test_base_exception_is_critical_regression(self) -> None:
         class _TestBaseException(BaseException):
             pass
 
@@ -209,7 +220,7 @@ class TestConcurrentLookupCriticalCancel:
 
         assert isinstance(exc_info.value.__cause__, _TestBaseException)
 
-    async def test_cancelled_error_is_not_critical_regression(self):
+    async def test_cancelled_error_is_not_critical_regression(self) -> None:
         """Regression: CancelledError was treated as a critical exception."""
 
         async def ok() -> WhoisResult:
@@ -261,7 +272,7 @@ class TestAsyncClientConcurrentLookup:
                 mock_async_client._concurrent_lookup(
                     lookup,
                     ["example.com"],
-                    max_concurrent,
+                    cast("int", max_concurrent),
                     label="WHOIS",
                     result_type=WhoisResult,
                 ),

@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 import pytest
 
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.search_filters import build_search_filters
+
+
+class _NumericFilterKwargs(TypedDict, total=False):
+    min_length: int
+    max_length: int
+    limit: int
 
 
 class TestBuildSearchFilters:
@@ -64,7 +72,7 @@ class TestBuildSearchFilters:
         ],
     )
     def test_numeric_filters_must_be_positive(
-        self, kwargs: dict[str, int], param_name: str
+        self, kwargs: _NumericFilterKwargs, param_name: str
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             build_search_filters(**kwargs)

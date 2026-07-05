@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from domainiq._params.analysis import (
@@ -26,6 +28,10 @@ from domainiq._params.whois import build_whois_params
 from domainiq.constants import API_FLAG_ENABLED
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.models import BulkWhoisType, DNSRecordType, SnapshotOptions
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
 
 
 class TestWhoisParams:
@@ -105,7 +111,9 @@ class TestDnsParams:
         assert result["q"] == "example.com"
 
     @pytest.mark.parametrize("record_types", [[""], ["  "], ["A", ""]])
-    def test_dns_rejects_empty_record_types(self, record_types: list[str]) -> None:
+    def test_dns_rejects_empty_record_types(
+        self, record_types: list[str | DNSRecordType]
+    ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             build_dns_params("example.com", record_types)
 
@@ -158,7 +166,10 @@ class TestReportParams:
         ],
     )
     def test_report_params_reject_invalid_targets(
-        self, builder, value: str, param_name: str
+        self,
+        builder: Callable[[str], dict[str, Any]],
+        value: str,
+        param_name: str,
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             builder(value)
@@ -218,7 +229,9 @@ class TestAnalysisParams:
             lambda domain: build_domain_snapshot_history_params(domain, 1024, 768, 10),
         ],
     )
-    def test_snapshot_params_reject_invalid_domain(self, builder) -> None:
+    def test_snapshot_params_reject_invalid_domain(
+        self, builder: Callable[[str], dict[str, Any]]
+    ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             builder("example..com")
 
@@ -270,7 +283,7 @@ class TestBulkParams:
         ],
     )
     def test_bulk_params_require_non_empty_lists(
-        self, builder, param_name: str
+        self, builder: Callable[[list[str]], dict[str, Any]], param_name: str
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             builder([])
@@ -292,7 +305,10 @@ class TestBulkParams:
         ],
     )
     def test_bulk_params_reject_empty_list_values(
-        self, builder, values: list[str], param_name: str
+        self,
+        builder: Callable[[list[str]], dict[str, Any]],
+        values: list[str],
+        param_name: str,
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             builder(values)
@@ -317,7 +333,10 @@ class TestBulkParams:
         ],
     )
     def test_bulk_domain_params_reject_invalid_domains(
-        self, builder, values: list[str], param_name: str
+        self,
+        builder: Callable[[list[str]], dict[str, Any]],
+        values: list[str],
+        param_name: str,
     ) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
             builder(values)
