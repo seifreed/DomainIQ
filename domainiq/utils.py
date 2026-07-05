@@ -2,15 +2,17 @@
 
 import csv
 import logging
-from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from enum import Enum
 from io import StringIO
 from math import ceil
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .exceptions import DomainIQAPIError, DomainIQError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 logger = logging.getLogger(__name__)
 

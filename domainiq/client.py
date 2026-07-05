@@ -3,8 +3,7 @@
 import contextlib
 import logging
 import warnings
-from types import TracebackType
-from typing import Any, Self, Unpack
+from typing import TYPE_CHECKING, Any, Self, Unpack
 
 from ._base_client import (
     _assert_csv_str,
@@ -22,9 +21,13 @@ from ._mixins import (
     _WhoisMixin,
 )
 from ._request_pipeline import execute_sync_request
-from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .http import RequestsTransport, SyncTransport
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from .config import Config, ConfigKwargs
 
 logger = logging.getLogger(__name__)
 

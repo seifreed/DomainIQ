@@ -1,8 +1,8 @@
 """Dispatcher registry and command routing for the DomainIQ CLI."""
 
-import argparse
 import sys
 from functools import partial
+from typing import TYPE_CHECKING
 
 from domainiq.constants import (
     EXIT_ERROR,
@@ -10,12 +10,6 @@ from domainiq.constants import (
     EXIT_PARTIAL,
     EXIT_SUCCESS,
     SNAPSHOT_DEFAULT_LIMIT,
-)
-from domainiq.protocols import (
-    DNSProtocol,
-    DomainAnalysisProtocol,
-    DomainIQClientProtocol,
-    WhoisProtocol,
 )
 
 from ._dispatch_bulk import _dispatch_bulk
@@ -27,6 +21,16 @@ from ._handlers import build_snapshot_options, handle_dns_lookup, handle_whois_l
 from ._serialization import print_result
 from ._types import DnsArgs, SnapshotArgs, WhoisArgs
 from ._validation import validate_args
+
+if TYPE_CHECKING:
+    import argparse
+
+    from domainiq.protocols import (
+        DNSProtocol,
+        DomainAnalysisProtocol,
+        DomainIQClientProtocol,
+        WhoisProtocol,
+    )
 
 
 def _dispatch_whois(client: WhoisProtocol, args: argparse.Namespace) -> _CommandResult:

@@ -1,15 +1,19 @@
 """CLI dispatchers for monitor commands."""
 
-import argparse
-from collections.abc import Callable
 from functools import partial
+from typing import TYPE_CHECKING
 
 from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.protocols import MonitorProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result
+
+if TYPE_CHECKING:
+    import argparse
+    from collections.abc import Callable
+
+    from domainiq.protocols import MonitorProtocol
 
 
 def _dispatch_monitor(

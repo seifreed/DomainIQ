@@ -4,9 +4,7 @@ import asyncio
 import contextlib
 import logging
 import warnings
-from collections.abc import Callable, Coroutine
-from types import TracebackType
-from typing import Any, Self, TypeVar, Unpack
+from typing import TYPE_CHECKING, Any, Self, TypeVar, Unpack
 
 from ._async_concurrency import _LookupFailure, _run_with_critical_cancel
 from ._base_client import (
@@ -26,7 +24,6 @@ from ._mixins import (
 )
 from ._models import DNSRecordType, DNSResult, WhoisResult
 from ._request_pipeline import execute_async_request
-from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .exceptions import (
     DomainIQAPIError,
@@ -39,6 +36,12 @@ from .exceptions import (
 )
 from .http import AiohttpTransport, AsyncTransport
 from .validators import ensure_positive_int, is_ip_address
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+    from types import TracebackType
+
+    from .config import Config, ConfigKwargs
 
 logger = logging.getLogger(__name__)
 

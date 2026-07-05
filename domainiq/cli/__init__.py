@@ -1,8 +1,8 @@
 """Command-line interface for the DomainIQ library."""
 
-import argparse
 import sys
 import traceback
+from typing import TYPE_CHECKING
 
 import domainiq.client as client_module
 from domainiq.cli._dispatch import _dispatch_command
@@ -13,6 +13,9 @@ from domainiq.utils import setup_logging
 
 from ._args import create_parser
 from ._credentials import prompt_for_api_key
+
+if TYPE_CHECKING:
+    import argparse
 
 __all__ = ["create_parser", "main"]
 

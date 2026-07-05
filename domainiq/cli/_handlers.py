@@ -1,13 +1,18 @@
 """Command handlers and serialization helpers for the DomainIQ CLI."""
 
+from typing import TYPE_CHECKING
+
 from domainiq.constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
 from domainiq.models import DomainSearchFilters, KeywordMatchType, SnapshotOptions
-from domainiq.protocols import DNSProtocol, SearchProtocol, WhoisProtocol
 from domainiq.search_filters import build_search_filters
 from domainiq.validators import ensure_positive_int, is_ip_address
 
 from ._serialization import print_result
-from ._types import DnsArgs, DomainSearchArgs, SnapshotArgs, WhoisArgs
+
+if TYPE_CHECKING:
+    from domainiq.protocols import DNSProtocol, SearchProtocol, WhoisProtocol
+
+    from ._types import DnsArgs, DomainSearchArgs, SnapshotArgs, WhoisArgs
 
 
 def build_snapshot_options(args: SnapshotArgs) -> SnapshotOptions:

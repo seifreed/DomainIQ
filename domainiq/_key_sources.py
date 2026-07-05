@@ -8,10 +8,12 @@ The SDK resolves keys only from explicit, non-interactive sources:
 
 import logging
 import os
-from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .exceptions import DomainIQConfigurationError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

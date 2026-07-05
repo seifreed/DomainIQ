@@ -1,12 +1,16 @@
 """CLI dispatchers for bulk commands."""
 
-import argparse
+from typing import TYPE_CHECKING
 
 from domainiq.models import BulkWhoisType
-from domainiq.protocols import BulkProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result
+
+if TYPE_CHECKING:
+    import argparse
+
+    from domainiq.protocols import BulkProtocol
 
 
 def _dispatch_bulk(client: BulkProtocol, args: argparse.Namespace) -> _CommandResult:

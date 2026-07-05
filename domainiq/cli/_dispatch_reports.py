@@ -1,11 +1,14 @@
 """CLI dispatchers for report commands."""
 
-import argparse
-
-from domainiq.protocols import ReportProtocol
+from typing import TYPE_CHECKING
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result
+
+if TYPE_CHECKING:
+    import argparse
+
+    from domainiq.protocols import ReportProtocol
 
 _REPORT_COMMANDS: tuple[str, ...] = (
     "domain_report",

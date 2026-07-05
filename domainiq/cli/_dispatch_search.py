@@ -1,15 +1,19 @@
 """CLI dispatchers for search commands."""
 
-import argparse
 from functools import partial
+from typing import TYPE_CHECKING
 
 from domainiq.models import ReverseMatchType
-from domainiq.protocols import SearchProtocol
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._handlers import handle_domain_search
 from ._serialization import print_result
 from ._types import DomainSearchArgs
+
+if TYPE_CHECKING:
+    import argparse
+
+    from domainiq.protocols import SearchProtocol
 
 
 def _dispatch_search(

@@ -1,9 +1,12 @@
 """Dataclass response models for DomainIQ API responses."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from domainiq.constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @dataclass
