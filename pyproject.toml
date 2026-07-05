@@ -127,6 +127,7 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+    "if TYPE_CHECKING:",
 ]
 
 # Ruff = linter only (isort, flake8, pyupgrade, bandit-lint, ...). Black owns formatting.
