@@ -29,7 +29,10 @@ def _sanitize_value(value: object) -> object:
 
 def sanitize_params_for_log(params: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of params with the API key masked for logging."""
-    return _sanitize_value(params)  # type: ignore[return-value]
+    return {
+        k: _API_KEY_LOG_MASK if k in ("key", "api_key") else _sanitize_value(v)
+        for k, v in params.items()
+    }
 
 
 def _format_single_value(value: object) -> str:

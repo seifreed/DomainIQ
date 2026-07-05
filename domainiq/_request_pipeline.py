@@ -18,6 +18,7 @@ from .request_policy import (
 
 if TYPE_CHECKING:
     from .http import AsyncTransport, SyncTransport
+    from .http._responses import AsyncResponse, SyncResponse
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ _RequestResult = dict[str, Any] | list[Any] | str
 
 
 def _process_response(
-    response: Any,  # noqa: ANN401
+    response: SyncResponse | AsyncResponse,
     attempt: int,
     policy: RequestPolicy,
     output_format: str,

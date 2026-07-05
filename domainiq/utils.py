@@ -131,20 +131,18 @@ def csv_to_dict_list(csv_content: object) -> list[dict[str, Any]]:
     if not isinstance(csv_content, str):
         msg = f"Expected CSV content as string, got {type(csv_content).__name__}"
         raise DomainIQError(msg)
+    content = csv_content.strip()
+    if not content:
+        logger.debug("csv_to_dict_list: received empty content, returning []")
+        return []
     try:
-        content = csv_content.strip()
-        if not content:
-            logger.debug("csv_to_dict_list: received empty content, returning []")
-            return []
         with StringIO(content) as csv_file:
             reader = csv.DictReader(csv_file, delimiter=",")
             result = list(reader)
-        if result:
-            return result
-        return []  # noqa: TRY300
     except csv.Error as e:
         msg = f"Failed to parse CSV content: {e}"
         raise DomainIQError(msg) from e
+    return result or []
 
 
 def setup_logging(
