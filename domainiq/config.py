@@ -1,5 +1,7 @@
 """Passive configuration object for the DomainIQ SDK."""
 
+from __future__ import annotations
+
 import logging
 import math
 import os
@@ -8,6 +10,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import Unpack
 
 from ._key_sources import _ApiKeyLoader
 from .constants import (
@@ -91,38 +94,33 @@ class ConfigKwargs(TypedDict, total=False):
 class Config:
     """Configuration object for DomainIQ clients."""
 
-    def __init__(  # noqa: PLR0913 - config preserves explicit keyword options.
+    def __init__(
         self,
-        api_key: str | None = None,
-        base_url: str = _DEFAULT_BASE_URL,
-        timeout: float | None = None,
-        max_retries: int | None = None,
-        retry_delay: int | None = None,
-        config_file: str | Path | None = None,
-        connector_limit: int | None = None,
-        connector_limit_per_host: int | None = None,
+        *,
         loader: _ApiKeyLoader | None = None,
         env: Mapping[str, str] | None = None,
+        **kwargs: Unpack[ConfigKwargs],
     ) -> None:
         """Initialize configuration.
 
         Args:
-            api_key: DomainIQ API key. If None, will try to load
-                from environment or config file.
-            base_url: Base URL for DomainIQ API.
-            timeout: Request timeout in seconds (int or float).
-            max_retries: Maximum number of retries for failed requests.
-            retry_delay: Delay between retries in seconds.
-            config_file: Path to config file containing API key.
-                If None, defaults to ~/.domainiq.
-            connector_limit: Maximum async connector pool size.
-            connector_limit_per_host: Maximum async connections per host.
             loader: Optional pre-built key loader (inject for testing or custom
                 key sources). If None, a default _ApiKeyLoader is created.
             env: Optional environment mapping for reading DOMAINIQ_* numeric
                 settings. If None, the real process environment is used.
+            kwargs: Explicit configuration options (see :class:`ConfigKwargs`):
+                api_key, base_url, timeout, max_retries, retry_delay,
+                config_file, connector_limit, connector_limit_per_host.
         """
-        self.base_url = base_url
+        api_key = kwargs.get("api_key")
+        config_file = kwargs.get("config_file")
+        timeout = kwargs.get("timeout")
+        max_retries = kwargs.get("max_retries")
+        retry_delay = kwargs.get("retry_delay")
+        connector_limit = kwargs.get("connector_limit")
+        connector_limit_per_host = kwargs.get("connector_limit_per_host")
+
+        self.base_url = kwargs.get("base_url", _DEFAULT_BASE_URL)
         self.timeout = (
             _env_float("DOMAINIQ_TIMEOUT", DEFAULT_TIMEOUT, env)
             if timeout is None

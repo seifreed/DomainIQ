@@ -11,7 +11,7 @@ import warnings
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -24,6 +24,9 @@ from domainiq import (
 )
 from domainiq.cli import create_parser
 from domainiq.config import Config
+
+if TYPE_CHECKING:
+    from domainiq.config import ConfigKwargs
 from domainiq.deserializers import parse_dns_result, parse_whois_result
 from domainiq.formatters import format_api_params
 from domainiq.http import RequestsTransport
@@ -37,23 +40,6 @@ from domainiq.validators import (
     validate_email,
     validate_ipv4,
 )
-
-
-class _ConfigKwargs(TypedDict, total=False):
-    """Config keyword arguments used when unpacking test-supplied kwargs.
-
-    Fields mirror the real ``Config`` parameter types so that ``**`` unpacking
-    of a cast dict type-checks; the tests deliberately feed invalid *values*
-    (never invalid keys) through the cast to exercise validation errors.
-    """
-
-    base_url: str
-    timeout: float | None
-    max_retries: int | None
-    retry_delay: int | None
-    config_file: str | Path | None
-    connector_limit: int | None
-    connector_limit_per_host: int | None
 
 
 class TestDomainIQClientUnit:
@@ -175,7 +161,7 @@ class TestConfigUnit:
         self, kwargs: dict[str, object], message: str
     ) -> None:
         with pytest.raises(DomainIQConfigurationError, match=message):
-            Config(api_key="test_key", **cast("_ConfigKwargs", kwargs))
+            Config(**cast("ConfigKwargs", {"api_key": "test_key", **kwargs}))
 
     def test_client_initialization_reports_invalid_numeric_config(self) -> None:
         with pytest.raises(
@@ -304,9 +290,8 @@ class TestConfigUnit:
         value: float,
     ) -> None:
         config = Config(
-            api_key="test_key",
             env={env_name: "abc"},
-            **cast("_ConfigKwargs", {kwarg: value}),
+            **cast("ConfigKwargs", {"api_key": "test_key", kwarg: value}),
         )
 
         assert getattr(config, kwarg) == value
@@ -325,7 +310,7 @@ class TestConfigUnit:
         self, kwargs: dict[str, int], message: str
     ) -> None:
         with pytest.raises(DomainIQConfigurationError, match=message):
-            Config(api_key="test_key", **cast("_ConfigKwargs", kwargs))
+            Config(**cast("ConfigKwargs", {"api_key": "test_key", **kwargs}))
 
     def test_set_config_path_reloads_key_from_new_file(self, tmp_path: Path) -> None:
         initial = tmp_path / "initial"
