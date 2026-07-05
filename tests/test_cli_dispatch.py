@@ -33,6 +33,7 @@ from domainiq.constants import (
 from domainiq.constants import (
     EXIT_SUCCESS as _EXIT_SUCCESS,
 )
+from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQError
 from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
 
@@ -427,9 +428,7 @@ class TestDispatchMonitor:
     def test_modify_typo_strength_uses_constants_regression(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Regression: typo strength bounds were hardcoded instead of using constants."""
-        from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
-
+        """Regression: typo strength bounds were hardcoded, not read from constants."""
         client = _mock_client()
         args = _make_args(modify_typo_strength=["42", "7", str(TYPO_STRENGTH_MIN - 1)])
 
@@ -536,7 +535,8 @@ class TestRunCommand:
 
         class BrokenStderr:
             def write(self, _msg: str) -> None:
-                raise OSError("broken pipe")
+                error = "broken pipe"
+                raise OSError(error)
 
         monkeypatch.setattr("sys.stderr", BrokenStderr())
         executed, had_errors = _run_command(

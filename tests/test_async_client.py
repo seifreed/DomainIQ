@@ -306,7 +306,8 @@ class TestAsyncClientConcurrentLookup:
 
         async def lookup(target: str) -> WhoisResult:
             if target == "bad":
-                raise DomainIQValidationError("invalid target", param_name="domain")
+                msg = "invalid target"
+                raise DomainIQValidationError(msg, param_name="domain")
             return WhoisResult(domain=target)
 
         with caplog.at_level("WARNING", logger="domainiq.async_client"):

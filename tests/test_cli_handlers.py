@@ -97,9 +97,7 @@ class TestPrintResult:
         captured = capsys.readouterr()
         assert '  "a": 1' in captured.out
 
-    def test_domainiq_error_from_depth_exceeded_is_caught_regression(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_domainiq_error_from_depth_exceeded_is_caught_regression(self) -> None:
         """Regression: DomainIQError from serialize_result escaped print_result."""
         deeply_nested: dict[str, Any] = {}
         current = deeply_nested

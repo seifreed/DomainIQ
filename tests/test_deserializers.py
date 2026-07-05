@@ -17,6 +17,7 @@ from domainiq.deserializers import (
     parse_monitor_report,
     parse_reverse_search_result,
     parse_search_result,
+    parse_whois_result,
 )
 from domainiq.exceptions import DomainIQAPIError
 from domainiq.parsers import parse_bool
@@ -294,8 +295,6 @@ class TestMonitorDeserializer:
 class TestWhoisDeserializer:
     def test_empty_string_registrant_name_not_fallback_regression(self) -> None:
         """Regression: empty string registrant_name fell back to registrant."""
-        from domainiq.deserializers import parse_whois_result
-
         result = parse_whois_result(
             {
                 "domain": "example.com",
@@ -307,8 +306,6 @@ class TestWhoisDeserializer:
 
     def test_empty_string_registrant_org_not_fallback_regression(self) -> None:
         """Regression: empty string registrant_organization fell back to org."""
-        from domainiq.deserializers import parse_whois_result
-
         result = parse_whois_result(
             {
                 "domain": "example.com",
@@ -374,7 +371,7 @@ class TestDnsRecordValueExtraction:
         assert result.records[0].value == "93.184.216.34"
 
     def test_prefers_soa_or_ns_for_domain_extraction_regression(self) -> None:
-        """Regression: SOA/NS preference skipped; first record won regardless of type."""
+        """Regression: SOA/NS preference skipped; first record won regardless."""
         result = parse_dns_result(
             {
                 "records": [
@@ -412,7 +409,7 @@ class TestDnsRecordValueExtraction:
 
         assert result.domain == "a.example.com"
 
-    def test_record_name_defaults_to_empty_string_when_host_and_name_are_none_regression(
+    def test_record_name_defaults_to_empty_when_host_and_name_none_regression(
         self,
     ) -> None:
         """Regression: cast allowed None into DNSRecord.name which expects str."""

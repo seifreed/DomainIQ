@@ -6,11 +6,14 @@ from datetime import datetime
 
 import pytest
 
+from domainiq.exceptions import DomainIQAPIError
 from domainiq.parsers import (
+    _normalize_email_values,
     parse_bool,
     parse_nameservers,
     parse_statuses,
     try_parse_date,
+    unwrap_api_envelope,
 )
 
 
@@ -50,8 +53,6 @@ class TestParseStatusesEdgeCases:
 class TestParseEmailsEdgeCases:
     def test_rejects_zero_and_false_in_list_regression(self) -> None:
         """Regression: 0 and False in email lists produced '0' and 'False'."""
-        from domainiq.parsers import _normalize_email_values
-
         assert _normalize_email_values([0, False, "admin@example.com"]) == [
             "admin@example.com"
         ]
@@ -75,17 +76,11 @@ class TestParseBoolEdgeCases:
 class TestUnwrapApiEnvelopeEdgeCases:
     def test_non_dict_input_raises_clean_error_regression(self) -> None:
         """Regression: list input caused AttributeError instead of clean error."""
-        from domainiq.exceptions import DomainIQAPIError
-        from domainiq.parsers import unwrap_api_envelope
-
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
             unwrap_api_envelope([{"result": "ok"}], ("domain",))  # type: ignore[arg-type]
 
     def test_scalar_input_raises_clean_error_regression(self) -> None:
         """Regression: scalar string input caused AttributeError."""
-        from domainiq.exceptions import DomainIQAPIError
-        from domainiq.parsers import unwrap_api_envelope
-
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
             unwrap_api_envelope("invalid", ("domain",))  # type: ignore[arg-type]
 

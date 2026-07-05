@@ -143,8 +143,7 @@ class TestFormatApiParams:
         assert sanitized["key"] == "********"
 
     def test_dict_value_preprocessed_for_json_regression(self) -> None:
-        """Regression: dict values bypassed _preprocess_for_json, sending raw Python bools/Enums."""
-        from domainiq.models import DNSRecordType
+        """Regression: dict values bypassed _preprocess_for_json for raw bools/Enums."""
 
         formatted = format_api_params(
             {"payload": {"enabled": True, "type": DNSRecordType.A}}

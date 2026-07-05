@@ -8,7 +8,8 @@ import subprocess
 import sys
 import time
 import warnings
-from datetime import datetime
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
@@ -88,27 +89,19 @@ class TestDomainIQClientUnit:
 
         client._transport.close()
 
-    def test_del_safe_during_interpreter_shutdown_regression(self) -> None:
+    def test_del_safe_during_interpreter_shutdown_regression(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Regression: __del__ raised AttributeError when warnings module was None."""
-        code = (
-            "import warnings\n"
-            "from domainiq import DomainIQClient\n"
-            "from domainiq.http import RequestsTransport\n"
-            "client = DomainIQClient.__new__(DomainIQClient)\n"
-            "client._transport = RequestsTransport()\n"
-            "# Simulate interpreter shutdown by replacing warnings.warn\n"
-            "warnings.warn = None\n"
-            "client.__del__()\n"
-            "print('OK')\n"
-        )
-        completed = subprocess.run(
-            [sys.executable, "-c", code],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert completed.returncode == 0, completed.stderr
-        assert "OK" in completed.stdout
+        client = DomainIQClient.__new__(DomainIQClient)
+        client._transport = RequestsTransport()
+        # Simulate interpreter shutdown: the warnings machinery is torn down,
+        # so warnings.warn resolves to None inside __del__.
+        monkeypatch.setattr(warnings, "warn", None)
+
+        client.__del__()  # must not raise even though warnings.warn is None
+
+        assert client._transport.is_open is False
 
 
 class TestConfigUnit:
@@ -188,7 +181,10 @@ class TestConfigUnit:
         assert "API key is required" in str(exc_info.value)
 
     def test_config_validation_rejects_whitespace_only_base_url_regression(self):
-        """Regression: whitespace-only base_url passed validation but caused malformed requests."""
+        """Regression: whitespace-only base_url passed validation.
+
+        A blank base_url previously slipped through and produced malformed requests.
+        """
         config = Config(api_key="test_key")
         config.base_url = "   "
 
@@ -401,33 +397,25 @@ class TestUtilsUnit:
             ensure_positive_int("report_id", 10.5)
 
     def test_ensure_positive_int_accepts_integral_types_regression(self) -> None:
-        from decimal import Decimal
-
         assert ensure_positive_int("report_id", Decimal(5)) == 5
         assert ensure_positive_int("report_id", Decimal("5.0")) == 5
 
     def test_ensure_positive_int_rejects_decimal_nan_regression(self) -> None:
         """Regression: Decimal('NaN') crashed with unhandled ValueError."""
-        from decimal import Decimal
-
         with pytest.raises(DomainIQValidationError, match="must be a positive integer"):
             ensure_positive_int("report_id", Decimal("NaN"))
 
     def test_ensure_positive_int_rejects_decimal_infinity_regression(self) -> None:
         """Regression: Decimal('Infinity') crashed with unhandled ValueError."""
-        from decimal import Decimal
-
         with pytest.raises(DomainIQValidationError, match="must be a positive integer"):
             ensure_positive_int("report_id", Decimal("Infinity"))
 
     def test_validate_date_string_raises_for_non_string_input(self) -> None:
         """Regression: passing an int or datetime raises DomainIQValidationError."""
-        from domainiq.validators import validate_date_string
-
         with pytest.raises(DomainIQValidationError):
             validate_date_string(123)
         with pytest.raises(DomainIQValidationError):
-            validate_date_string(datetime.now())
+            validate_date_string(datetime.now(tz=UTC))
 
 
 class TestModelsUnit:
@@ -921,9 +909,9 @@ class TestLogicBugRegressions:
         assert json.loads(formatted["payload"]) == [{"a": 1}, {"b": 2}]
 
     def test_format_api_params_dict_with_datetime_uses_default_str(self):
-        from datetime import datetime
-
-        formatted = format_api_params({"filter": {"date": datetime(2024, 1, 1)}})
+        formatted = format_api_params(
+            {"filter": {"date": datetime(2024, 1, 1, tzinfo=UTC)}}
+        )
         assert "2024-01-01" in formatted["filter"]
 
     def test_cli_email_alert_default_is_true(self):

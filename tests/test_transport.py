@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
@@ -187,11 +187,12 @@ class TestRequestsTransport:
 
         class _BadTextResponse:
             status_code = 200
-            headers = {}
+            headers: ClassVar[dict[str, str]] = {}
 
             @property
             def text(self) -> str:
-                raise AttributeError("corrupted")
+                msg = "corrupted"
+                raise AttributeError(msg)
 
         session = _FakeRequestsSession(_BadTextResponse())
         transport = _requests_transport_with_session(monkeypatch, session)

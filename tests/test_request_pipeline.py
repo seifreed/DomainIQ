@@ -15,7 +15,7 @@ class _FakeSyncTransport:
         self._outcomes = outcomes
         self._index = 0
 
-    def get(self, url: str, params: dict[str, str], timeout: float) -> SyncResponse:
+    def get(self, _url: str, _params: dict[str, str], _timeout: float) -> SyncResponse:
         outcome = self._outcomes[self._index]
         self._index += 1
         if isinstance(outcome, BaseException):
@@ -29,7 +29,7 @@ class _FakeAsyncTransport:
         self._index = 0
 
     async def get(
-        self, url: str, params: dict[str, str], timeout: float
+        self, _url: str, _params: dict[str, str], _timeout: float
     ) -> SyncResponse:
         outcome = self._outcomes[self._index]
         self._index += 1
