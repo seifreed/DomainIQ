@@ -87,9 +87,11 @@ def _parse_date_string(date_str: str) -> datetime | None:
 
     for fmt in _DATE_FORMATS:
         try:
-            return datetime.strptime(stripped, fmt)
+            parsed = datetime.strptime(stripped, fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
+        else:
+            return _normalize_datetime(parsed)
     return None
 
 
