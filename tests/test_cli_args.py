@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from domainiq.cli._args import create_parser
+from domainiq.cli._types import DnsArgs
 from domainiq.cli._validation import validate_args as _validate_args
 
 
@@ -111,6 +112,12 @@ class TestArgParsing:
         )
         assert args.types == "A,MX"
 
+    def test_empty_types_string_is_parsed_as_none_regression(self) -> None:
+        """Regression: empty --types "" produced [''] instead of None."""
+        args = self.parser.parse_args(["--dns-lookup", "example.com", "--types", ""])
+        dns_args = DnsArgs.from_namespace(args)
+        assert dns_args.types is None
+
     def test_parse_domain_search(self) -> None:
         args = self.parser.parse_args(["--domain-search", "keyword1", "keyword2"])
         assert args.domain_search == ["keyword1", "keyword2"]
@@ -177,6 +184,20 @@ class TestArgParsing:
         with pytest.raises(SystemExit):
             self.parser.parse_args(["--domain-search", "kw", "--search-limit", value])
 
+    def test_search_limit_rejects_non_numeric(self) -> None:
+        with pytest.raises(SystemExit):
+            self.parser.parse_args(["--domain-search", "kw", "--search-limit", "abc"])
+
+    def test_snapshot_limit_must_be_positive_regression(self) -> None:
+        """Regression: --snapshot-limit accepted 0 and negative values."""
+        with pytest.raises(SystemExit):
+            self.parser.parse_args(["--snapshot-limit", "0"])
+
+    def test_timeout_accepts_float_regression(self) -> None:
+        """Regression: --timeout rejected float values."""
+        args = self.parser.parse_args(["--timeout", "30.5"])
+        assert args.timeout == 30.5
+
 
 class TestValidateArgs:
     def test_no_errors_when_args_valid(self) -> None:
@@ -222,3 +243,33 @@ class TestValidateArgs:
         args = _make_args(monitor_change=9)
         errors = _validate_args(args)
         assert any("monitor-report-changes" in e for e in errors)
+
+    def test_empty_string_in_list_arg_is_caught_regression(self) -> None:
+        """Regression: empty strings inside nargs='+' args bypassed validation."""
+        args = _make_args(domain_search=["ok", ""])
+        errors = _validate_args(args)
+        assert any("--domain-search cannot be empty" in e for e in errors)
+
+    def test_empty_reverse_dns_is_caught_regression(self) -> None:
+        """Regression: --reverse-dns was missing from empty-string checks."""
+        args = _make_args(reverse_dns="")
+        errors = _validate_args(args)
+        assert any("--reverse-dns cannot be empty" in e for e in errors)
+
+    def test_empty_types_is_caught_regression(self) -> None:
+        """Regression: --types was missing from empty-string checks."""
+        args = _make_args(types="")
+        errors = _validate_args(args)
+        assert any("--types cannot be empty" in e for e in errors)
+
+    def test_empty_min_create_date_is_caught_regression(self) -> None:
+        """Regression: --min-create-date was missing from empty-string checks."""
+        args = _make_args(min_create_date="")
+        errors = _validate_args(args)
+        assert any("--min-create-date cannot be empty" in e for e in errors)
+
+    def test_empty_max_create_date_is_caught_regression(self) -> None:
+        """Regression: --max-create-date was missing from empty-string checks."""
+        args = _make_args(max_create_date="")
+        errors = _validate_args(args)
+        assert any("--max-create-date cannot be empty" in e for e in errors)

@@ -20,6 +20,7 @@ from ._params.reports import (
     build_organization_report_params,
 )
 from .deserializers import parse_domain_report, parse_ip_report_result
+from .utils import validate_api_dict
 
 if TYPE_CHECKING:
     from ._models import (
@@ -41,21 +42,34 @@ class _ReportMixin(_SyncRequestable):
     def name_report(self, name: str) -> NameReportResult:
         """Get registrant name report."""
         return cast(
-            "NameReportResult", self._make_json_request(build_name_report_params(name))
+            "NameReportResult",
+            validate_api_dict(
+                self._make_json_request(build_name_report_params(name)),
+                "NameReportResult",
+                required_keys=("name",),
+            ),
         )
 
     def organization_report(self, organization: str) -> OrganizationReportResult:
         """Get registrant organization report."""
         return cast(
             "OrganizationReportResult",
-            self._make_json_request(build_organization_report_params(organization)),
+            validate_api_dict(
+                self._make_json_request(build_organization_report_params(organization)),
+                "OrganizationReportResult",
+                required_keys=("organization",),
+            ),
         )
 
     def email_report(self, email: str) -> EmailReportResult:
         """Get registrant email report."""
         return cast(
             "EmailReportResult",
-            self._make_json_request(build_email_report_params(email)),
+            validate_api_dict(
+                self._make_json_request(build_email_report_params(email)),
+                "EmailReportResult",
+                required_keys=("email",),
+            ),
         )
 
     def ip_report(self, ip: str) -> IpReportResult:
@@ -79,15 +93,23 @@ class _AsyncReportMixin(_AsyncRequestable):
         """Get registrant name report asynchronously."""
         return cast(
             "NameReportResult",
-            await self._make_json_request(build_name_report_params(name)),
+            validate_api_dict(
+                await self._make_json_request(build_name_report_params(name)),
+                "NameReportResult",
+                required_keys=("name",),
+            ),
         )
 
     async def organization_report(self, organization: str) -> OrganizationReportResult:
         """Get registrant organization report asynchronously."""
         return cast(
             "OrganizationReportResult",
-            await self._make_json_request(
-                build_organization_report_params(organization)
+            validate_api_dict(
+                await self._make_json_request(
+                    build_organization_report_params(organization)
+                ),
+                "OrganizationReportResult",
+                required_keys=("organization",),
             ),
         )
 
@@ -95,7 +117,11 @@ class _AsyncReportMixin(_AsyncRequestable):
         """Get registrant email report asynchronously."""
         return cast(
             "EmailReportResult",
-            await self._make_json_request(build_email_report_params(email)),
+            validate_api_dict(
+                await self._make_json_request(build_email_report_params(email)),
+                "EmailReportResult",
+                required_keys=("email",),
+            ),
         )
 
     async def ip_report(self, ip: str) -> IpReportResult:

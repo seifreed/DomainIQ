@@ -17,6 +17,7 @@ from domainiq.cli import main
 from domainiq.cli._args import create_parser
 from domainiq.cli._credentials import _is_interactive, prompt_for_api_key
 from domainiq.cli._handlers import (
+    build_snapshot_options,
     handle_dns_lookup,
     handle_domain_search,
     handle_whois_lookup,
@@ -30,7 +31,11 @@ from domainiq.constants import (
 from domainiq.constants import (
     EXIT_SUCCESS as _EXIT_SUCCESS,
 )
-from domainiq.exceptions import DomainIQConfigurationError, DomainIQError
+from domainiq.exceptions import (
+    DomainIQConfigurationError,
+    DomainIQError,
+    DomainIQValidationError,
+)
 
 
 def _mock_client() -> MagicMock:
@@ -91,6 +96,69 @@ class TestPrintResult:
         print_result({"a": 1})
         captured = capsys.readouterr()
         assert '  "a": 1' in captured.out
+
+    def test_domainiq_error_from_depth_exceeded_is_caught_regression(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Regression: DomainIQError from serialize_result escaped print_result."""
+        deeply_nested: dict[str, Any] = {}
+        current = deeply_nested
+        for _ in range(200):
+            current["child"] = {}
+            current = current["child"]
+        with pytest.raises(DomainIQError):
+            print_result(deeply_nested)
+
+
+class TestBuildSnapshotOptions:
+    def test_accepts_valid_dimensions(self) -> None:
+        args = argparse.Namespace(
+            snapshot_full=True,
+            no_cache=False,
+            raw=False,
+            width=1024,
+            height=768,
+        )
+        options = build_snapshot_options(args)
+        assert options.width == 1024
+        assert options.height == 768
+        assert options.full is True
+
+    def test_uses_defaults_when_dimensions_none(self) -> None:
+        args = argparse.Namespace(
+            snapshot_full=False,
+            no_cache=False,
+            raw=False,
+            width=None,
+            height=None,
+        )
+        options = build_snapshot_options(args)
+        assert options.width == 250
+        assert options.height == 125
+
+    def test_rejects_zero_width(self) -> None:
+        args = argparse.Namespace(
+            snapshot_full=False,
+            no_cache=False,
+            raw=False,
+            width=0,
+            height=None,
+        )
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_snapshot_options(args)
+        assert exc_info.value.param_name == "width"
+
+    def test_rejects_negative_height(self) -> None:
+        args = argparse.Namespace(
+            snapshot_full=False,
+            no_cache=False,
+            raw=False,
+            width=None,
+            height=-1,
+        )
+        with pytest.raises(DomainIQValidationError) as exc_info:
+            build_snapshot_options(args)
+        assert exc_info.value.param_name == "height"
 
 
 class TestHandleWhoisLookup:

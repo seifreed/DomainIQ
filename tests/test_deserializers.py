@@ -51,9 +51,7 @@ class TestDomainSnapshotDeserializer:
         assert result.raw_data is None
 
     def test_raw_snapshot_data_with_non_base64_suffix_is_ignored(self) -> None:
-        result = parse_domain_snapshot(
-            {"domain": "example.com", "raw": "aGVsbG8=!!!!"}
-        )
+        result = parse_domain_snapshot({"domain": "example.com", "raw": "aGVsbG8=!!!!"})
 
         assert result.raw_data is None
 
@@ -332,9 +330,7 @@ class TestDnsRecordValueExtraction:
         result = parse_dns_result(
             {
                 "domain": "example.com",
-                "records": [
-                    {"host": "example.com", "type": "A", "ip": 0}
-                ],
+                "records": [{"host": "example.com", "type": "A", "ip": 0}],
             }
         )
 
@@ -345,9 +341,7 @@ class TestDnsRecordValueExtraction:
         result = parse_dns_result(
             {
                 "domain": "example.com",
-                "records": [
-                    {"host": "example.com", "type": "TXT", "txt": ""}
-                ],
+                "records": [{"host": "example.com", "type": "TXT", "txt": ""}],
             }
         )
 
@@ -358,9 +352,7 @@ class TestDnsRecordValueExtraction:
         result = parse_dns_result(
             {
                 "domain": "example.com",
-                "records": [
-                    {"host": "example.com", "type": "A", "ip": False}
-                ],
+                "records": [{"host": "example.com", "type": "A", "ip": False}],
             }
         )
 
@@ -426,9 +418,7 @@ class TestDnsRecordValueExtraction:
         """Regression: cast allowed None into DNSRecord.name which expects str."""
         result = parse_dns_result(
             {
-                "records": [
-                    {"type": "A", "ip": "192.0.2.1"}
-                ],
+                "records": [{"type": "A", "ip": "192.0.2.1"}],
             }
         )
 
@@ -507,7 +497,5 @@ class TestDeserializerTypeCoercion:
         assert result.items[0].typo_strength == 10
 
     def test_monitor_report_id_coerced_from_string(self) -> None:
-        result = parse_monitor_report(
-            {"id": "42", "name": "brand-watch", "items": []}
-        )
+        result = parse_monitor_report({"id": "42", "name": "brand-watch", "items": []})
         assert result.id == 42

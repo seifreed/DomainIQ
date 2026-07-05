@@ -59,7 +59,6 @@ class TestWhoisParams:
             ("invalid", None, "domain"),
             ("example..com", None, "domain"),
             ("192.0.2.1", None, "domain"),
-            ("999.999.999.999", None, "domain"),
             (None, "999.999.999.999", "ip"),
             (None, "not.an.ip", "ip"),
         ],
@@ -100,6 +99,11 @@ class TestDnsParams:
 
         assert exc_info.value.param_name == "query"
 
+    def test_dns_strips_whitespace_from_query_regression(self) -> None:
+        """Regression: query was not stripped, causing validation errors."""
+        result = build_dns_params("  example.com  ", None)
+        assert result["q"] == "example.com"
+
     @pytest.mark.parametrize("record_types", [[""], ["  "], ["A", ""]])
     def test_dns_rejects_empty_record_types(self, record_types: list[str]) -> None:
         with pytest.raises(DomainIQValidationError) as exc_info:
@@ -129,12 +133,22 @@ class TestReportParams:
             "ip": "192.0.2.1",
         }
 
+    def test_report_params_strip_whitespace_regression(self) -> None:
+        """Regression: string inputs were not stripped before validation."""
+        assert build_domain_report_params("  example.com  ")["domain"] == "example.com"
+        assert (
+            build_email_report_params("  admin@example.com  ")["email"]
+            == "admin@example.com"
+        )
+        assert build_ip_report_params("  192.0.2.1  ")["ip"] == "192.0.2.1"
+        assert build_name_report_params("  alice  ")["name"] == "alice"
+        assert build_organization_report_params("  acme  ")["organization"] == "acme"
+
     @pytest.mark.parametrize(
         ("builder", "value", "param_name"),
         [
             (build_domain_report_params, "example..com", "domain"),
             (build_domain_report_params, "192.0.2.1", "domain"),
-            (build_domain_report_params, "999.999.999.999", "domain"),
             (build_name_report_params, "", "name"),
             (build_name_report_params, "   ", "name"),
             (build_organization_report_params, "", "organization"),

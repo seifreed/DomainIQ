@@ -6,7 +6,11 @@ from domainiq.models import ReverseMxSearchType
 
 
 def _positive_int(value: str) -> int:
-    n = int(value)
+    try:
+        n = int(value)
+    except ValueError as e:
+        msg = f"must be a positive integer, got {value!r}"
+        raise argparse.ArgumentTypeError(msg) from e
     if n <= 0:
         msg = f"must be a positive integer, got {n}"
         raise argparse.ArgumentTypeError(msg)
@@ -22,7 +26,7 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
-        "--timeout", type=int, default=30, help="Request timeout in seconds"
+        "--timeout", type=float, default=30, help="Request timeout in seconds"
     )
 
 
@@ -48,7 +52,11 @@ def _add_domain_analysis_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--domain-categorize", nargs="+", help="Categorize domains")
     parser.add_argument("--domain-snapshot", help="Get domain snapshot")
     parser.add_argument("--domain-snapshot-history", help="Get snapshot history")
-    parser.add_argument("--snapshot-limit", type=int, help="Limit snapshots returned")
+    parser.add_argument(
+        "--snapshot-limit",
+        type=_positive_int,
+        help="Limit snapshots returned",
+    )
     parser.add_argument(
         "--snapshot-full", action="store_true", help="Capture full page screenshot"
     )

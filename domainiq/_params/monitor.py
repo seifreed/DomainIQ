@@ -63,12 +63,14 @@ def _validate_monitor_item_values(
         "item_type",
     )
     if item_type_value == "domain":
-        for item in items:
+        for raw_item in items:
+            item = raw_item.strip()
             if not validate_domain(item):
                 msg = f"Invalid domain: {item}"
                 raise DomainIQValidationError(msg, param_name="items")
     elif item_type_value == "ip":
-        for item in items:
+        for raw_item in items:
+            item = raw_item.strip()
             if not is_ip_address(item):
                 msg = f"Invalid IP address: {item}"
                 raise DomainIQValidationError(msg, param_name="items")

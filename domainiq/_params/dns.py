@@ -31,6 +31,7 @@ def build_dns_params(
     record_types: list[str | DNSRecordType] | None,
 ) -> dict[str, Any]:
     """Build parameters for the DNS endpoint."""
+    query = query.strip()
     if not validate_domain(query):
         msg = f"Invalid query: {query}"
         raise DomainIQValidationError(msg, param_name="query")

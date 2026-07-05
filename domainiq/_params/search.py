@@ -46,16 +46,18 @@ def _validate_type_value(
 
 
 def _validate_domain_value(value: str, param_name: str) -> None:
+    value = value.strip()
     if not validate_domain(value):
         msg = f"Invalid domain: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
 
 
 def _validate_email_value(value: str, param_name: str) -> None:
+    value = value.strip()
     if "@" in value and not validate_email(value):
         msg = f"Invalid email: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
-    if not value or any(char.isspace() for char in value):
+    if not value:
         msg = f"Invalid email search term: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
 
@@ -67,6 +69,7 @@ def _validate_search_term(value: str, param_name: str) -> None:
 
 
 def _validate_ip_value(value: str, param_name: str) -> None:
+    value = value.strip()
     if not is_ip_address(value):
         msg = f"Invalid IP address: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
@@ -159,6 +162,7 @@ def build_reverse_mx_params(
 ) -> dict[str, Any]:
     """Build parameters for the reverse-MX endpoint."""
     search_type_value = _validate_type_value(search_type, _REVERSE_MX_TYPES)
+    _validate_search_term(data, "data")
     if search_type_value == "ip":
         _validate_ip_value(data, "data")
     elif search_type_value == "domain":

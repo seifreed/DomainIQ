@@ -217,9 +217,7 @@ class TestMonitorMutationParams:
         ("build_params", "param_name"),
         [
             (
-                lambda: build_add_monitor_item_params(
-                    0, "domain", ["example.com"]
-                ),
+                lambda: build_add_monitor_item_params(0, "domain", ["example.com"]),
                 "report_id",
             ),
             (lambda: build_enable_typos_params(0, 7, 5), "report_id"),

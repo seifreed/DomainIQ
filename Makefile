@@ -1,5 +1,5 @@
 # DomainIQ Makefile - Code Quality and Development Tasks
-# Requires Python 3.10+ and development dependencies installed
+# Requires Python 3.14 and development dependencies installed
 
 .PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs pre-commit all-checks gen-mixins gen-mixins-check
 
@@ -29,21 +29,21 @@ gen-mixins-check:  ## Check generated async mixins are up to date
 	@echo "✅ Generated mixins are current"
 
 # Code quality targets
-quality: lint format type-check security  ## Run all code quality checks
+quality: lint format type-check security check-deps  ## Run all code quality checks
 
 lint:  ## Run linting with Ruff
 	@echo "🔍 Running Ruff linting..."
 	ruff check domainiq/ tests/ examples/ --fix --show-fixes
 	@echo "✅ Linting completed"
 
-format:  ## Format code with Ruff
-	@echo "🎨 Formatting code with Ruff..."
-	ruff format domainiq/ tests/ examples/
+format:  ## Format code with Black
+	@echo "🎨 Formatting code with Black..."
+	black domainiq/ tests/ examples/
 	@echo "✅ Formatting completed"
 
 format-check:  ## Check if code is formatted correctly
 	@echo "🎨 Checking code formatting..."
-	ruff format --check domainiq/ tests/ examples/
+	black --check domainiq/ tests/ examples/
 	@echo "✅ Format check completed"
 
 type-check:  ## Run type checking with MyPy
@@ -96,7 +96,7 @@ pre-commit:  ## Run pre-commit hooks on all files
 # Comprehensive quality checks
 all-checks: quality test coverage security  ## Run all quality checks and tests
 
-ci-checks: gen-mixins-check format-check lint type-check security test-unit  ## Run CI/CD checks
+ci-checks: gen-mixins-check format-check lint type-check security check-deps test-unit  ## Run CI/CD checks
 
 # Build and distribution
 clean:  ## Clean build artifacts and cache files
@@ -136,7 +136,7 @@ docs-serve:  ## Serve documentation locally
 # Development helpers
 install-tools:  ## Install all development tools globally
 	pip install --upgrade pip
-	pip install ruff mypy bandit pre-commit build twine
+	pip install ruff black mypy bandit pip-audit pre-commit build twine
 
 upgrade-deps:  ## Upgrade all dependencies to latest versions
 	pip install --upgrade pip
@@ -166,6 +166,7 @@ quality-gate:  ## Quality gate - all checks must pass
 	@$(MAKE) lint
 	@$(MAKE) type-check
 	@$(MAKE) security
+	@$(MAKE) check-deps
 	@$(MAKE) test-unit
 	@echo "✅ Quality gate passed!"
 

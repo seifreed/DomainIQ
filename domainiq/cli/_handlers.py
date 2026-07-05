@@ -1,25 +1,29 @@
 """Command handlers and serialization helpers for the DomainIQ CLI."""
 
-import argparse
-
 from domainiq.constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
 from domainiq.models import DomainSearchFilters, KeywordMatchType, SnapshotOptions
 from domainiq.protocols import DNSProtocol, SearchProtocol, WhoisProtocol
 from domainiq.search_filters import build_search_filters
-from domainiq.validators import is_ip_address
+from domainiq.validators import ensure_positive_int, is_ip_address
 
 from ._serialization import print_result
-from ._types import DnsArgs, DomainSearchArgs, WhoisArgs
+from ._types import DnsArgs, DomainSearchArgs, SnapshotArgs, WhoisArgs
 
 
-def build_snapshot_options(args: argparse.Namespace) -> SnapshotOptions:
-    """Build SnapshotOptions from parsed CLI args."""
+def build_snapshot_options(args: SnapshotArgs) -> SnapshotOptions:
+    """Build SnapshotOptions from CLI snapshot args."""
+    width = args.width
+    if width is not None:
+        width = ensure_positive_int("width", width)
+    height = args.height
+    if height is not None:
+        height = ensure_positive_int("height", height)
     return SnapshotOptions(
         full=args.snapshot_full,
         no_cache=args.no_cache,
         raw=args.raw,
-        width=args.width if args.width is not None else SNAPSHOT_DEFAULT_WIDTH,
-        height=args.height if args.height is not None else SNAPSHOT_DEFAULT_HEIGHT,
+        width=width if width is not None else SNAPSHOT_DEFAULT_WIDTH,
+        height=height if height is not None else SNAPSHOT_DEFAULT_HEIGHT,
     )
 
 

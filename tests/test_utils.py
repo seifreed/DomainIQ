@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from domainiq.exceptions import DomainIQAPIError, DomainIQError
+from domainiq.exceptions import DomainIQAPIError
 from domainiq.utils import (
     assert_json_dict,
     compute_backoff,
@@ -18,6 +18,7 @@ from domainiq.utils import (
     parse_retry_after,
     setup_logging,
     truncate_repr,
+    validate_api_dict,
 )
 
 if TYPE_CHECKING:
@@ -34,15 +35,62 @@ class TestJsonAndReprHelpers:
         with pytest.raises(DomainIQAPIError, match="Expected JSON dict"):
             assert_json_dict(["not", "a", "dict"])
 
+    def test_validate_api_dict_accepts_non_empty_dict(self) -> None:
+        raw = {"ok": True}
+
+        assert validate_api_dict(raw, "TestResult") is raw
+
+    def test_validate_api_dict_rejects_empty_dict(self) -> None:
+        with pytest.raises(
+            DomainIQAPIError, match="Expected TestResult but got empty dict"
+        ):
+            validate_api_dict({}, "TestResult")
+
+    def test_validate_api_dict_rejects_missing_required_keys(self) -> None:
+        with pytest.raises(
+            DomainIQAPIError, match="Expected TestResult with at least one of"
+        ):
+            validate_api_dict({"other": 1}, "TestResult", ("required_a", "required_b"))
+
+    def test_validate_api_dict_accepts_dict_with_required_key(self) -> None:
+        raw = {"required_a": 1}
+
+        assert validate_api_dict(raw, "TestResult", ("required_a", "required_b")) is raw
+
     def test_truncate_repr_shortens_long_values(self) -> None:
         value = "x" * 20
 
         assert truncate_repr(value, max_len=10).endswith("...")
 
+    def test_truncate_repr_never_exceeds_max_len(self) -> None:
+        value = "x" * 200
+
+        result = truncate_repr(value, max_len=50)
+        assert len(result) <= 50
+        assert result.endswith("...")
+
+    def test_truncate_repr_small_max_len(self) -> None:
+        value = "x" * 20
+
+        result = truncate_repr(value, max_len=2)
+        assert len(result) <= 2
+
+    def test_truncate_repr_max_len_three_includes_ellipsis_regression(
+        self,
+    ) -> None:
+        value = "x" * 20
+
+        result = truncate_repr(value, max_len=3)
+        assert result == "..."
+
 
 class TestRetryAndCsvHelpers:
     def test_compute_backoff_doubles_per_attempt(self) -> None:
         assert compute_backoff(2, 3) == 16.0
+
+    def test_compute_backoff_capped_at_30_regression(self) -> None:
+        """Regression: very large attempt caused integer overflow/hang."""
+        assert compute_backoff(1, 1000) == compute_backoff(1, 30)
 
     def test_parse_retry_after(self) -> None:
         assert parse_retry_after({"Retry-After": "10"}) == 10
@@ -75,9 +123,16 @@ class TestRetryAndCsvHelpers:
         ]
         assert csv_to_dict_list("   ") == []
 
-    def test_csv_to_dict_list_rejects_json_like_content(self) -> None:
-        with pytest.raises(DomainIQError, match="Expected CSV"):
-            csv_to_dict_list('{"domain": "example.com"}')
+    def test_csv_to_dict_list_returns_empty_for_json_like_content_regression(
+        self,
+    ) -> None:
+        """Regression: JSON-like strings are no longer misidentified as CSV errors."""
+        assert csv_to_dict_list('{"domain": "example.com"}') == []
+
+    def test_csv_to_dict_list_accepts_csv_starting_with_brace_regression(self) -> None:
+        assert csv_to_dict_list('"{header",value\nexample.com,192.0.2.1\n') == [
+            {"{header": "example.com", "value": "192.0.2.1"}
+        ]
 
 
 class TestModelListHelper:
@@ -120,6 +175,29 @@ class TestSetupLogging:
             setup_logging("WARNING", filename=str(log_file))
             logger.warning("written")
 
+            assert log_file.exists()
+            assert "written" in log_file.read_text()
+        finally:
+            for handler in logger.handlers:
+                handler.close()
+            logger.handlers[:] = original_handlers
+            logger.setLevel(original_level)
+
+    def test_setup_logging_replaces_existing_handlers_regression(
+        self, tmp_path: Path
+    ) -> None:
+        logger = logging.getLogger("domainiq")
+        original_handlers = list(logger.handlers)
+        original_level = logger.level
+        logger.handlers.clear()
+        log_file = tmp_path / "domainiq.log"
+        try:
+            setup_logging("INFO")
+            setup_logging("WARNING", filename=str(log_file))
+            logger.warning("written")
+
+            assert len(logger.handlers) == 1
+            assert isinstance(logger.handlers[0], logging.FileHandler)
             assert log_file.exists()
             assert "written" in log_file.read_text()
         finally:

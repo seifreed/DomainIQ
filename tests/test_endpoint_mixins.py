@@ -83,7 +83,7 @@ class TestDNSMixins:
                     '{"domain": "example.com", "records": ['
                     '{"name": "example.com", "type": "A", "value": "192.0.2.1"}'
                     "]}"
-                )
+                ),
             )
         )
 
@@ -108,13 +108,11 @@ class TestDNSMixins:
                     '{"domain": "example.net", "records": ['
                     '{"name": "example.net", "type": "MX", "value": "mail.example.net"}'
                     "]}"
-                )
+                ),
             )
         )
 
-        result = await mock_async_client.dns_lookup(
-            "example.net", [DNSRecordType.MX]
-        )
+        result = await mock_async_client.dns_lookup("example.net", [DNSRecordType.MX])
 
         assert result.domain == "example.net"
         assert result.records[0].type == "MX"

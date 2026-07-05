@@ -12,11 +12,11 @@ if TYPE_CHECKING:
 
 
 def _validate_date_param(value: str, param_name: str) -> str:
-    parsed = validate_date_string(value)
-    if parsed is None:
+    try:
+        return validate_date_string(value)
+    except DomainIQValidationError:
         msg = f"Invalid date format for {param_name}: {value}"
-        raise DomainIQValidationError(msg, param_name=param_name)
-    return parsed
+        raise DomainIQValidationError(msg, param_name=param_name) from None
 
 
 def _validate_length_range(min_length: int | None, max_length: int | None) -> None:

@@ -108,7 +108,7 @@ class TestRequestsTransport:
         assert response.status_code == 202
         assert response.headers == {"X-Test": "yes"}
         assert response.text == '{"ok": true}'
-        assert session.mount_prefixes == ["https://"]
+        assert session.mount_prefixes == ["https://", "http://"]
         assert session.calls == [
             {
                 "url": "https://api.example.test",
@@ -143,6 +143,23 @@ class TestRequestsTransport:
 
         assert exc_info.value.__cause__ is request_exc
 
+    def test_http_error_is_mapped_to_oserror(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        http_exc = requests_transport_module.requests.exceptions.HTTPError(
+            "401 Client Error"
+        )
+        session = _FakeRequestsSession(http_exc)
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        with pytest.raises(OSError, match="401 Client Error") as exc_info:
+            transport.get("https://api.example.test", {}, timeout=1)
+
+        assert isinstance(
+            exc_info.value.__cause__,
+            requests_transport_module.requests.exceptions.HTTPError,
+        )
+
     def test_close_closes_session(self, monkeypatch: pytest.MonkeyPatch) -> None:
         session = _FakeRequestsSession(_FakeRequestsResponse())
         transport = _requests_transport_with_session(monkeypatch, session)
@@ -150,6 +167,37 @@ class TestRequestsTransport:
         transport.close()
 
         assert session.closed is True
+
+    def test_is_open_reflects_session_state(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        session = _FakeRequestsSession(_FakeRequestsResponse())
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        assert transport.is_open is True
+
+        transport.close()
+
+        assert transport.is_open is False
+
+    def test_response_body_error_propagates_as_is(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: resp.text errors propagate without being wrapped in OSError."""
+
+        class _BadTextResponse:
+            status_code = 200
+            headers = {}
+
+            @property
+            def text(self) -> str:
+                raise AttributeError("corrupted")
+
+        session = _FakeRequestsSession(_BadTextResponse())
+        transport = _requests_transport_with_session(monkeypatch, session)
+
+        with pytest.raises(AttributeError, match="corrupted"):
+            transport.get("https://api.example.test", {}, 1)
 
 
 # ---------------------------------------------------------------------------

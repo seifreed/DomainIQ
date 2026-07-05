@@ -7,7 +7,7 @@ from typing import Any
 from domainiq._models import BulkWhoisType
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.utils import enum_value
-from domainiq.validators import validate_domain
+from domainiq.validators import is_ip_address, validate_domain
 
 from ._shared import require_non_empty
 
@@ -57,4 +57,9 @@ def build_bulk_whois_params(
 def build_bulk_whois_ip_params(domains: list[str]) -> dict[str, Any]:
     """Build parameters for bulk WHOIS IP."""
     require_non_empty("domains", domains)
-    return {"service": "bulk_whois_ip", "domains": domains}
+    for entry in domains:
+        stripped = entry.strip()
+        if not validate_domain(stripped) and not is_ip_address(stripped):
+            msg = f"Invalid domain or IP address: {entry}"
+            raise DomainIQValidationError(msg, param_name="domains")
+    return {"service": "bulk_whois_ip", "domains": [d.strip() for d in domains]}

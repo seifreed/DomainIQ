@@ -23,6 +23,7 @@ __all__ = [
     "parse_retry_after",
     "setup_logging",
     "truncate_repr",
+    "validate_api_dict",
 ]
 
 
@@ -39,15 +40,53 @@ def assert_json_dict(raw: dict[str, Any] | list[Any] | str) -> dict[str, Any]:
     raise DomainIQAPIError(msg)
 
 
+def validate_api_dict(
+    raw: dict[str, Any],
+    expected_type_name: str,
+    required_keys: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Validate that a raw API dict is non-empty and contains expected keys.
+
+    Args:
+        raw: The dict to validate (already confirmed dict by assert_json_dict).
+        expected_type_name: Human-readable type name for error messages.
+        required_keys: At least one of these keys must be present. If empty,
+            only checks that the dict itself is non-empty.
+
+    Returns:
+        The same dict reference (passthrough).
+
+    Raises:
+        DomainIQAPIError: If the dict is empty or missing all required keys.
+    """
+    if not raw:
+        msg = f"Expected {expected_type_name} but got empty dict"
+        raise DomainIQAPIError(msg)
+    if required_keys and not any(k in raw for k in required_keys):
+        msg = (
+            f"Expected {expected_type_name} with at least one of "
+            f"{required_keys!r} but got {truncate_repr(raw)}"
+        )
+        raise DomainIQAPIError(msg)
+    return raw
+
+
 def truncate_repr(value: object, max_len: int = 200) -> str:
     """Return repr(value) truncated to max_len characters with ellipsis."""
     r = repr(value)
-    return r[:max_len] + "..." if len(r) > max_len else r
+    max_len = max(max_len, 0)
+    if len(r) > max_len:
+        ellipsis = "..."
+        if max_len < len(ellipsis):
+            return r[:max_len]
+        return r[: max_len - len(ellipsis)] + ellipsis
+    return r
 
 
 def compute_backoff(retry_delay: int, attempt: int) -> float:
     """Exponential backoff: retry_delay * 2^attempt."""
-    return float(retry_delay * (2**attempt))
+    capped_attempt = min(attempt, 10)
+    return float(retry_delay * (2**capped_attempt))
 
 
 def parse_retry_after(headers: Mapping[str, str]) -> int | None:
@@ -60,10 +99,10 @@ def parse_retry_after(headers: Mapping[str, str]) -> int | None:
     if value:
         try:
             seconds = int(value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             try:
                 retry_at = parsedate_to_datetime(value)
-            except (TypeError, ValueError, IndexError, OverflowError):
+            except TypeError, ValueError, IndexError, OverflowError:
                 logger.debug("Could not parse Retry-After header value: %r", value)
                 return None
             if retry_at.tzinfo is None:
@@ -87,17 +126,20 @@ def csv_to_dict_list(csv_content: str) -> list[dict[str, Any]]:
     Raises:
         DomainIQError: If CSV parsing fails
     """
+    if not isinstance(csv_content, str):
+        msg = f"Expected CSV content as string, got {type(csv_content).__name__}"
+        raise DomainIQError(msg)
     try:
         content = csv_content.strip()
         if not content:
             logger.debug("csv_to_dict_list: received empty content, returning []")
             return []
-        if content[0] in ("{", "["):
-            msg = "Expected CSV but received JSON-like content"
-            raise DomainIQError(msg)
-        csv_file = StringIO(content)
-        reader = csv.DictReader(csv_file, delimiter=",")
-        return list(reader)
+        with StringIO(content) as csv_file:
+            reader = csv.DictReader(csv_file, delimiter=",")
+            result = list(reader)
+        if result:
+            return result
+        return []  # noqa: TRY300
     except csv.Error as e:
         msg = f"Failed to parse CSV content: {e}"
         raise DomainIQError(msg) from e
@@ -117,16 +159,23 @@ def setup_logging(
         format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     lib_logger = logging.getLogger("domainiq")
-    lib_logger.setLevel(getattr(logging, level.upper()))
+    try:
+        lib_logger.setLevel(getattr(logging, level.upper()))
+    except AttributeError as exc:
+        msg = f"Invalid logging level: {level}"
+        raise ValueError(msg) from exc
 
-    if not lib_logger.handlers:
-        formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
-        if filename:
-            handler: logging.Handler = logging.FileHandler(filename)
-        else:
-            handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        lib_logger.addHandler(handler)
+    for old_handler in lib_logger.handlers[:]:
+        lib_logger.removeHandler(old_handler)
+        old_handler.close()
+
+    formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+    if filename:
+        handler: logging.Handler = logging.FileHandler(filename)
+    else:
+        handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    lib_logger.addHandler(handler)
 
 
 def ensure_list_of_models[M](

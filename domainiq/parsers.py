@@ -4,6 +4,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from domainiq.utils import assert_json_dict
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -34,7 +36,7 @@ _TIMESTAMP_MIN_DIGITS = 10
 def _parse_numeric_timestamp(value: float, raw_value: object) -> datetime | None:
     try:
         return datetime.fromtimestamp(value, UTC).replace(tzinfo=None)
-    except (OSError, OverflowError, ValueError):
+    except OSError, OverflowError, ValueError:
         logger.warning(
             "try_parse_date: numeric timestamp parse failed for %r",
             raw_value,
@@ -77,6 +79,7 @@ def _parse_date_string(date_str: str) -> datetime | None:
                 "try_parse_date: timestamp parse failed for %r",
                 date_str[:80],
             )
+            return None
         else:
             parsed = _parse_numeric_timestamp(timestamp, date_str)
             if parsed is not None:
@@ -84,7 +87,7 @@ def _parse_date_string(date_str: str) -> datetime | None:
 
     for fmt in _DATE_FORMATS:
         try:
-            return datetime.strptime(stripped, fmt)  # noqa: DTZ007 — same naive-datetime contract as DTZ006; API does not supply timezone in string formats
+            return datetime.strptime(stripped, fmt)
         except ValueError:
             continue
     return None
@@ -118,11 +121,15 @@ def parse_bool(value: object, default: bool = False) -> bool:
         return value != 0
     if isinstance(value, str):
         lowered = value.strip().lower()
-        if lowered in ("1", "2", "true", "yes"):
+        if lowered in ("1", "true", "yes"):
             return True
         if lowered in ("0", "false", "no", ""):
             return False
+        logger.debug(
+            "parse_bool falling back to default=%s for value=%r", default, value
+        )
         return default
+    logger.debug("parse_bool falling back to default=%s for value=%r", default, value)
     return default
 
 
@@ -130,8 +137,6 @@ def unwrap_api_envelope(
     data: dict[str, Any], exclude_keys: tuple[str, ...]
 ) -> dict[str, Any]:
     """Unwrap {'result': {...}} top-level API envelope when present."""
-    from domainiq.utils import assert_json_dict
-
     data = assert_json_dict(data)
     result = data.get("result")
     if isinstance(result, dict) and not any(k in data for k in exclude_keys):
@@ -140,9 +145,11 @@ def unwrap_api_envelope(
 
 
 def _normalize_nameserver_value(ns: object) -> str | None:
+    if isinstance(ns, bool):
+        return None
     if isinstance(ns, dict) and "host" in ns:
         ns = ns["host"]
-    if ns is None or ns is False or ns == 0:
+    if ns is None or ns == 0:
         return None
     normalized = str(ns).strip()
     return normalized or None

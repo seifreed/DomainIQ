@@ -37,26 +37,31 @@ from .parsers import (
 from .utils import assert_json_dict, validate_api_dict
 
 
-def _to_int(value: Any) -> int | None:
+def _to_int(value: object) -> int | None:
     if value is None:
         return None
-    if isinstance(value, int) and not isinstance(value, bool):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
         return value
     try:
         return int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 
-def _to_float(value: Any) -> float | None:
+def _to_float(value: object) -> float | None:
     if value is None:
         return None
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
         return float(value)
     try:
         return float(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
+
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -91,6 +96,12 @@ def _extract_record_value(record_data: dict[str, Any], record_type: str) -> str:
     for key in keys:
         if key in record_data:
             return str(record_data[key])
+    logger.debug(
+        "_extract_record_value: no matching key %s for record type %r in %r",
+        keys,
+        record_type,
+        record_data,
+    )
     return ""
 
 
@@ -106,13 +117,11 @@ def _normalize_dict_list(raw: object) -> list[dict[str, Any]]:
     if isinstance(raw, dict):
         return [cast("dict[str, Any]", raw)]
     if isinstance(raw, list):
-        return [
-            cast("dict[str, Any]", item) for item in raw if isinstance(item, dict)
-        ]
+        return [cast("dict[str, Any]", item) for item in raw if isinstance(item, dict)]
     return []
 
 
-def _coalesce(primary: Any, fallback: Any) -> Any:
+def _coalesce(primary: object, fallback: object) -> object:
     """Return primary if it is not None, otherwise fallback."""
     return primary if primary is not None else fallback
 
@@ -146,11 +155,7 @@ def parse_whois_result(data: dict[str, Any]) -> WhoisResult:
 def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
     """Parse a DomainIQ API DNS response dict into a DNSResult."""
     inner = unwrap_api_envelope(envelope, ("results", "records", "domain"))
-    raw_results = (
-        inner["results"]
-        if "results" in inner and inner["results"] is not None
-        else inner.get("records")
-    )
+    raw_results = inner.get("results") or inner.get("records")
     results = _normalize_dict_list(raw_results)
     domain = inner.get("domain", "")
     if not domain and results:
@@ -172,9 +177,7 @@ def parse_dns_result(envelope: dict[str, Any]) -> DNSResult:
                 type=record_type,
                 value=_extract_record_value(record_data, record_type),
                 ttl=_to_int(record_data.get("ttl")),
-                priority=_to_int(
-                    record_data.get("pri", record_data.get("priority"))
-                ),
+                priority=_to_int(record_data.get("pri", record_data.get("priority"))),
             )
         )
     return DNSResult(domain=domain, records=records)

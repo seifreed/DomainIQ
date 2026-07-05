@@ -46,7 +46,11 @@ def _find_critical_exception(
     """Return the first non-cancelled exception from done tasks, if any."""
     for task in tasks:
         if task.done() and not task.cancelled() and task.exception() is not None:
-            return task.exception()
+            exc = task.exception()
+            if isinstance(exc, asyncio.CancelledError):
+                continue
+            if isinstance(exc, BaseException):
+                return exc
     return None
 
 
@@ -74,21 +78,26 @@ async def _run_with_critical_cancel[T](
 
     try:
         await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-    except (Exception, asyncio.CancelledError):
+    except asyncio.CancelledError:
         await _cancel_and_settle(tasks)
         raise
 
     critical = _find_critical_exception(tasks)
     if critical is not None:
+        await _cancel_and_settle(tasks)
         for task in tasks:
             if task.done() and not task.cancelled():
                 exc = task.exception()
                 if exc is not None and exc is not critical:
                     logger.warning("Additional critical exception discarded: %s", exc)
-        await _cancel_and_settle(tasks)
         partials = _collect_task_results(tasks, expected_type)
         raise DomainIQPartialResultsError(critical, partials) from critical
 
+    await _cancel_and_settle(tasks)
+    missed = _find_critical_exception(tasks)
+    if missed is not None:
+        partials = _collect_task_results(tasks, expected_type)
+        raise DomainIQPartialResultsError(missed, partials) from missed
     return _collect_task_results(tasks, expected_type)
 
 

@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+import warnings
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -24,9 +25,13 @@ from domainiq.cli import create_parser
 from domainiq.config import Config
 from domainiq.deserializers import parse_dns_result, parse_whois_result
 from domainiq.formatters import format_api_params
+from domainiq.http import RequestsTransport
 from domainiq.parsers import try_parse_date as _try_parse_date
 from domainiq.validators import (
+    _is_ip_like_domain,
+    _validate_label,
     ensure_positive_int,
+    validate_date_string,
     validate_domain,
     validate_email,
     validate_ipv4,
@@ -60,6 +65,51 @@ class TestDomainIQClientUnit:
             assert client.config.api_key == "test_key"
             assert hasattr(client, "_transport")
 
+    def test_del_noops_without_transport(self) -> None:
+        client = DomainIQClient.__new__(DomainIQClient)
+        client.__del__()
+
+    def test_del_noops_when_transport_is_closed(self) -> None:
+        client = DomainIQClient.__new__(DomainIQClient)
+        client._transport = RequestsTransport()
+        client._transport.close()
+
+        with warnings.catch_warnings(record=True) as caught:
+            client.__del__()
+
+        assert caught == []
+
+    def test_del_warns_when_transport_is_still_open(self) -> None:
+        client = DomainIQClient.__new__(DomainIQClient)
+        client._transport = RequestsTransport()
+
+        with pytest.warns(ResourceWarning, match="Unclosed DomainIQClient"):
+            client.__del__()
+
+        client._transport.close()
+
+    def test_del_safe_during_interpreter_shutdown_regression(self) -> None:
+        """Regression: __del__ raised AttributeError when warnings module was None."""
+        code = (
+            "import warnings\n"
+            "from domainiq import DomainIQClient\n"
+            "from domainiq.http import RequestsTransport\n"
+            "client = DomainIQClient.__new__(DomainIQClient)\n"
+            "client._transport = RequestsTransport()\n"
+            "# Simulate interpreter shutdown by replacing warnings.warn\n"
+            "warnings.warn = None\n"
+            "client.__del__()\n"
+            "print('OK')\n"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert "OK" in completed.stdout
+
 
 class TestConfigUnit:
     """Unit tests for Config."""
@@ -71,21 +121,17 @@ class TestConfigUnit:
         assert config.base_url == "https://www.domainiq.com/api"
 
     def test_config_validation_invalid_timeout(self):
-        config = Config(api_key="test_key", timeout=-1)
-
         with pytest.raises(DomainIQConfigurationError) as exc_info:
-            config.validate()
+            Config(api_key="test_key", timeout=-1)
 
         assert "Timeout must be positive" in str(exc_info.value)
 
     @pytest.mark.parametrize("timeout", ["abc", True, float("nan"), float("inf")])
     def test_config_validation_rejects_invalid_timeout_types(self, timeout):
-        config = Config(api_key="test_key", timeout=timeout)
-
         with pytest.raises(
             DomainIQConfigurationError, match="Timeout must be a finite number"
         ):
-            config.validate()
+            Config(api_key="test_key", timeout=timeout)
 
     @pytest.mark.parametrize(
         ("kwargs", "message"),
@@ -114,10 +160,8 @@ class TestConfigUnit:
         ],
     )
     def test_config_validation_rejects_invalid_integer_types(self, kwargs, message):
-        config = Config(api_key="test_key", **kwargs)
-
         with pytest.raises(DomainIQConfigurationError, match=message):
-            config.validate()
+            Config(api_key="test_key", **kwargs)
 
     def test_client_initialization_reports_invalid_numeric_config(self):
         with pytest.raises(
@@ -134,6 +178,25 @@ class TestConfigUnit:
 
         assert "API key is required" in str(exc_info.value)
 
+    def test_config_validation_rejects_whitespace_only_api_key(self):
+        config = Config(api_key="test_key")
+        config.api_key = "   "
+
+        with pytest.raises(DomainIQConfigurationError) as exc_info:
+            config.validate()
+
+        assert "API key is required" in str(exc_info.value)
+
+    def test_config_validation_rejects_whitespace_only_base_url_regression(self):
+        """Regression: whitespace-only base_url passed validation but caused malformed requests."""
+        config = Config(api_key="test_key")
+        config.base_url = "   "
+
+        with pytest.raises(DomainIQConfigurationError) as exc_info:
+            config.validate()
+
+        assert "Base URL is required" in str(exc_info.value)
+
     def test_config_no_key_anywhere(self):
         with (
             patch.dict("os.environ", {}, clear=True),
@@ -146,6 +209,12 @@ class TestConfigUnit:
 
     def test_config_from_environment(self):
         with patch.dict("os.environ", {"DOMAINIQ_API_KEY": "env_key_123"}):
+            config = Config()
+            assert config.api_key == "env_key_123"
+
+    def test_config_from_environment_strips_whitespace_regression(self) -> None:
+        """Regression: env var value was not stripped, causing auth failures."""
+        with patch.dict("os.environ", {"DOMAINIQ_API_KEY": "  env_key_123  \n"}):
             config = Config()
             assert config.api_key == "env_key_123"
 
@@ -232,10 +301,8 @@ class TestConfigUnit:
         ],
     )
     def test_config_validation_invalid_connector_limits(self, kwargs, message):
-        config = Config(api_key="test_key", **kwargs)
-
         with pytest.raises(DomainIQConfigurationError, match=message):
-            config.validate()
+            Config(api_key="test_key", **kwargs)
 
     def test_set_config_path_reloads_key_from_new_file(self, tmp_path):
         initial = tmp_path / "initial"
@@ -267,7 +334,6 @@ class TestUtilsUnit:
         assert not validate_domain("example\n.com")
         assert not validate_domain("example.com\n")
         assert not validate_domain("192.0.2.1")
-        assert not validate_domain("999.999.999.999")
         assert not validate_domain("a" * 64 + ".com")
 
     def test_validate_ipv4_valid(self):
@@ -301,12 +367,67 @@ class TestUtilsUnit:
         assert not validate_email("user.@example.com")
         assert not validate_email("user..name@example.com")
 
+    def test_validate_date_string_valid(self):
+        assert validate_date_string("2023-01-01") == "2023-01-01"
+        assert validate_date_string("2024-12-31") == "2024-12-31"
+
+    def test_validate_date_string_invalid(self):
+        with pytest.raises(DomainIQValidationError):
+            validate_date_string("")
+        with pytest.raises(DomainIQValidationError):
+            validate_date_string("not-a-date")
+        with pytest.raises(DomainIQValidationError):
+            validate_date_string("2023/01/01")
+        with pytest.raises(DomainIQValidationError):
+            validate_date_string("23-01-01")
+
+    def test_validate_date_string_strips_whitespace_regression(self):
+        assert validate_date_string(" 2023-01-01 ") == "2023-01-01"
+        assert validate_date_string("2024-12-31\t") == "2024-12-31"
+
     @pytest.mark.parametrize("value", [True, False, 1.5, "3"])
     def test_ensure_positive_int_rejects_non_int_values(self, value):
         with pytest.raises(DomainIQValidationError) as exc_info:
             ensure_positive_int("report_id", value)
 
         assert exc_info.value.param_name == "report_id"
+
+    def test_ensure_positive_int_accepts_whole_number_float(self) -> None:
+        """Regression: 10.0 was rejected because isinstance(10.0, int) is False."""
+        assert ensure_positive_int("report_id", 10.0) == 10
+
+    def test_ensure_positive_int_rejects_non_whole_float(self) -> None:
+        with pytest.raises(DomainIQValidationError):
+            ensure_positive_int("report_id", 10.5)
+
+    def test_ensure_positive_int_accepts_integral_types_regression(self) -> None:
+        from decimal import Decimal
+
+        assert ensure_positive_int("report_id", Decimal(5)) == 5
+        assert ensure_positive_int("report_id", Decimal("5.0")) == 5
+
+    def test_ensure_positive_int_rejects_decimal_nan_regression(self) -> None:
+        """Regression: Decimal('NaN') crashed with unhandled ValueError."""
+        from decimal import Decimal
+
+        with pytest.raises(DomainIQValidationError, match="must be a positive integer"):
+            ensure_positive_int("report_id", Decimal("NaN"))
+
+    def test_ensure_positive_int_rejects_decimal_infinity_regression(self) -> None:
+        """Regression: Decimal('Infinity') crashed with unhandled ValueError."""
+        from decimal import Decimal
+
+        with pytest.raises(DomainIQValidationError, match="must be a positive integer"):
+            ensure_positive_int("report_id", Decimal("Infinity"))
+
+    def test_validate_date_string_raises_for_non_string_input(self) -> None:
+        """Regression: passing an int or datetime raises DomainIQValidationError."""
+        from domainiq.validators import validate_date_string
+
+        with pytest.raises(DomainIQValidationError):
+            validate_date_string(123)
+        with pytest.raises(DomainIQValidationError):
+            validate_date_string(datetime.now())
 
 
 class TestModelsUnit:
@@ -614,6 +735,15 @@ class TestLogicBugRegressions:
         assert not validate_ipv4("1..2.3")
         assert not validate_ipv4(".1.2.3")
 
+    def test_is_ip_like_domain_rejects_invalid_dotted_quad(self):
+        assert not _is_ip_like_domain("999.999.999.999")
+        assert not _is_ip_like_domain("256.1.2.3")
+
+    def test_validate_label_rejects_invalid_unicode(self):
+        assert not _validate_label("hello world")
+        assert not _validate_label("test\x00")
+        assert not _validate_label("test\n")
+
     def test_dns_result_maps_aaaa_from_ip_field(self):
         data = {
             "results": [
@@ -679,6 +809,18 @@ class TestLogicBugRegressions:
         assert len(result.records) == 1
         assert result.records[0].type == "A"
         assert result.records[0].value == "192.0.2.1"
+
+    def test_dns_result_empty_results_list_falls_back_to_records(self):
+        data = {
+            "results": [],
+            "records": [{"name": "fallback.com", "type": "A", "ip": "192.0.2.1"}],
+        }
+
+        result = parse_dns_result(data)
+
+        assert result.domain == "fallback.com"
+        assert len(result.records) == 1
+        assert result.records[0].type == "A"
 
     def test_dns_result_prefers_soa_record_name_for_domain(self):
         data = {
@@ -777,6 +919,12 @@ class TestLogicBugRegressions:
         assert '"' in formatted["payload"]
         assert "'" not in formatted["payload"]
         assert json.loads(formatted["payload"]) == [{"a": 1}, {"b": 2}]
+
+    def test_format_api_params_dict_with_datetime_uses_default_str(self):
+        from datetime import datetime
+
+        formatted = format_api_params({"filter": {"date": datetime(2024, 1, 1)}})
+        assert "2024-01-01" in formatted["filter"]
 
     def test_cli_email_alert_default_is_true(self):
         parser = create_parser()

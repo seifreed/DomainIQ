@@ -192,6 +192,38 @@ class TestConcurrentLookupCriticalCancel:
         )
         assert [result.domain for result in results] == ["a", "b", "c"]
 
+    async def test_base_exception_is_critical_regression(self):
+        class _TestBaseException(BaseException):
+            pass
+
+        async def ok() -> WhoisResult:
+            await asyncio.sleep(0)
+            return WhoisResult(domain="ok.com")
+
+        async def raise_base() -> WhoisResult:
+            await asyncio.sleep(0)
+            raise _TestBaseException
+
+        with pytest.raises(DomainIQPartialResultsError) as exc_info:
+            await _run_with_critical_cancel([ok(), raise_base()], WhoisResult)
+
+        assert isinstance(exc_info.value.__cause__, _TestBaseException)
+
+    async def test_cancelled_error_is_not_critical_regression(self):
+        """Regression: CancelledError was treated as a critical exception."""
+
+        async def ok() -> WhoisResult:
+            await asyncio.sleep(0)
+            return WhoisResult(domain="ok.com")
+
+        async def cancelled() -> WhoisResult:
+            await asyncio.sleep(0)
+            raise asyncio.CancelledError
+
+        results = await _run_with_critical_cancel([ok(), cancelled()], WhoisResult)
+        assert results[0] == WhoisResult(domain="ok.com")
+        assert results[1] is None
+
 
 @pytest.mark.asyncio
 class TestAsyncClientConcurrentLookup:
@@ -247,6 +279,34 @@ class TestAsyncClientConcurrentLookup:
             if target == "bad":
                 msg = "temporary API failure"
                 raise DomainIQAPIError(msg)
+            return WhoisResult(domain=target)
+
+        with caplog.at_level("WARNING", logger="domainiq.async_client"):
+            results = await mock_async_client._concurrent_lookup(
+                lookup,
+                ["ok", "bad", "later"],
+                max_concurrent=2,
+                label="WHOIS",
+                result_type=WhoisResult,
+            )
+
+        assert [result.domain if result else None for result in results] == [
+            "ok",
+            None,
+            "later",
+        ]
+        assert "WHOIS lookup failed for bad" in caplog.text
+
+    async def test_validation_error_is_noncritical_regression(
+        self,
+        mock_async_client: AsyncDomainIQClient,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Regression: DomainIQValidationError cancelled all concurrent lookups."""
+
+        async def lookup(target: str) -> WhoisResult:
+            if target == "bad":
+                raise DomainIQValidationError("invalid target", param_name="domain")
             return WhoisResult(domain=target)
 
         with caplog.at_level("WARNING", logger="domainiq.async_client"):

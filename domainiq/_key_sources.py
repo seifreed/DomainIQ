@@ -31,9 +31,10 @@ class _ParamKeySource:
         self._key = api_key
 
     def get_key(self) -> str | None:
-        if self._key:
+        key = self._key.strip() if self._key else None
+        if key:
             logger.debug("Using API key from parameter")
-        return self._key
+        return key or None
 
 
 class _EnvKeySource:
@@ -42,6 +43,7 @@ class _EnvKeySource:
     def get_key(self) -> str | None:
         key = os.getenv("DOMAINIQ_API_KEY")
         if key:
+            key = key.strip()
             logger.debug("Using API key from DOMAINIQ_API_KEY environment variable")
         return key or None
 

@@ -25,13 +25,13 @@ from ._dispatch_reports import _dispatch_reports
 from ._dispatch_search import _dispatch_search
 from ._handlers import build_snapshot_options, handle_dns_lookup, handle_whois_lookup
 from ._serialization import print_result
-from ._types import DnsArgs, WhoisArgs
+from ._types import DnsArgs, SnapshotArgs, WhoisArgs
 from ._validation import validate_args
 
 
 def _dispatch_whois(client: WhoisProtocol, args: argparse.Namespace) -> _CommandResult:
     """Dispatch WHOIS commands. Returns (executed, had_errors)."""
-    if args.whois_lookup:
+    if args.whois_lookup is not None:
         return _run_command(
             partial(handle_whois_lookup, client, WhoisArgs.from_namespace(args))
         )
@@ -40,7 +40,7 @@ def _dispatch_whois(client: WhoisProtocol, args: argparse.Namespace) -> _Command
 
 def _dispatch_dns(client: DNSProtocol, args: argparse.Namespace) -> _CommandResult:
     """Dispatch DNS commands. Returns (executed, had_errors)."""
-    if args.dns_lookup:
+    if args.dns_lookup is not None:
         return _run_command(
             partial(handle_dns_lookup, client, DnsArgs.from_namespace(args))
         )
@@ -52,14 +52,14 @@ def _dispatch_domain_analysis(
 ) -> _CommandResult:
     """Dispatch domain analysis commands. Returns (executed, had_errors)."""
     results = []
-    if args.domain_categorize:
+    if args.domain_categorize is not None:
         results.append(
             _run_command(
                 lambda: print_result(client.domain_categorize(args.domain_categorize))
             )
         )
-    if args.domain_snapshot:
-        opts = build_snapshot_options(args)
+    if args.domain_snapshot is not None:
+        opts = build_snapshot_options(SnapshotArgs.from_namespace(args))
         results.append(
             _run_command(
                 lambda: print_result(
@@ -67,8 +67,8 @@ def _dispatch_domain_analysis(
                 )
             )
         )
-    if args.domain_snapshot_history:
-        opts = build_snapshot_options(args)
+    if args.domain_snapshot_history is not None:
+        opts = build_snapshot_options(SnapshotArgs.from_namespace(args))
         results.append(
             _run_command(
                 lambda: print_result(
@@ -76,9 +76,11 @@ def _dispatch_domain_analysis(
                         args.domain_snapshot_history,
                         width=opts.width,
                         height=opts.height,
-                        limit=args.snapshot_limit
-                        if args.snapshot_limit is not None
-                        else SNAPSHOT_DEFAULT_LIMIT,
+                        limit=(
+                            args.snapshot_limit
+                            if args.snapshot_limit is not None
+                            else SNAPSHOT_DEFAULT_LIMIT
+                        ),
                     )
                 )
             )

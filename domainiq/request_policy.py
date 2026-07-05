@@ -35,6 +35,11 @@ class RequestPolicy:
     max_retries: int
     retry_delay: int
 
+    def __post_init__(self) -> None:
+        if self.max_retries < 0:
+            msg = f"max_retries must be non-negative, got {self.max_retries}"
+            raise ValueError(msg)
+
 
 def _compute_retry_delay(
     status_code: int,
@@ -49,7 +54,7 @@ def _compute_retry_delay(
 
     if status_code == HTTP_TOO_MANY_REQUESTS and attempt < policy.max_retries:
         if retry_after_secs is not None:
-            return float(retry_after_secs)
+            return max(1.0, float(retry_after_secs))
         return compute_backoff(policy.retry_delay, attempt)
 
     return None
@@ -58,10 +63,12 @@ def _compute_retry_delay(
 def _handle_retryable_status(
     status_code: int,
     response_text: str,
+    response_headers: Mapping[str, str],
     attempt: int,
     policy: RequestPolicy,
 ) -> float | None:
-    delay = _compute_retry_delay(status_code, None, attempt, policy)
+    retry_after_secs = parse_retry_after(dict(response_headers))
+    delay = _compute_retry_delay(status_code, retry_after_secs, attempt, policy)
     if delay is not None:
         logger.warning(
             "Server error %s, retrying in %ss (attempt %s/%s)",
@@ -108,7 +115,9 @@ def classify_http_response(
 ) -> float | None:
     """Return a retry delay, None for success, or raise a fatal error."""
     if status_code in _RETRYABLE_STATUSES:
-        return _handle_retryable_status(status_code, response_text, attempt, policy)
+        return _handle_retryable_status(
+            status_code, response_text, response_headers, attempt, policy
+        )
     if status_code == HTTP_UNAUTHORIZED:
         msg = "Invalid API key or authentication failed"
         raise DomainIQAuthenticationError(msg)

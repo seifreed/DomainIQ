@@ -33,7 +33,7 @@ def _dispatch_reports(
     results = [
         _run_report_command(client, args, command)
         for command in _REPORT_COMMANDS
-        if getattr(args, command)
+        if getattr(args, command) is not None
     ]
     return _aggregate(results)
 

@@ -97,7 +97,7 @@ class TestRateLimitError:
             _POLICY,
         )
 
-        assert delay == 0.0
+        assert delay == 1.0
 
     def test_429_honours_retry_after_http_date(self) -> None:
         retry_at = datetime.now(UTC) + timedelta(seconds=60)

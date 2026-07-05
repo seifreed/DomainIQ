@@ -148,6 +148,7 @@ class Config:
             loader if loader is not None else _ApiKeyLoader(self.config_file_path)
         )
         self.api_key = self._loader.load(api_key)
+        self.validate()
 
     def set_config_path(self, path: str | Path, api_key: str | None = None) -> None:
         """Set a custom config file path and reload the API key.
@@ -158,7 +159,8 @@ class Config:
                 over the config file.
         """
         self.config_file_path = Path(path)
-        self._loader = _ApiKeyLoader(self.config_file_path)
+        if isinstance(self._loader, _ApiKeyLoader):
+            self._loader = _ApiKeyLoader(self.config_file_path)
         self.api_key = self._loader.load(api_key)
         self.validate()
 
@@ -168,11 +170,11 @@ class Config:
         Raises:
             DomainIQConfigurationError: If configuration is invalid.
         """
-        if not self.api_key:
+        if not self.api_key or not self.api_key.strip():
             msg = "API key is required"
             raise DomainIQConfigurationError(msg)
 
-        if not self.base_url:
+        if not self.base_url or not self.base_url.strip():
             msg = "Base URL is required"
             raise DomainIQConfigurationError(msg)
 

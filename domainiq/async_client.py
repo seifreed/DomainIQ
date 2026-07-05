@@ -1,6 +1,7 @@
 """Asynchronous client for the DomainIQ API."""
 
 import asyncio
+import contextlib
 import logging
 import warnings
 from collections.abc import Callable, Coroutine
@@ -34,16 +35,18 @@ from .exceptions import (
     DomainIQError,
     DomainIQRateLimitError,
     DomainIQTimeoutError,
+    DomainIQValidationError,
 )
 from .http import AiohttpTransport, AsyncTransport
 from .validators import ensure_positive_int, is_ip_address
 
 logger = logging.getLogger(__name__)
 
+_HTTP_SERVER_ERROR_MIN = 500
 _LT = TypeVar("_LT")
 
 
-def _make_default_async_transport(config: "Config") -> AsyncTransport:
+def _make_default_async_transport(config: Config) -> AsyncTransport:
     """Create default AiohttpTransport from config. ImportError → DomainIQError."""
     try:
         return AiohttpTransport(
@@ -180,20 +183,27 @@ class AsyncDomainIQClient(
                     DomainIQRateLimitError,
                 ):
                     raise
+                except DomainIQAPIError as e:
+                    if (
+                        e.status_code is not None
+                        and e.status_code >= _HTTP_SERVER_ERROR_MIN
+                    ):
+                        raise
+                    logger.warning("%s lookup failed for %s: %s", label, target, e)
+                    return _LookupFailure(target, e)
                 except (
-                    DomainIQAPIError,
                     DomainIQTimeoutError,
+                    DomainIQValidationError,
                     TimeoutError,
                     OSError,
                 ) as e:
                     logger.warning("%s lookup failed for %s: %s", label, target, e)
                     return _LookupFailure(target, e)
 
-        raw = await _run_with_critical_cancel(
+        return await _run_with_critical_cancel(
             [_bounded(t) for t in targets],
             result_type,
         )
-        return [None if isinstance(r, _LookupFailure) else r for r in raw]
 
     async def concurrent_whois_lookup(
         self,
@@ -260,9 +270,15 @@ class AsyncDomainIQClient(
         if transport is None:
             return
         if getattr(transport, "is_open", False):
-            warnings.warn(
-                f"Unclosed {self.__class__.__name__}. "
-                "Use 'async with' or call 'await client.close()' explicitly.",
-                ResourceWarning,
-                stacklevel=2,
-            )
+            sync_close = getattr(transport, "try_sync_close", None)
+            if sync_close is not None:
+                with contextlib.suppress(Exception):
+                    sync_close()
+            warn = getattr(warnings, "warn", None)
+            if warn is not None:
+                warn(
+                    f"Unclosed {self.__class__.__name__}. "
+                    "Use 'async with' or call 'await client.close()' explicitly.",
+                    ResourceWarning,
+                    stacklevel=2,
+                )

@@ -4,6 +4,7 @@ import ipaddress
 import logging
 import re
 from datetime import date
+from decimal import Decimal
 
 from .exceptions import DomainIQValidationError
 
@@ -15,10 +16,10 @@ MIN_DOMAIN_LABELS = 2
 MAX_EMAIL_PARTS = 2
 IPV4_VERSION = 4
 IPV6_VERSION = 6
+IPV4_OCTET_COUNT = 4
 
 _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
 _EMAIL_LOCAL_PATTERN = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
-_IPV4_DOTTED_QUAD_PATTERN = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
 
 
 def _is_ip_like_domain(value: str) -> bool:
@@ -26,7 +27,7 @@ def _is_ip_like_domain(value: str) -> bool:
     try:
         ipaddress.ip_address(value)
     except ValueError:
-        return bool(_IPV4_DOTTED_QUAD_PATTERN.fullmatch(value))
+        return False
     return True
 
 
@@ -35,13 +36,8 @@ def _validate_label(label: str) -> bool:
     try:
         # Intentional rebind: normalize IDN label before length/char validation.
         label = label.encode("idna").decode("ascii")
-    except (UnicodeError, UnicodeDecodeError):
-        if not label.isascii():
-            return (
-                0 < len(label) <= MAX_LABEL_LENGTH
-                and not label.startswith("-")
-                and not label.endswith("-")
-            )
+    except UnicodeError:
+        return False
     if not (0 < len(label) <= MAX_LABEL_LENGTH):
         return False
     if label.startswith("-") or label.endswith("-"):
@@ -58,15 +54,20 @@ def validate_domain(domain: str) -> bool:
     Returns:
         True if domain appears valid, False otherwise
     """
-    if not domain or not isinstance(domain, str):
-        return False
-    if len(domain) > MAX_DOMAIN_LENGTH:
-        return False
-    if _is_ip_like_domain(domain):
-        return False
-    if domain.startswith(".") or domain.endswith(".") or ".." in domain:
+    if (
+        not domain
+        or not isinstance(domain, str)
+        or len(domain) > MAX_DOMAIN_LENGTH
+        or _is_ip_like_domain(domain)
+        or domain.startswith(".")
+        or domain.endswith(".")
+        or ".." in domain
+    ):
         return False
     labels = domain.split(".")
+    # Reject strings that look like IPv4 addresses (4 numeric octets).
+    if len(labels) == IPV4_OCTET_COUNT and all(part.isdigit() for part in labels):
+        return False
     if len(labels) < MIN_DOMAIN_LABELS:
         return False
     return all(_validate_label(label) for label in labels)
@@ -163,6 +164,13 @@ def validate_whois_target(
     domain_provided = domain is not None
     ip_provided = ip is not None
 
+    if domain is not None and not isinstance(domain, str):
+        msg = f"domain must be a string, got {type(domain).__name__}"
+        raise DomainIQValidationError(msg, param_name="domain")
+    if ip is not None and not isinstance(ip, str):
+        msg = f"ip must be a string, got {type(ip).__name__}"
+        raise DomainIQValidationError(msg, param_name="ip")
+
     if domain is not None:
         domain = domain.strip() or None
     if ip is not None:
@@ -192,16 +200,28 @@ def validate_whois_target(
 
 def ensure_positive_int(field_name: str, value: object) -> int:
     """Raise DomainIQValidationError if value is not a positive integer."""
-    if not isinstance(value, int) or isinstance(value, bool):
+    if (
+        (isinstance(value, int) and not isinstance(value, bool))
+        or (isinstance(value, float) and value.is_integer())
+        or (
+            isinstance(value, Decimal)
+            and not value.is_nan()
+            and not value.is_infinite()
+            and value == int(value)
+        )
+    ):
+        int_value = int(value)
+    else:
         msg = f"{field_name} must be a positive integer, got {value!r}"
         raise DomainIQValidationError(msg, param_name=field_name)
-    if value <= 0:
-        msg = f"{field_name} must be positive, got {value}"
+
+    if int_value <= 0:
+        msg = f"{field_name} must be positive, got {value!r}"
         raise DomainIQValidationError(msg, param_name=field_name)
-    return value
+    return int_value
 
 
-def validate_date_string(date_str: str) -> str | None:
+def validate_date_string(date_str: str) -> str:
     """Parse and validate date string for API usage.
 
     Only accepts unambiguous ISO format YYYY-MM-DD.
@@ -210,12 +230,17 @@ def validate_date_string(date_str: str) -> str | None:
         date_str: Date string in YYYY-MM-DD format
 
     Returns:
-        Validated date string (YYYY-MM-DD) or None if invalid
-    """
-    if not date_str:
-        return None
+        Validated date string (YYYY-MM-DD)
 
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+    Raises:
+        DomainIQValidationError: If the date string is invalid.
+    """
+    if not isinstance(date_str, str) or not date_str:
+        msg = f"Invalid date format: {date_str!r} (expected YYYY-MM-DD)"
+        raise DomainIQValidationError(msg, param_name="date")
+
+    date_str = date_str.strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str):
         try:
             date.fromisoformat(date_str)
         except ValueError:
@@ -223,5 +248,5 @@ def validate_date_string(date_str: str) -> str | None:
         else:
             return date_str
 
-    logger.warning("Invalid date format: %s (expected YYYY-MM-DD)", date_str)
-    return None
+    msg = f"Invalid date format: {date_str} (expected YYYY-MM-DD)"
+    raise DomainIQValidationError(msg, param_name="date")

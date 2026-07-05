@@ -1,6 +1,7 @@
 """Shared helpers for CLI command dispatchers."""
 
 import argparse
+import contextlib
 import sys
 from collections.abc import Callable
 from typing import Any, NamedTuple
@@ -21,8 +22,9 @@ def _run_command(fn: Callable[[], None]) -> _CommandResult:
     try:
         fn()
         return _CommandResult(executed=True, errored=False)
-    except (DomainIQError, ValueError, OSError, TypeError, RuntimeError) as e:
-        sys.stderr.write(f"Error: {e}\n")
+    except (DomainIQError, OSError) as e:
+        with contextlib.suppress(OSError):
+            sys.stderr.write(f"Error: {e}\n")
         return _CommandResult(executed=True, errored=True)
 
 

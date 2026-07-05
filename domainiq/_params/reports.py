@@ -17,6 +17,7 @@ def _validate_required_string(value: str, param_name: str) -> None:
 
 
 def build_domain_report_params(domain: str) -> dict[str, Any]:
+    domain = domain.strip()
     if not validate_domain(domain):
         msg = f"Invalid domain: {domain}"
         raise DomainIQValidationError(msg, param_name="domain")
@@ -25,15 +26,18 @@ def build_domain_report_params(domain: str) -> dict[str, Any]:
 
 def build_name_report_params(name: str) -> dict[str, Any]:
     _validate_required_string(name, "name")
-    return simple_service_params("name_report", "name", name)
+    return simple_service_params("name_report", "name", name.strip())
 
 
 def build_organization_report_params(organization: str) -> dict[str, Any]:
     _validate_required_string(organization, "organization")
-    return simple_service_params("organization_report", "organization", organization)
+    return simple_service_params(
+        "organization_report", "organization", organization.strip()
+    )
 
 
 def build_email_report_params(email: str) -> dict[str, Any]:
+    email = email.strip()
     if not validate_email(email):
         msg = f"Invalid email: {email}"
         raise DomainIQValidationError(msg, param_name="email")
@@ -41,6 +45,7 @@ def build_email_report_params(email: str) -> dict[str, Any]:
 
 
 def build_ip_report_params(ip: str) -> dict[str, Any]:
+    ip = ip.strip()
     if not is_ip_address(ip):
         msg = f"Invalid IP address: {ip}"
         raise DomainIQValidationError(msg, param_name="ip")

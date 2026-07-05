@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from domainiq._request_pipeline import execute_async_request, execute_sync_request
+from domainiq.exceptions import DomainIQAPIError
 from domainiq.http._responses import SyncResponse
 from domainiq.request_policy import RequestPolicy
 
@@ -14,9 +15,7 @@ class _FakeSyncTransport:
         self._outcomes = outcomes
         self._index = 0
 
-    def get(
-        self, url: str, params: dict[str, str], timeout: float
-    ) -> SyncResponse:
+    def get(self, url: str, params: dict[str, str], timeout: float) -> SyncResponse:
         outcome = self._outcomes[self._index]
         self._index += 1
         if isinstance(outcome, BaseException):
@@ -63,20 +62,17 @@ class TestExecuteSyncRequest:
         )
         assert result == {"ok": True}
 
-    def test_unicode_decode_error_retried(self) -> None:
+    def test_unicode_decode_error_raises_immediately(self) -> None:
         transport = _FakeSyncTransport(
-            [
-                UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid"),
-                _ok_response(),
-            ]
+            [UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")]
         )
-        result = execute_sync_request(
-            transport,  # type: ignore[arg-type]
-            {"service": "whois"},
-            "json",
-            _policy(max_retries=1),
-        )
-        assert result == {"ok": True}
+        with pytest.raises(DomainIQAPIError):
+            execute_sync_request(
+                transport,  # type: ignore[arg-type]
+                {"service": "whois"},
+                "json",
+                _policy(max_retries=3),
+            )
 
     def test_runtime_error_closed_retried(self) -> None:
         transport = _FakeSyncTransport(
@@ -136,20 +132,17 @@ class TestExecuteAsyncRequest:
         )
         assert result == {"ok": True}
 
-    async def test_unicode_decode_error_retried(self) -> None:
+    async def test_unicode_decode_error_raises_immediately(self) -> None:
         transport = _FakeAsyncTransport(
-            [
-                UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid"),
-                _ok_response(),
-            ]
+            [UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")]
         )
-        result = await execute_async_request(
-            transport,  # type: ignore[arg-type]
-            {"service": "whois"},
-            "json",
-            _policy(max_retries=1),
-        )
-        assert result == {"ok": True}
+        with pytest.raises(DomainIQAPIError):
+            await execute_async_request(
+                transport,  # type: ignore[arg-type]
+                {"service": "whois"},
+                "json",
+                _policy(max_retries=3),
+            )
 
     async def test_runtime_error_closed_retried(self) -> None:
         transport = _FakeAsyncTransport(
@@ -166,7 +159,9 @@ class TestExecuteAsyncRequest:
         )
         assert result == {"ok": True}
 
-    async def test_runtime_error_transport_closed_variant_retried_regression(self) -> None:
+    async def test_runtime_error_transport_closed_variant_retried_regression(
+        self,
+    ) -> None:
         """Regression: RuntimeError with 'shut' instead of 'closed' was not retried."""
         transport = _FakeAsyncTransport(
             [
@@ -207,17 +202,17 @@ class TestExecuteAsyncRequest:
             )
 
     def test_unicode_decode_error_preserves_cause_regression(self) -> None:
-        """Regression: UnicodeDecodeError cause was lost during retry wrapping."""
+        """Regression: UnicodeDecodeError is raised immediately with cause preserved."""
         original = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")
-        transport = _FakeSyncTransport([original, _ok_response()])
-        execute_sync_request(
-            transport,  # type: ignore[arg-type]
-            {"service": "whois"},
-            "json",
-            _policy(max_retries=1),
-        )
-        # Transport was called twice → request succeeded after retry.
-        assert transport._index == 2
+        transport = _FakeSyncTransport([original])
+        with pytest.raises(DomainIQAPIError) as exc_info:
+            execute_sync_request(
+                transport,  # type: ignore[arg-type]
+                {"service": "whois"},
+                "json",
+                _policy(max_retries=3),
+            )
+        assert exc_info.value.__cause__ is original
 
     def test_runtime_error_closed_preserves_cause_regression(self) -> None:
         """Regression: RuntimeError cause was lost during retry wrapping."""

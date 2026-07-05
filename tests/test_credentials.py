@@ -77,6 +77,26 @@ class TestCredentialPrompting:
         assert target.read_text() == "default_key"
         assert target.stat().st_mode & 0o777 == 0o600
 
+    def test_prompted_key_enforces_permissions_on_existing_file_regression(
+        self, tmp_path: Path
+    ) -> None:
+        """Regression: existing files with broad permissions were not restricted."""
+        target = tmp_path / ".domainiq"
+        target.write_text("old_key")
+        target.chmod(0o644)
+
+        with (
+            patch("pathlib.Path.home", return_value=tmp_path),
+            patch("domainiq.cli._credentials._is_interactive", return_value=True),
+            patch(
+                "domainiq.cli._credentials._prompt_with_timeout",
+                return_value="new_key",
+            ),
+        ):
+            prompt_for_api_key(None)
+
+        assert target.stat().st_mode & 0o777 == 0o600
+
 
 class TestPromptWithTimeout:
     def test_prompt_without_sigalrm_uses_plain_input(
@@ -134,3 +154,16 @@ class TestPromptWithTimeout:
             credentials.signal.SIGALRM, old_handler
         )
         assert mock_alarm.call_args_list == [call(5), call(0)]
+
+    def test_prompt_fallback_when_signal_fails_from_thread(self) -> None:
+        with (
+            patch("builtins.input", return_value=" api-key "),
+            patch(
+                "domainiq.cli._credentials.signal.signal",
+                side_effect=ValueError("signal only works in main thread"),
+            ) as mock_signal,
+        ):
+            result = _prompt_with_timeout("prompt: ", 5)
+
+        assert result == "api-key"
+        mock_signal.assert_called_once()

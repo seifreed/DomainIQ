@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import time
@@ -19,7 +20,7 @@ def _is_interactive() -> bool:
     """Return True when both stdin and stdout are attached to a TTY."""
     try:
         return os.isatty(0) and os.isatty(1)
-    except (AttributeError, OSError):
+    except AttributeError, OSError:
         return False
 
 
@@ -32,7 +33,11 @@ def _prompt_with_timeout(prompt: str, timeout: int) -> str:
         msg = "Prompt timed out"
         raise TimeoutError(msg)
 
-    old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    try:
+        old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    except ValueError:
+        # signal.signal() raises ValueError when called from a non-main thread.
+        return input(prompt).strip()
     old_alarm = signal.alarm(timeout)
     start = time.monotonic()
     try:
@@ -53,8 +58,12 @@ def _save_api_key(config_path: Path, api_key: str) -> None:
         os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
         0o600,
     )
-    with os.fdopen(fd, "w") as file_obj:
-        file_obj.write(api_key)
+    try:
+        with os.fdopen(fd, "w") as file_obj:
+            file_obj.write(api_key)
+    finally:
+        with contextlib.suppress(OSError, FileNotFoundError):
+            config_path.chmod(0o600)
 
 
 def prompt_for_api_key(config_file: str | None) -> str:

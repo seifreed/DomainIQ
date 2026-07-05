@@ -17,7 +17,7 @@ def _dispatch_search(
 ) -> _CommandResult:
     """Dispatch search commands. Returns (executed, had_errors)."""
     results = []
-    if args.domain_search:
+    if args.domain_search is not None:
         results.append(
             _run_command(
                 partial(
@@ -25,7 +25,7 @@ def _dispatch_search(
                 )
             )
         )
-    if args.reverse_search_type and args.reverse_search:
+    if args.reverse_search_type is not None and args.reverse_search is not None:
         results.append(
             _run_command(
                 lambda: print_result(
@@ -37,11 +37,11 @@ def _dispatch_search(
                 )
             )
         )
-    if args.reverse_dns:
+    if args.reverse_dns is not None:
         results.append(
             _run_command(lambda: print_result(client.reverse_dns(args.reverse_dns)))
         )
-    if args.reverse_ip_type and args.reverse_ip_data:
+    if args.reverse_ip_type is not None and args.reverse_ip_data is not None:
         results.append(
             _run_command(
                 lambda: print_result(
@@ -49,7 +49,7 @@ def _dispatch_search(
                 )
             )
         )
-    if args.reverse_mx_type and args.reverse_mx_data:
+    if args.reverse_mx_type is not None and args.reverse_mx_data is not None:
         results.append(
             _run_command(
                 lambda: print_result(

@@ -1,6 +1,8 @@
 """Main client for the DomainIQ API."""
 
+import contextlib
 import logging
+import warnings
 from types import TracebackType
 from typing import Any, Self, Unpack
 
@@ -112,6 +114,23 @@ class DomainIQClient(
     def _make_csv_request(self, params: dict[str, Any]) -> str:
         """Make an API request expecting CSV response."""
         return _assert_csv_str(self._make_request(params, output_format=API_FORMAT_CSV))
+
+    def __del__(self) -> None:
+        """Warn if transport was not properly closed."""
+        transport = getattr(self, "_transport", None)
+        if transport is None:
+            return
+        if getattr(transport, "is_open", False):
+            with contextlib.suppress(Exception):
+                transport.close()
+            warn = getattr(warnings, "warn", None)
+            if warn is not None:
+                warn(
+                    f"Unclosed {self.__class__.__name__}. "
+                    "Use 'with' or call 'client.close()' explicitly.",
+                    ResourceWarning,
+                    stacklevel=2,
+                )
 
     def close(self) -> None:
         """Close the HTTP session."""

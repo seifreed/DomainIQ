@@ -250,9 +250,7 @@ class TestDispatchBulk:
         assert result.executed is True
         assert result.errored is False
         client.bulk_dns.assert_called_once_with(["example.com", "example.net"])
-        client.bulk_whois.assert_called_once_with(
-            ["example.org"], BulkWhoisType.CACHED
-        )
+        client.bulk_whois.assert_called_once_with(["example.org"], BulkWhoisType.CACHED)
         client.bulk_whois_ip.assert_called_once_with(["192.0.2.1"])
 
 
@@ -385,9 +383,7 @@ class TestDispatchMonitor:
 
         assert result.executed is True
         assert result.errored is False
-        client.add_monitor_item.assert_called_once_with(
-            42, "domain", ["example.com"]
-        )
+        client.add_monitor_item.assert_called_once_with(42, "domain", ["example.com"])
 
     def test_dispatch_command_reports_invalid_add_monitor_item_report_id(
         self, capsys: pytest.CaptureFixture[str]
@@ -428,6 +424,22 @@ class TestDispatchMonitor:
         captured = capsys.readouterr()
         assert "item_id" in captured.err
 
+    def test_modify_typo_strength_uses_constants_regression(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Regression: typo strength bounds were hardcoded instead of using constants."""
+        from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
+
+        client = _mock_client()
+        args = _make_args(modify_typo_strength=["42", "7", str(TYPO_STRENGTH_MIN - 1)])
+
+        result = _dispatch_command(client, args)
+
+        assert result == _EXIT_ERROR
+        client.modify_typo_strength.assert_not_called()
+        captured = capsys.readouterr()
+        assert f"{TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}" in captured.err
+
 
 class TestRunCommand:
     def test_returns_executed_true_no_errors_on_success(self) -> None:
@@ -449,19 +461,14 @@ class TestRunCommand:
         captured = capsys.readouterr()
         assert msg in captured.err
 
-    def test_returns_had_errors_on_value_error(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_value_error_propagates_instead_of_being_caught(self) -> None:
         msg = "bad value"
 
         def _raise() -> None:
             raise ValueError(msg)
 
-        executed, had_errors = _run_command(_raise)
-        assert executed is True
-        assert had_errors is True
-        captured = capsys.readouterr()
-        assert msg in captured.err
+        with pytest.raises(ValueError, match=msg):
+            _run_command(_raise)
 
     def test_returns_had_errors_on_oserror(
         self, capsys: pytest.CaptureFixture[str]
@@ -477,32 +484,63 @@ class TestRunCommand:
         captured = capsys.readouterr()
         assert msg in captured.err
 
-    def test_type_error_is_caught_regression(self,
-        capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Regression: TypeError leaked raw traceback to stderr."""
+    def test_type_error_propagates(self) -> None:
         msg = "unexpected type mismatch"
 
         def _raise() -> None:
             raise TypeError(msg)
 
-        executed, had_errors = _run_command(_raise)
-        assert executed is True
-        assert had_errors is True
-        captured = capsys.readouterr()
-        assert msg in captured.err
+        with pytest.raises(TypeError, match=msg):
+            _run_command(_raise)
 
-    def test_runtime_error_is_caught_regression(self,
-        capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Regression: RuntimeError leaked raw traceback to stderr."""
+    def test_runtime_error_propagates(self) -> None:
         msg = "internal failure"
 
         def _raise() -> None:
             raise RuntimeError(msg)
 
-        executed, had_errors = _run_command(_raise)
+        with pytest.raises(RuntimeError, match=msg):
+            _run_command(_raise)
+
+    def test_attribute_error_propagates(self) -> None:
+        msg = "missing attribute"
+
+        def _raise() -> None:
+            raise AttributeError(msg)
+
+        with pytest.raises(AttributeError, match=msg):
+            _run_command(_raise)
+
+    def test_key_error_propagates(self) -> None:
+        msg = "missing key"
+
+        def _raise() -> None:
+            raise KeyError(msg)
+
+        with pytest.raises(KeyError, match=msg):
+            _run_command(_raise)
+
+    def test_index_error_propagates(self) -> None:
+        msg = "index out of range"
+
+        def _raise() -> None:
+            raise IndexError(msg)
+
+        with pytest.raises(IndexError, match=msg):
+            _run_command(_raise)
+
+    def test_broken_stderr_does_not_crash_regression(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: broken stderr caused unhandled OSError crash."""
+
+        class BrokenStderr:
+            def write(self, _msg: str) -> None:
+                raise OSError("broken pipe")
+
+        monkeypatch.setattr("sys.stderr", BrokenStderr())
+        executed, had_errors = _run_command(
+            lambda: (_ for _ in ()).throw(DomainIQError("fail"))
+        )
         assert executed is True
         assert had_errors is True
-        captured = capsys.readouterr()
-        assert msg in captured.err

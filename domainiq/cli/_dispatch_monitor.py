@@ -4,6 +4,7 @@ import argparse
 from collections.abc import Callable
 from functools import partial
 
+from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.protocols import MonitorProtocol
 
@@ -69,7 +70,7 @@ def _parse_int_arg(value: str, param_name: str) -> int:
 
 def _add_monitor_item(client: MonitorProtocol, args: argparse.Namespace) -> object:
     report_id, item_type, raw_items = args.add_monitor_item
-    items = [item.strip() for item in raw_items.split(",")]
+    items = [item.strip() for item in raw_items.split(",") if item.strip()]
     return client.add_monitor_item(
         _parse_int_arg(report_id, "report_id"),
         item_type,
@@ -96,6 +97,9 @@ def _modify_typo_strength(
     report_id = _parse_int_arg(args.modify_typo_strength[0], "report_id")
     item_id = _parse_int_arg(args.modify_typo_strength[1], "item_id")
     strength = _parse_int_arg(args.modify_typo_strength[2], "strength")
+    if not TYPO_STRENGTH_MIN <= strength <= TYPO_STRENGTH_MAX:
+        msg = f"strength must be between {TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}"
+        raise DomainIQValidationError(msg, param_name="strength")
     return client.modify_typo_strength(report_id, item_id, strength)
 
 

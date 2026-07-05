@@ -7,6 +7,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Literal
 
+from .exceptions import DomainIQAPIError
 from .request_policy import (
     RequestPolicy,
     classify_http_response,
@@ -83,11 +84,8 @@ def execute_sync_request(
             _sync_sleep(_handle_request_error(exc, attempt, policy))
             continue
         except UnicodeDecodeError as exc:
-            logger.warning("Unicode decode error on attempt %s: %s", attempt, exc)
-            _os_error = OSError(f"Response decoding failed: {exc}")
-            _os_error.__cause__ = exc
-            _sync_sleep(_handle_request_error(_os_error, attempt, policy))
-            continue
+            msg = f"Response decoding failed: {exc}"
+            raise DomainIQAPIError(msg, status_code=None) from exc
         except RuntimeError as exc:
             _msg = str(exc).lower()
             if any(k in _msg for k in ("closed", "shut", "terminated")):
@@ -105,7 +103,7 @@ def execute_sync_request(
         return decision[1]
 
     _unreachable = "unreachable"
-    raise AssertionError(_unreachable)  # pragma: no cover
+    raise RuntimeError(_unreachable)  # pragma: no cover
 
 
 async def execute_async_request(
@@ -126,11 +124,8 @@ async def execute_async_request(
             await _async_sleep(_handle_request_error(exc, attempt, policy))
             continue
         except UnicodeDecodeError as exc:
-            logger.warning("Unicode decode error on attempt %s: %s", attempt, exc)
-            _os_error = OSError(f"Response decoding failed: {exc}")
-            _os_error.__cause__ = exc
-            await _async_sleep(_handle_request_error(_os_error, attempt, policy))
-            continue
+            msg = f"Response decoding failed: {exc}"
+            raise DomainIQAPIError(msg, status_code=None) from exc
         except RuntimeError as exc:
             _msg = str(exc).lower()
             if any(k in _msg for k in ("closed", "shut", "terminated")):
@@ -148,7 +143,7 @@ async def execute_async_request(
         return decision[1]
 
     _unreachable = "unreachable"
-    raise AssertionError(_unreachable)  # pragma: no cover
+    raise RuntimeError(_unreachable)  # pragma: no cover
 
 
 __all__ = [

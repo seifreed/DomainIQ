@@ -12,7 +12,7 @@ from typing import Any, Unpack
 from ._request_pipeline import RequestPolicy
 from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
-from .exceptions import DomainIQAPIError
+from .exceptions import DomainIQAPIError, DomainIQConfigurationError
 from .formatters import format_api_params, sanitize_params_for_log
 from .utils import assert_json_dict, truncate_repr
 
@@ -29,6 +29,9 @@ class _BaseDomainIQClient:
         **kwargs: Unpack[ConfigKwargs],
     ) -> None:
         """Initialize base client state."""
+        if config is not None and kwargs:
+            msg = "Cannot specify both 'config' and configuration keyword arguments"
+            raise TypeError(msg)
         if config is None:
             config = Config(**kwargs)
         config.validate()
@@ -49,6 +52,12 @@ class _BaseDomainIQClient:
             request_params["output_mode"] = API_FORMAT_JSON
         elif output_format == API_FORMAT_CSV:
             request_params["output_mode"] = API_FORMAT_CSV
+        else:
+            msg = (
+                f"Unsupported output_format: {output_format!r}. "
+                "Use API_FORMAT_JSON or API_FORMAT_CSV."
+            )
+            raise DomainIQConfigurationError(msg)
         logger.debug(
             "Making API request with params: %s",
             sanitize_params_for_log(request_params),

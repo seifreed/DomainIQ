@@ -31,7 +31,7 @@ class DnsArgs:
 
     @classmethod
     def from_namespace(cls, args: argparse.Namespace) -> DnsArgs:
-        types = args.types.split(",") if args.types else None
+        types = [t for t in args.types.split(",") if t] if args.types else None
         return cls(query=args.dns_lookup, types=types)
 
 
@@ -65,4 +65,23 @@ class DomainSearchArgs:
             min_create_date=args.min_create_date,
             max_create_date=args.max_create_date,
             search_limit=args.search_limit,
+        )
+
+
+@dataclass(frozen=True)
+class SnapshotArgs:
+    width: int | None
+    height: int | None
+    snapshot_full: bool
+    no_cache: bool
+    raw: bool
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace) -> SnapshotArgs:
+        return cls(
+            width=args.width,
+            height=args.height,
+            snapshot_full=args.snapshot_full,
+            no_cache=args.no_cache,
+            raw=args.raw,
         )

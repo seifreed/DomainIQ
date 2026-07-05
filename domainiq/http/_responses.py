@@ -11,7 +11,11 @@ if TYPE_CHECKING:
 
 
 def _decode_json_body(text: str) -> dict[str, Any] | list[Any]:
-    decoded = _json.loads(text)
+    stripped = text.strip()
+    if not stripped:
+        msg = "Response body is empty"
+        raise ValueError(msg)
+    decoded = _json.loads(stripped)
     if isinstance(decoded, (dict, list)):
         return decoded
     msg = f"Expected JSON object or array, got {type(decoded).__name__}"

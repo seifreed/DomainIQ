@@ -25,6 +25,9 @@ class SyncTransport(Protocol):
         timeout: float,
     ) -> SyncResponse: ...
 
+    @property
+    def is_open(self) -> bool: ...
+
     def close(self) -> None: ...
 
 
