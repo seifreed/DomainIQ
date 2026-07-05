@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -36,6 +35,7 @@ from domainiq.constants import (
 from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQError
 from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
+from tests.conftest import StubClient
 
 
 def _make_args(**kwargs: Any) -> argparse.Namespace:
@@ -110,14 +110,14 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
-def _mock_client() -> MagicMock:
-    return MagicMock()
+def _mock_client() -> StubClient:
+    return StubClient()
 
 
 class TestDispatch:
     def test_dispatch_whois_returns_executed_true(self) -> None:
         client = _mock_client()
-        client.whois_lookup.return_value = {"domain": "example.com"}
+        client.set_result("whois_lookup", {"domain": "example.com"})
         args = _make_args(whois_lookup="example.com")
         executed, had_errors = _dispatch_whois(client, args)
         assert executed is True
@@ -132,7 +132,6 @@ class TestDispatch:
 
     def test_dispatch_dns_returns_executed_true(self) -> None:
         client = _mock_client()
-        client.dns_lookup.return_value = []
         args = _make_args(dns_lookup="example.com")
         executed, _had_errors = _dispatch_dns(client, args)
         assert executed is True
@@ -145,22 +144,20 @@ class TestDispatch:
 
     def test_dispatch_command_success(self) -> None:
         client = _mock_client()
-        client.whois_lookup.return_value = {}
         args = _make_args(whois_lookup="example.com")
         result = _dispatch_command(client, args)
         assert result == _EXIT_SUCCESS
 
     def test_dispatch_command_error_on_domainiq_error(self) -> None:
         client = _mock_client()
-        client.whois_lookup.side_effect = DomainIQError("API failure")
+        client.set_error("whois_lookup", DomainIQError("API failure"))
         args = _make_args(whois_lookup="example.com")
         result = _dispatch_command(client, args)
         assert result == _EXIT_ERROR
 
     def test_dispatch_command_partial_on_mixed_results(self) -> None:
         client = _mock_client()
-        client.whois_lookup.return_value = {}
-        client.dns_lookup.side_effect = DomainIQError("DNS failure")
+        client.set_error("dns_lookup", DomainIQError("DNS failure"))
         args = _make_args(whois_lookup="example.com", dns_lookup="example.com")
         result = _dispatch_command(client, args)
         assert result == _EXIT_PARTIAL
@@ -184,7 +181,6 @@ class TestDispatch:
 class TestDispatchSearch:
     def test_dispatch_domain_search_forwards_namespace_args(self) -> None:
         client = _mock_client()
-        client.domain_search.return_value = {}
         args = _make_args(
             domain_search=["brand"],
             match="all",
@@ -196,17 +192,13 @@ class TestDispatchSearch:
 
         assert result.executed is True
         assert result.errored is False
-        call_kwargs = client.domain_search.call_args.kwargs
+        call_kwargs = client.calls_to("domain_search")[-1].kwargs
         assert call_kwargs["keywords"] == ["brand"]
         assert call_kwargs["match"] is KeywordMatchType.ALL
         assert call_kwargs["filters"] == {"exclude_idn": True, "max_length": 12}
 
     def test_dispatch_reverse_search_commands(self) -> None:
         client = _mock_client()
-        client.reverse_search.return_value = {}
-        client.reverse_dns.return_value = {}
-        client.reverse_ip.return_value = {}
-        client.reverse_mx.return_value = {}
         args = _make_args(
             reverse_search_type="email",
             reverse_search="admin@example.com",
@@ -223,22 +215,27 @@ class TestDispatchSearch:
 
         assert result.executed is True
         assert result.errored is False
-        client.reverse_search.assert_called_once_with(
-            "email", "admin@example.com", match=ReverseMatchType.BEGINS
-        )
-        client.reverse_dns.assert_called_once_with("example.com")
-        client.reverse_ip.assert_called_once_with("ip", "192.0.2.1")
-        client.reverse_mx.assert_called_once_with(
-            "domain", "example.com", recursive=True
-        )
+        search_calls = client.calls_to("reverse_search")
+        assert len(search_calls) == 1
+        assert search_calls[0].args == ("email", "admin@example.com")
+        assert search_calls[0].kwargs == {"match": ReverseMatchType.BEGINS}
+        dns_calls = client.calls_to("reverse_dns")
+        assert len(dns_calls) == 1
+        assert dns_calls[0].args == ("example.com",)
+        assert dns_calls[0].kwargs == {}
+        ip_calls = client.calls_to("reverse_ip")
+        assert len(ip_calls) == 1
+        assert ip_calls[0].args == ("ip", "192.0.2.1")
+        assert ip_calls[0].kwargs == {}
+        mx_calls = client.calls_to("reverse_mx")
+        assert len(mx_calls) == 1
+        assert mx_calls[0].args == ("domain", "example.com")
+        assert mx_calls[0].kwargs == {"recursive": True}
 
 
 class TestDispatchBulk:
     def test_dispatch_bulk_commands(self) -> None:
         client = _mock_client()
-        client.bulk_dns.return_value = {}
-        client.bulk_whois.return_value = {}
-        client.bulk_whois_ip.return_value = {}
         args = _make_args(
             bulk_dns=["example.com", "example.net"],
             bulk_whois=["example.org"],
@@ -250,19 +247,28 @@ class TestDispatchBulk:
 
         assert result.executed is True
         assert result.errored is False
-        client.bulk_dns.assert_called_once_with(["example.com", "example.net"])
-        client.bulk_whois.assert_called_once_with(["example.org"], BulkWhoisType.CACHED)
-        client.bulk_whois_ip.assert_called_once_with(["192.0.2.1"])
+        dns_calls = client.calls_to("bulk_dns")
+        assert len(dns_calls) == 1
+        assert dns_calls[0].args == (["example.com", "example.net"],)
+        assert dns_calls[0].kwargs == {}
+        whois_calls = client.calls_to("bulk_whois")
+        assert len(whois_calls) == 1
+        assert whois_calls[0].args == (["example.org"], BulkWhoisType.CACHED)
+        assert whois_calls[0].kwargs == {}
+        whois_ip_calls = client.calls_to("bulk_whois_ip")
+        assert len(whois_ip_calls) == 1
+        assert whois_ip_calls[0].args == (["192.0.2.1"],)
+        assert whois_ip_calls[0].kwargs == {}
 
 
 class TestDispatchReports:
     def test_dispatch_report_commands(self, capsys: pytest.CaptureFixture[str]) -> None:
         client = _mock_client()
-        client.domain_report.return_value = {"domain": "example.com"}
-        client.name_report.return_value = {"name": "Alice"}
-        client.organization_report.return_value = {"organization": "Example Org"}
-        client.email_report.return_value = {"email": "admin@example.com"}
-        client.ip_report.return_value = {"ip": "192.0.2.1"}
+        client.set_result("domain_report", {"domain": "example.com"})
+        client.set_result("name_report", {"name": "Alice"})
+        client.set_result("organization_report", {"organization": "Example Org"})
+        client.set_result("email_report", {"email": "admin@example.com"})
+        client.set_result("ip_report", {"ip": "192.0.2.1"})
         args = _make_args(
             domain_report="example.com",
             name_report="Alice",
@@ -275,11 +281,26 @@ class TestDispatchReports:
 
         assert result.executed is True
         assert result.errored is False
-        client.domain_report.assert_called_once_with("example.com")
-        client.name_report.assert_called_once_with("Alice")
-        client.organization_report.assert_called_once_with("Example Org")
-        client.email_report.assert_called_once_with("admin@example.com")
-        client.ip_report.assert_called_once_with("192.0.2.1")
+        domain_calls = client.calls_to("domain_report")
+        assert len(domain_calls) == 1
+        assert domain_calls[0].args == ("example.com",)
+        assert domain_calls[0].kwargs == {}
+        name_calls = client.calls_to("name_report")
+        assert len(name_calls) == 1
+        assert name_calls[0].args == ("Alice",)
+        assert name_calls[0].kwargs == {}
+        org_calls = client.calls_to("organization_report")
+        assert len(org_calls) == 1
+        assert org_calls[0].args == ("Example Org",)
+        assert org_calls[0].kwargs == {}
+        email_calls = client.calls_to("email_report")
+        assert len(email_calls) == 1
+        assert email_calls[0].args == ("admin@example.com",)
+        assert email_calls[0].kwargs == {}
+        ip_calls = client.calls_to("ip_report")
+        assert len(ip_calls) == 1
+        assert ip_calls[0].args == ("192.0.2.1",)
+        assert ip_calls[0].kwargs == {}
         assert "example.com" in capsys.readouterr().out
 
     def test_dispatch_reports_skips_when_no_report_args(self) -> None:
@@ -290,14 +311,14 @@ class TestDispatchReports:
 
         assert result.executed is False
         assert result.errored is False
-        client.domain_report.assert_not_called()
+        assert client.calls_to("domain_report") == []
 
     def test_dispatch_reports_aggregates_partial_errors(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         client = _mock_client()
-        client.domain_report.return_value = {"domain": "example.com"}
-        client.name_report.side_effect = DomainIQError("report failed")
+        client.set_result("domain_report", {"domain": "example.com"})
+        client.set_error("name_report", DomainIQError("report failed"))
         args = _make_args(domain_report="example.com", name_report="Alice")
 
         result = _dispatch_reports(client, args)
@@ -312,10 +333,6 @@ class TestDispatchReports:
 class TestDispatchMonitor:
     def test_dispatch_monitor_read_commands(self) -> None:
         client = _mock_client()
-        client.monitor_list.return_value = {}
-        client.monitor_report_items.return_value = {}
-        client.monitor_report_summary.return_value = {}
-        client.monitor_report_changes.return_value = {}
         args = _make_args(
             monitor_list=True,
             monitor_report_items=42,
@@ -330,22 +347,25 @@ class TestDispatchMonitor:
 
         assert result.executed is True
         assert result.errored is False
-        client.monitor_list.assert_called_once_with()
-        client.monitor_report_items.assert_called_once_with(42)
-        client.monitor_report_summary.assert_called_once_with(
-            42, item_id=7, days_range=30
-        )
-        client.monitor_report_changes.assert_called_once_with(42, 99)
+        list_calls = client.calls_to("monitor_list")
+        assert len(list_calls) == 1
+        assert list_calls[0].args == ()
+        assert list_calls[0].kwargs == {}
+        items_calls = client.calls_to("monitor_report_items")
+        assert len(items_calls) == 1
+        assert items_calls[0].args == (42,)
+        assert items_calls[0].kwargs == {}
+        summary_calls = client.calls_to("monitor_report_summary")
+        assert len(summary_calls) == 1
+        assert summary_calls[0].args == (42,)
+        assert summary_calls[0].kwargs == {"item_id": 7, "days_range": 30}
+        changes_calls = client.calls_to("monitor_report_changes")
+        assert len(changes_calls) == 1
+        assert changes_calls[0].args == (42, 99)
+        assert changes_calls[0].kwargs == {}
 
     def test_dispatch_monitor_management_commands(self) -> None:
         client = _mock_client()
-        client.create_monitor_report.return_value = {}
-        client.add_monitor_item.return_value = {}
-        client.enable_typos.return_value = {}
-        client.disable_typos.return_value = {}
-        client.modify_typo_strength.return_value = {}
-        client.delete_monitor_item.return_value = {}
-        client.delete_monitor_report.return_value = {}
         args = _make_args(
             create_monitor_report=["domain", "brand-watch"],
             email_alert=False,
@@ -361,30 +381,49 @@ class TestDispatchMonitor:
 
         assert result.executed is True
         assert result.errored is False
-        client.create_monitor_report.assert_called_once_with(
-            "domain", "brand-watch", email_alert=False
-        )
-        client.add_monitor_item.assert_called_once_with(
-            42, "domain", ["example.com", "example.net"]
-        )
-        client.enable_typos.assert_called_once_with(42, 7)
-        client.disable_typos.assert_called_once_with(42, 7)
-        client.modify_typo_strength.assert_called_once_with(42, 7, 10)
-        client.delete_monitor_item.assert_called_once_with(7)
-        client.delete_monitor_report.assert_called_once_with(42)
+        create_calls = client.calls_to("create_monitor_report")
+        assert len(create_calls) == 1
+        assert create_calls[0].args == ("domain", "brand-watch")
+        assert create_calls[0].kwargs == {"email_alert": False}
+        add_calls = client.calls_to("add_monitor_item")
+        assert len(add_calls) == 1
+        assert add_calls[0].args == (42, "domain", ["example.com", "example.net"])
+        assert add_calls[0].kwargs == {}
+        enable_calls = client.calls_to("enable_typos")
+        assert len(enable_calls) == 1
+        assert enable_calls[0].args == (42, 7)
+        assert enable_calls[0].kwargs == {}
+        disable_calls = client.calls_to("disable_typos")
+        assert len(disable_calls) == 1
+        assert disable_calls[0].args == (42, 7)
+        assert disable_calls[0].kwargs == {}
+        modify_calls = client.calls_to("modify_typo_strength")
+        assert len(modify_calls) == 1
+        assert modify_calls[0].args == (42, 7, 10)
+        assert modify_calls[0].kwargs == {}
+        del_item_calls = client.calls_to("delete_monitor_item")
+        assert len(del_item_calls) == 1
+        assert del_item_calls[0].args == (7,)
+        assert del_item_calls[0].kwargs == {}
+        del_report_calls = client.calls_to("delete_monitor_report")
+        assert len(del_report_calls) == 1
+        assert del_report_calls[0].args == (42,)
+        assert del_report_calls[0].kwargs == {}
 
     def test_dispatch_monitor_management_filters_empty_add_item_values(
         self,
     ) -> None:
         client = _mock_client()
-        client.add_monitor_item.return_value = {}
         args = _make_args(add_monitor_item=["42", "domain", "example.com,"])
 
         result = _dispatch_monitor_management(client, args)
 
         assert result.executed is True
         assert result.errored is False
-        client.add_monitor_item.assert_called_once_with(42, "domain", ["example.com"])
+        add_calls = client.calls_to("add_monitor_item")
+        assert len(add_calls) == 1
+        assert add_calls[0].args == (42, "domain", ["example.com"])
+        assert add_calls[0].kwargs == {}
 
     def test_dispatch_command_reports_invalid_add_monitor_item_report_id(
         self, capsys: pytest.CaptureFixture[str]
@@ -395,7 +434,7 @@ class TestDispatchMonitor:
         result = _dispatch_command(client, args)
 
         assert result == _EXIT_ERROR
-        client.add_monitor_item.assert_not_called()
+        assert client.calls_to("add_monitor_item") == []
         captured = capsys.readouterr()
         assert "report_id" in captured.err
 
@@ -408,7 +447,7 @@ class TestDispatchMonitor:
         result = _dispatch_command(client, args)
 
         assert result == _EXIT_ERROR
-        client.enable_typos.assert_not_called()
+        assert client.calls_to("enable_typos") == []
         captured = capsys.readouterr()
         assert "report_id" in captured.err
 
@@ -421,7 +460,7 @@ class TestDispatchMonitor:
         result = _dispatch_command(client, args)
 
         assert result == _EXIT_ERROR
-        client.modify_typo_strength.assert_not_called()
+        assert client.calls_to("modify_typo_strength") == []
         captured = capsys.readouterr()
         assert "item_id" in captured.err
 
@@ -435,7 +474,7 @@ class TestDispatchMonitor:
         result = _dispatch_command(client, args)
 
         assert result == _EXIT_ERROR
-        client.modify_typo_strength.assert_not_called()
+        assert client.calls_to("modify_typo_strength") == []
         captured = capsys.readouterr()
         assert f"{TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}" in captured.err
 

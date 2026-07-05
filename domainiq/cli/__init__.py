@@ -1,5 +1,7 @@
 """Command-line interface for the DomainIQ library."""
 
+from __future__ import annotations
+
 import sys
 import traceback
 from typing import TYPE_CHECKING
@@ -16,14 +18,25 @@ from ._credentials import prompt_for_api_key
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
+
+    from domainiq.protocols import DomainIQClientProtocol
+
+    ClientFactory = Callable[[Config], AbstractContextManager[DomainIQClientProtocol]]
 
 __all__ = ["create_parser", "main"]
 
 
-def _build_config(args: argparse.Namespace) -> Config:
+def _build_config(
+    args: argparse.Namespace,
+    *,
+    config_factory: Callable[..., Config] = Config,
+    prompt: Callable[[str | None], str] = prompt_for_api_key,
+) -> Config:
     """Build Config from parsed CLI arguments."""
     try:
-        return Config(
+        return config_factory(
             api_key=args.api_key,
             timeout=args.timeout,
             config_file=args.config_file,
@@ -31,15 +44,20 @@ def _build_config(args: argparse.Namespace) -> Config:
     except DomainIQConfigurationError as exc:
         if "No API key found" not in str(exc):
             raise
-        api_key = prompt_for_api_key(args.config_file)
-        return Config(
+        api_key = prompt(args.config_file)
+        return config_factory(
             api_key=api_key,
             timeout=args.timeout,
             config_file=args.config_file,
         )
 
 
-def _handle_cli_error(exc: BaseException, debug: bool) -> int:
+def _handle_cli_error(
+    exc: BaseException,
+    debug: bool,
+    *,
+    print_exc: Callable[[], None] = traceback.print_exc,
+) -> int:
     """Map a caught exception to a CLI exit code, printing to stderr."""
     if isinstance(exc, DomainIQError):
         sys.stderr.write(f"Error: {exc}\n")
@@ -52,22 +70,27 @@ def _handle_cli_error(exc: BaseException, debug: bool) -> int:
     if isinstance(exc, OSError):
         sys.stderr.write(f"{type(exc).__name__}: {exc}\n")
         if debug:
-            traceback.print_exc()
+            print_exc()
         return 1
     raise exc
 
 
-def main() -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    build_config: Callable[[argparse.Namespace], Config] = _build_config,
+    client_factory: ClientFactory = client_module.DomainIQClient,
+) -> int:
     """Main CLI entry point."""
     parser = create_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     log_level = "DEBUG" if args.debug else "INFO" if args.verbose else "WARNING"
     setup_logging(level=log_level)
 
     try:
-        config = _build_config(args)
-        with client_module.DomainIQClient(config) as client:
+        config = build_config(args)
+        with client_factory(config) as client:
             exit_code = _dispatch_command(client, args)
             if exit_code == EXIT_NO_COMMAND:
                 parser.print_help()

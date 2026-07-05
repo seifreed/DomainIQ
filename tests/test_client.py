@@ -11,7 +11,6 @@ import warnings
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -193,26 +192,28 @@ class TestConfigUnit:
 
         assert "Base URL is required" in str(exc_info.value)
 
-    def test_config_no_key_anywhere(self):
-        with (
-            patch.dict("os.environ", {}, clear=True),
-            patch("pathlib.Path.exists", return_value=False),
-            pytest.raises(DomainIQError) as exc_info,
-        ):
-            Config()
+    def test_config_no_key_anywhere(self, tmp_path: Path) -> None:
+        with pytest.raises(DomainIQError) as exc_info:
+            Config(env={}, config_file=str(tmp_path / "missing"))
 
         assert "No API key found" in str(exc_info.value)
 
-    def test_config_from_environment(self):
-        with patch.dict("os.environ", {"DOMAINIQ_API_KEY": "env_key_123"}):
-            config = Config()
-            assert config.api_key == "env_key_123"
+    def test_config_from_environment(self, tmp_path: Path) -> None:
+        config = Config(
+            env={"DOMAINIQ_API_KEY": "env_key_123"},
+            config_file=str(tmp_path / "missing"),
+        )
+        assert config.api_key == "env_key_123"
 
-    def test_config_from_environment_strips_whitespace_regression(self) -> None:
+    def test_config_from_environment_strips_whitespace_regression(
+        self, tmp_path: Path
+    ) -> None:
         """Regression: env var value was not stripped, causing auth failures."""
-        with patch.dict("os.environ", {"DOMAINIQ_API_KEY": "  env_key_123  \n"}):
-            config = Config()
-            assert config.api_key == "env_key_123"
+        config = Config(
+            env={"DOMAINIQ_API_KEY": "  env_key_123  \n"},
+            config_file=str(tmp_path / "missing"),
+        )
+        assert config.api_key == "env_key_123"
 
     def test_config_module_import_ignores_invalid_numeric_environment(self):
         env = os.environ | {"DOMAINIQ_MAX_RETRIES": "abc"}
@@ -238,26 +239,23 @@ class TestConfigUnit:
             "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST",
         ],
     )
-    def test_invalid_numeric_environment_values_raise_config_error(self, env_name):
-        with (
-            patch.dict("os.environ", {env_name: "abc"}, clear=True),
-            pytest.raises(DomainIQConfigurationError, match=env_name),
-        ):
-            Config(api_key="test_key")
+    def test_invalid_numeric_environment_values_raise_config_error(
+        self, env_name: str
+    ) -> None:
+        with pytest.raises(DomainIQConfigurationError, match=env_name):
+            Config(api_key="test_key", env={env_name: "abc"})
 
-    def test_config_uses_numeric_environment_values(self):
-        with patch.dict(
-            "os.environ",
-            {
+    def test_config_uses_numeric_environment_values(self) -> None:
+        config = Config(
+            api_key="test_key",
+            env={
                 "DOMAINIQ_TIMEOUT": "12.5",
                 "DOMAINIQ_MAX_RETRIES": "5",
                 "DOMAINIQ_RETRY_DELAY": "2",
                 "DOMAINIQ_CONNECTOR_LIMIT": "11",
                 "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST": "3",
             },
-            clear=True,
-        ):
-            config = Config(api_key="test_key")
+        )
 
         assert config.timeout == 12.5
         assert config.max_retries == 5
@@ -277,12 +275,11 @@ class TestConfigUnit:
     )
     def test_explicit_numeric_config_values_override_invalid_environment(
         self,
-        env_name,
-        kwarg,
-        value,
-    ):
-        with patch.dict("os.environ", {env_name: "abc"}, clear=True):
-            config = Config(api_key="test_key", **{kwarg: value})
+        env_name: str,
+        kwarg: str,
+        value: float,
+    ) -> None:
+        config = Config(api_key="test_key", env={env_name: "abc"}, **{kwarg: value})
 
         assert getattr(config, kwarg) == value
 

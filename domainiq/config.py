@@ -4,7 +4,10 @@ import logging
 import math
 import os
 from pathlib import Path
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 from ._key_sources import _ApiKeyLoader
 from .constants import (
@@ -22,9 +25,12 @@ logger = logging.getLogger(__name__)
 _DEFAULT_BASE_URL = os.getenv("DOMAINIQ_BASE_URL", "https://www.domainiq.com/api")
 
 
-def _env_float(name: str, default: float) -> float:
+def _env_float(
+    name: str, default: float, env: Mapping[str, str] | None = None
+) -> float:
     """Read a float environment setting, raising a config error if invalid."""
-    raw_value = os.getenv(name)
+    source = env if env is not None else os.environ
+    raw_value = source.get(name)
     if raw_value is None:
         return default
 
@@ -35,9 +41,10 @@ def _env_float(name: str, default: float) -> float:
         raise DomainIQConfigurationError(msg) from exc
 
 
-def _env_int(name: str, default: int) -> int:
+def _env_int(name: str, default: int, env: Mapping[str, str] | None = None) -> int:
     """Read an integer environment setting, raising a config error if invalid."""
-    raw_value = os.getenv(name)
+    source = env if env is not None else os.environ
+    raw_value = source.get(name)
     if raw_value is None:
         return default
 
@@ -95,6 +102,7 @@ class Config:
         connector_limit: int | None = None,
         connector_limit_per_host: int | None = None,
         loader: _ApiKeyLoader | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         """Initialize configuration.
 
@@ -111,25 +119,27 @@ class Config:
             connector_limit_per_host: Maximum async connections per host.
             loader: Optional pre-built key loader (inject for testing or custom
                 key sources). If None, a default _ApiKeyLoader is created.
+            env: Optional environment mapping for reading DOMAINIQ_* numeric
+                settings. If None, the real process environment is used.
         """
         self.base_url = base_url
         self.timeout = (
-            _env_float("DOMAINIQ_TIMEOUT", DEFAULT_TIMEOUT)
+            _env_float("DOMAINIQ_TIMEOUT", DEFAULT_TIMEOUT, env)
             if timeout is None
             else timeout
         )
         self.max_retries = (
-            _env_int("DOMAINIQ_MAX_RETRIES", DEFAULT_MAX_RETRIES)
+            _env_int("DOMAINIQ_MAX_RETRIES", DEFAULT_MAX_RETRIES, env)
             if max_retries is None
             else max_retries
         )
         self.retry_delay = (
-            _env_int("DOMAINIQ_RETRY_DELAY", DEFAULT_RETRY_DELAY)
+            _env_int("DOMAINIQ_RETRY_DELAY", DEFAULT_RETRY_DELAY, env)
             if retry_delay is None
             else retry_delay
         )
         self.connector_limit = (
-            _env_int("DOMAINIQ_CONNECTOR_LIMIT", DEFAULT_CONNECTOR_LIMIT)
+            _env_int("DOMAINIQ_CONNECTOR_LIMIT", DEFAULT_CONNECTOR_LIMIT, env)
             if connector_limit is None
             else connector_limit
         )
@@ -137,6 +147,7 @@ class Config:
             _env_int(
                 "DOMAINIQ_CONNECTOR_LIMIT_PER_HOST",
                 DEFAULT_CONNECTOR_LIMIT_PER_HOST,
+                env,
             )
             if connector_limit_per_host is None
             else connector_limit_per_host
@@ -145,7 +156,9 @@ class Config:
             Path(config_file) if config_file else Path.home() / ".domainiq"
         )
         self._loader = (
-            loader if loader is not None else _ApiKeyLoader(self.config_file_path)
+            loader
+            if loader is not None
+            else _ApiKeyLoader(self.config_file_path, env=env)
         )
         self.api_key = self._loader.load(api_key)
         self.validate()

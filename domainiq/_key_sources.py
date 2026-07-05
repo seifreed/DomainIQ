@@ -13,7 +13,10 @@ from typing import TYPE_CHECKING, Protocol
 from .exceptions import DomainIQConfigurationError
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
+
+_ENV_API_KEY = "DOMAINIQ_API_KEY"
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +45,11 @@ class _ParamKeySource:
 class _EnvKeySource:
     """Read the API key from the DOMAINIQ_API_KEY environment variable."""
 
+    def __init__(self, env: Mapping[str, str] | None = None) -> None:
+        self._env: Mapping[str, str] = env if env is not None else os.environ
+
     def get_key(self) -> str | None:
-        key = os.getenv("DOMAINIQ_API_KEY")
+        key = self._env.get(_ENV_API_KEY)
         if key:
             key = key.strip()
             logger.debug("Using API key from DOMAINIQ_API_KEY environment variable")
@@ -77,9 +83,11 @@ class _ApiKeyLoader:
         self,
         config_file_path: Path,
         sources: list[KeySource] | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         self._config_file_path = config_file_path
         self._sources = sources
+        self._env = env
 
     def load(self, api_key: str | None) -> str:
         """Run the discovery chain; return the resolved key or raise."""
@@ -89,7 +97,7 @@ class _ApiKeyLoader:
         else:
             chain = [
                 _ParamKeySource(api_key),
-                _EnvKeySource(),
+                _EnvKeySource(self._env),
                 _FileKeySource(self._config_file_path),
             ]
         for source in chain:
