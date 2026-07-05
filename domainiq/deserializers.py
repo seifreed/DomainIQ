@@ -44,10 +44,12 @@ def _to_int(value: object) -> int | None:
         return None
     if isinstance(value, int):
         return value
-    try:
-        return int(value)
-    except ValueError, TypeError:
-        return None
+    if isinstance(value, (str, float)):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _to_float(value: object) -> float | None:
@@ -57,10 +59,12 @@ def _to_float(value: object) -> float | None:
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    try:
-        return float(value)
-    except ValueError, TypeError:
-        return None
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
 
 
 if TYPE_CHECKING:
@@ -121,7 +125,7 @@ def _normalize_dict_list(raw: object) -> list[dict[str, Any]]:
     return []
 
 
-def _coalesce(primary: object, fallback: object) -> object:
+def _coalesce[T](primary: T | None, fallback: T) -> T:
     """Return primary if it is not None, otherwise fallback."""
     return primary if primary is not None else fallback
 

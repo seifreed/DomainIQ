@@ -116,7 +116,7 @@ def parse_retry_after(headers: Mapping[str, str]) -> int | None:
     return None
 
 
-def csv_to_dict_list(csv_content: str) -> list[dict[str, Any]]:
+def csv_to_dict_list(csv_content: object) -> list[dict[str, Any]]:
     """Convert CSV content to a list of dictionaries.
 
     Args:

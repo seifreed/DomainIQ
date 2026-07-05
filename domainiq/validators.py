@@ -154,9 +154,7 @@ def validate_email(email: str) -> bool:
     return validate_domain(domain)
 
 
-def validate_whois_target(
-    domain: str | None, ip: str | None
-) -> tuple[str | None, str | None]:
+def validate_whois_target(domain: object, ip: object) -> tuple[str | None, str | None]:
     """Validate and normalize domain/IP args for a WHOIS lookup.
 
     Returns (domain, ip) stripped of whitespace. Raises ValueError on invalid input.
