@@ -1,7 +1,7 @@
 # DomainIQ Makefile - Code Quality and Development Tasks
 # Requires Python 3.14 and development dependencies installed
 
-.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs all-checks gen-mixins gen-mixins-check
+.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build all-checks gen-mixins gen-mixins-check
 
 # Default target
 help:  ## Show this help message
@@ -13,7 +13,7 @@ install:  ## Install package in current environment
 	pip install -e .
 
 install-dev:  ## Install package with development dependencies
-	pip install -e .[dev,async,docs]
+	pip install -e .[dev,async]
 
 install-quality:  ## Install only quality tools
 	pip install -e .[quality]
@@ -113,16 +113,6 @@ build-check:  ## Check the package builds and its metadata validates
 	twine check build/build-check/*
 	@echo "✅ Package build check completed"
 
-# Documentation
-docs:  ## Build documentation
-	@echo "📚 Building documentation..."
-	cd docs && make html
-	@echo "✅ Documentation built"
-
-docs-serve:  ## Serve documentation locally
-	@echo "📚 Serving documentation..."
-	cd docs/_build/html && python -m http.server 8000
-
 # Development helpers
 install-tools:  ## Install all development tools globally
 	pip install --upgrade pip
@@ -130,7 +120,7 @@ install-tools:  ## Install all development tools globally
 
 upgrade-deps:  ## Upgrade all dependencies to latest versions
 	pip install --upgrade pip
-	pip install --upgrade -e .[dev,async,docs]
+	pip install --upgrade -e .[dev,async]
 
 check-deps:  ## Check for dependency vulnerabilities
 	@echo "🔍 Checking dependencies for vulnerabilities..."

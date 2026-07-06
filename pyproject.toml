@@ -72,14 +72,8 @@ quality = [
     "pip-audit>=2.9.0",
     "types-requests>=2.33.0",
 ]
-docs = [
-    "sphinx>=9.0.0",
-    "sphinx-rtd-theme>=3.0.0",
-    "myst-parser>=5.0.0",
-    "pygments>=2.20.0",
-]
 all = [
-    "domainiq[async,dev,docs]"
+    "domainiq[async,dev]"
 ]
 
 [project.urls]
@@ -99,7 +93,6 @@ path = "domainiq/__init__.py"
 include = [
     "/domainiq",
     "/tests",
-    "/docs",
     "README.md",
     "LICENSE.md",
     "CHANGELOG.md",
