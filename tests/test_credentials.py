@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,10 @@ from domainiq.exceptions import DomainIQConfigurationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+# POSIX mode bits (0o600) are not enforced on Windows, which secures files via
+# ACLs instead; the permission assertions below only hold on POSIX platforms.
+_POSIX_PERMISSIONS = sys.platform != "win32"
 
 _PREVIOUS_HANDLER = object()
 
@@ -141,7 +146,8 @@ class TestCredentialPrompting:
         )
         assert api_key == "default_key"
         assert target.read_text() == "default_key"
-        assert target.stat().st_mode & 0o777 == 0o600
+        if _POSIX_PERMISSIONS:
+            assert target.stat().st_mode & 0o777 == 0o600
 
     def test_prompted_key_enforces_permissions_on_existing_file_regression(
         self, tmp_path: Path
@@ -158,7 +164,9 @@ class TestCredentialPrompting:
             env={},
         )
 
-        assert target.stat().st_mode & 0o777 == 0o600
+        assert target.read_text() == "new_key"
+        if _POSIX_PERMISSIONS:
+            assert target.stat().st_mode & 0o777 == 0o600
 
 
 class TestPromptWithTimeout:
