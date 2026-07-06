@@ -118,9 +118,10 @@ build:  ## Build package for distribution
 	python -m build
 	@echo "✅ Package built in dist/"
 
-build-check:  ## Check package build without building
+build-check:  ## Check the package builds and its metadata validates
 	@echo "📦 Checking package build..."
-	python -m build --check
+	python -m build --outdir build/build-check
+	twine check build/build-check/*
 	@echo "✅ Package build check completed"
 
 # Documentation
@@ -176,7 +177,7 @@ pre-release: clean quality-gate build  ## Prepare for release
 
 release-check:  ## Check if ready for release
 	@echo "🔍 Checking release readiness..."
-	python setup.py check --restructuredtext --strict
+	python -m build
 	twine check dist/*
 	@echo "✅ Release check completed"
 
