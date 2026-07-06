@@ -15,7 +15,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from domainiq import DomainIQClient, DomainIQError
-from domainiq.utils import validate_domain
+from domainiq.validators import validate_domain
 
 # Security analysis constants
 NEW_DOMAIN_THRESHOLD_DAYS = 30
