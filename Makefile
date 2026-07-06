@@ -1,7 +1,7 @@
 # DomainIQ Makefile - Code Quality and Development Tasks
 # Requires Python 3.14 and development dependencies installed
 
-.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs pre-commit all-checks gen-mixins gen-mixins-check
+.PHONY: help install install-dev quality lint format type-check security test test-unit test-integration coverage clean build docs all-checks gen-mixins gen-mixins-check
 
 # Default target
 help:  ## Show this help message
@@ -82,17 +82,6 @@ coverage:  ## Run tests with coverage report
 	pytest --cov=domainiq --cov-report=html --cov-report=term --cov-report=xml
 	@echo "✅ Coverage report generated in htmlcov/"
 
-# Pre-commit targets
-pre-commit-install:  ## Install pre-commit hooks
-	@echo "⚙️  Installing pre-commit hooks..."
-	pre-commit install
-	@echo "✅ Pre-commit hooks installed"
-
-pre-commit:  ## Run pre-commit hooks on all files
-	@echo "🔄 Running pre-commit hooks..."
-	pre-commit run --all-files
-	@echo "✅ Pre-commit checks completed"
-
 # Comprehensive quality checks
 all-checks: quality test coverage security  ## Run all quality checks and tests
 
@@ -137,7 +126,7 @@ docs-serve:  ## Serve documentation locally
 # Development helpers
 install-tools:  ## Install all development tools globally
 	pip install --upgrade pip
-	pip install ruff black mypy bandit pip-audit pre-commit build twine
+	pip install ruff black mypy bandit pip-audit build twine
 
 upgrade-deps:  ## Upgrade all dependencies to latest versions
 	pip install --upgrade pip
