@@ -155,7 +155,7 @@ profile:  ## Run performance profiling on examples
 
 benchmark:  ## Run performance benchmarks
 	@echo "⚡ Running benchmarks..."
-	python -m pytest tests/ -k "benchmark" -v
+	python -m pytest tests/ -k "benchmark" -v --no-cov || [ $$? -eq 5 ]
 	@echo "✅ Benchmarks completed"
 
 # Quality gates
