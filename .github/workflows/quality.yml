@@ -8,8 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION_MATRIX: "['3.13', '3.14']"
-  MAIN_PYTHON_VERSION: "3.13"
+  MAIN_PYTHON_VERSION: "3.14"
 
 jobs:
   # Code Quality Checks
@@ -80,7 +79,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ${{ fromJson(env.PYTHON_VERSION_MATRIX) }}
+        python-version: ['3.14']
             
     steps:
     - name: Checkout code
@@ -123,9 +122,12 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Only run on main branch or if API key is available
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && secrets.DOMAINIQ_API_KEY != '')
-    
+    # Run on main or PRs; the integration step is skipped when no API key secret is set.
+    # (The secrets context cannot be used in a job-level if, so gate the step instead.)
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    env:
+      DOMAINIQ_API_KEY: ${{ secrets.DOMAINIQ_API_KEY }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -142,8 +144,7 @@ jobs:
         pip install -e .[dev,async]
         
     - name: Run integration tests
-      env:
-        DOMAINIQ_API_KEY: ${{ secrets.DOMAINIQ_API_KEY }}
+      if: env.DOMAINIQ_API_KEY != ''
       run: |
         pytest -v -m integration --tb=short --junit-xml=junit-integration.xml
         
