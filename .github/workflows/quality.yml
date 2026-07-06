@@ -7,6 +7,10 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write
+
 env:
   MAIN_PYTHON_VERSION: "3.14"
 
@@ -30,8 +34,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .[quality]
-        
+        pip install -e '.[quality,async]'
+
     - name: Run Ruff linting
       run: |
         echo "::group::Ruff Linting"
@@ -59,15 +63,8 @@ jobs:
     - name: Run Bandit security checks
       run: |
         echo "::group::Bandit Security Analysis"
-        bandit -r domainiq/ --configfile pyproject.toml --format json --output bandit-report.json
         bandit -r domainiq/ --configfile pyproject.toml
         echo "::endgroup::"
-        
-    - name: Upload Bandit results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: bandit-report.json
 
   # Unit Tests (no API key required)
   test-unit:
@@ -111,6 +108,8 @@ jobs:
           
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
+      # Optional reporting; needs CODECOV_TOKEN, which isn't required for a green build.
+      continue-on-error: true
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.MAIN_PYTHON_VERSION
       with:
         file: ./coverage.xml
@@ -175,6 +174,9 @@ jobs:
         
     - name: Upload Trivy scan results to GitHub Security
       uses: github/codeql-action/upload-sarif@v3
+      # Requires code scanning (GitHub Advanced Security) enabled on the repo;
+      # tolerate absence so the build stays green when it isn't configured.
+      continue-on-error: true
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -286,7 +288,9 @@ jobs:
         
     - name: Run performance benchmarks
       run: |
-        pytest tests/ -k "benchmark" --benchmark-json=benchmark-results.json
+        # No benchmark tests yet: skip the coverage gate and treat pytest's
+        # "no tests collected" (exit 5) as success. A failing benchmark exits 1.
+        pytest tests/ -k "benchmark" --benchmark-json=benchmark-results.json --no-cov || [ $? -eq 5 ]
         
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4
