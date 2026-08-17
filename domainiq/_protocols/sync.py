@@ -124,7 +124,11 @@ class SearchProtocol(Protocol):
 
 @runtime_checkable
 class BulkProtocol(Protocol):
-    def bulk_dns(self, domains: list[str]) -> list[BulkDNSResult]: ...
+    def bulk_dns(
+        self,
+        domains: list[str],
+        record_type: DNSRecordType | str | None = None,
+    ) -> list[BulkDNSResult]: ...
 
     def bulk_whois(
         self,

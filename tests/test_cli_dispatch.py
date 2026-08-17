@@ -98,6 +98,7 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "reverse_mx_data": None,
         "recursive": False,
         "bulk_dns": None,
+        "bulk_dns_type": None,
         "bulk_whois": None,
         "bulk_whois_type": "live",
         "bulk_whois_ip": None,
@@ -281,7 +282,7 @@ class TestDispatchBulk:
         dns_calls = client.calls_to("bulk_dns")
         assert len(dns_calls) == 1
         assert dns_calls[0].args == (["example.com", "example.net"],)
-        assert dns_calls[0].kwargs == {}
+        assert dns_calls[0].kwargs == {"record_type": None}
         whois_calls = client.calls_to("bulk_whois")
         assert len(whois_calls) == 1
         assert whois_calls[0].args == (["example.org"], BulkWhoisType.CACHED)
@@ -290,6 +291,12 @@ class TestDispatchBulk:
         assert len(whois_ip_calls) == 1
         assert whois_ip_calls[0].args == (["192.0.2.1"],)
         assert whois_ip_calls[0].kwargs == {}
+
+    def test_dispatch_bulk_dns_forwards_record_type(self) -> None:
+        client = _mock_client()
+        args = _make_args(bulk_dns=["example.com"], bulk_dns_type="MX")
+        _dispatch_bulk(cast("BulkProtocol", client), args)
+        assert client.calls_to("bulk_dns")[0].kwargs == {"record_type": "MX"}
 
 
 class TestDispatchReports:

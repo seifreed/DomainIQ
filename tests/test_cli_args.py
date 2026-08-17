@@ -61,6 +61,7 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "reverse_mx_data": None,
         "recursive": False,
         "bulk_dns": None,
+        "bulk_dns_type": None,
         "bulk_whois": None,
         "bulk_whois_type": "live",
         "bulk_whois_ip": None,

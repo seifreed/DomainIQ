@@ -257,6 +257,20 @@ class TestBulkParams:
             "domains": ["example.com", "example.net"],
         }
 
+    def test_bulk_dns_params_with_record_type(self) -> None:
+        assert build_bulk_dns_params(["example.com"], DNSRecordType.MX) == {
+            "service": "bulk_dns",
+            "domains": ["example.com"],
+            "type": "MX",
+        }
+
+    def test_bulk_dns_params_accepts_string_record_type(self) -> None:
+        assert build_bulk_dns_params(["example.com"], "A")["type"] == "A"
+
+    def test_bulk_dns_params_rejects_invalid_record_type(self) -> None:
+        with pytest.raises(DomainIQValidationError, match="Invalid record_type"):
+            build_bulk_dns_params(["example.com"], "NOPE")
+
     def test_bulk_whois_params_use_enum_wire_value(self) -> None:
         assert build_bulk_whois_params(["example.com"], BulkWhoisType.CACHED) == {
             "service": "bulk_whois",

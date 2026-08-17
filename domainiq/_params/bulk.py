@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from domainiq._models import BulkWhoisType
+from domainiq._models import BulkWhoisType, DNSRecordType
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.utils import enum_value
 from domainiq.validators import is_ip_address, validate_domain
@@ -12,6 +12,18 @@ from domainiq.validators import is_ip_address, validate_domain
 from ._shared import require_non_empty
 
 _BULK_WHOIS_TYPES = {member.value for member in BulkWhoisType}
+_DNS_RECORD_TYPES = {member.value for member in DNSRecordType}
+
+
+def _validate_dns_record_type(record_type: DNSRecordType | str) -> str:
+    record_type_value = enum_value(record_type)
+    if (
+        not isinstance(record_type_value, str)
+        or record_type_value not in _DNS_RECORD_TYPES
+    ):
+        msg = f"Invalid record_type: {record_type_value}"
+        raise DomainIQValidationError(msg, param_name="record_type")
+    return record_type_value
 
 
 def _validate_domain_items(items: list[str], param_name: str) -> None:
@@ -32,11 +44,20 @@ def _validate_lookup_type(lookup_type: BulkWhoisType | str) -> str:
     return lookup_type_value
 
 
-def build_bulk_dns_params(domains: list[str]) -> dict[str, Any]:
-    """Build parameters for bulk DNS."""
+def build_bulk_dns_params(
+    domains: list[str],
+    record_type: DNSRecordType | str | None = None,
+) -> dict[str, Any]:
+    """Build parameters for bulk DNS.
+
+    ``record_type`` is optional; when omitted the API defaults to ``NS``.
+    """
     require_non_empty("domains", domains)
     _validate_domain_items(domains, "domains")
-    return {"service": "bulk_dns", "domains": domains}
+    params: dict[str, Any] = {"service": "bulk_dns", "domains": domains}
+    if record_type is not None:
+        params["type"] = _validate_dns_record_type(record_type)
+    return params
 
 
 def build_bulk_whois_params(

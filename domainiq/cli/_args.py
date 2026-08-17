@@ -148,6 +148,10 @@ def _add_reverse_search_args(parser: argparse.ArgumentParser) -> None:
 def _add_bulk_args(parser: argparse.ArgumentParser) -> None:
     """Add bulk operation arguments."""
     parser.add_argument("--bulk-dns", nargs="+", help="Bulk DNS lookup for domains")
+    parser.add_argument(
+        "--bulk-dns-type",
+        help="DNS record type for bulk DNS lookup (defaults to NS)",
+    )
     parser.add_argument("--bulk-whois", nargs="+", help="Bulk WHOIS lookup")
     parser.add_argument(
         "--bulk-whois-type",

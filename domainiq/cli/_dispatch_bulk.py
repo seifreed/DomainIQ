@@ -18,7 +18,11 @@ def _dispatch_bulk(client: BulkProtocol, args: argparse.Namespace) -> _CommandRe
     results = []
     if args.bulk_dns:
         results.append(
-            _run_command(lambda: print_result(client.bulk_dns(args.bulk_dns)))
+            _run_command(
+                lambda: print_result(
+                    client.bulk_dns(args.bulk_dns, record_type=args.bulk_dns_type)
+                )
+            )
         )
     if args.bulk_whois:
         results.append(

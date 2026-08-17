@@ -127,7 +127,11 @@ class AsyncSearchProtocol(Protocol):
 
 @runtime_checkable
 class AsyncBulkProtocol(Protocol):
-    async def bulk_dns(self, domains: list[str]) -> list[BulkDNSResult]: ...
+    async def bulk_dns(
+        self,
+        domains: list[str],
+        record_type: DNSRecordType | str | None = None,
+    ) -> list[BulkDNSResult]: ...
 
     async def bulk_whois(
         self,
