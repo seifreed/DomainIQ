@@ -8,6 +8,7 @@ from ._base_client import _AsyncRequestable, _SyncRequestable
 from ._bulk_mixin import _AsyncBulkMixin, _BulkMixin
 from ._dns_mixin import _AsyncDNSMixin, _DNSMixin
 from ._domain_analysis_mixin import _AsyncDomainAnalysisMixin, _DomainAnalysisMixin
+from ._limits_mixin import _AsyncLimitsMixin, _LimitsMixin
 from ._monitor_mixin import _AsyncMonitorMixin, _MonitorMixin
 from ._queue_mixin import _AsyncQueueMixin, _QueueMixin
 from ._report_mixin import _AsyncReportMixin, _ReportMixin
@@ -18,6 +19,7 @@ __all__ = [
     "_AsyncBulkMixin",
     "_AsyncDNSMixin",
     "_AsyncDomainAnalysisMixin",
+    "_AsyncLimitsMixin",
     "_AsyncMonitorMixin",
     "_AsyncQueueMixin",
     "_AsyncReportMixin",
@@ -27,6 +29,7 @@ __all__ = [
     "_BulkMixin",
     "_DNSMixin",
     "_DomainAnalysisMixin",
+    "_LimitsMixin",
     "_MonitorMixin",
     "_QueueMixin",
     "_ReportMixin",

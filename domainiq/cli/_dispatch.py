@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         DNSProtocol,
         DomainAnalysisProtocol,
         DomainIQClientProtocol,
+        LimitsProtocol,
         QueueProtocol,
         WhoisProtocol,
     )
@@ -107,6 +108,15 @@ def _dispatch_queue(client: QueueProtocol, args: argparse.Namespace) -> _Command
     return _CommandResult(executed=False, errored=False)
 
 
+def _dispatch_limits(
+    client: LimitsProtocol, args: argparse.Namespace
+) -> _CommandResult:
+    """Dispatch the account-limits command. Returns (executed, had_errors)."""
+    if args.limits:
+        return _run_command(lambda: print_result(client.account_limits()))
+    return _CommandResult(executed=False, errored=False)
+
+
 _DISPATCHERS: tuple[_DispatchFn, ...] = (
     _dispatch_whois,
     _dispatch_dns,
@@ -117,6 +127,7 @@ _DISPATCHERS: tuple[_DispatchFn, ...] = (
     _dispatch_monitor,
     _dispatch_monitor_management,
     _dispatch_queue,
+    _dispatch_limits,
 )
 
 
@@ -162,6 +173,7 @@ __all__ = [
     "_dispatch_bulk",
     "_dispatch_command",
     "_dispatch_dns",
+    "_dispatch_limits",
     "_dispatch_monitor",
     "_dispatch_monitor_management",
     "_dispatch_queue",

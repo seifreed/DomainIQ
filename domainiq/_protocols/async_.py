@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, Unpack, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, Unpack, runtime_checkable
 
 from domainiq._models.enums import BulkWhoisType, KeywordMatchType, ReverseMatchType
 from domainiq.constants import TYPO_STRENGTH_MAX
@@ -210,6 +210,11 @@ class AsyncQueueProtocol(Protocol):
 
 
 @runtime_checkable
+class AsyncLimitsProtocol(Protocol):
+    async def account_limits(self) -> dict[str, Any]: ...
+
+
+@runtime_checkable
 class AsyncDomainIQClientProtocol(
     AsyncWhoisProtocol,
     AsyncDNSProtocol,
@@ -219,6 +224,7 @@ class AsyncDomainIQClientProtocol(
     AsyncBulkProtocol,
     AsyncMonitorProtocol,
     AsyncQueueProtocol,
+    AsyncLimitsProtocol,
     Protocol,
 ):
     """Structural interface for the asynchronous DomainIQ client."""
@@ -231,6 +237,7 @@ __all__ = [
     "AsyncDNSProtocol",
     "AsyncDomainAnalysisProtocol",
     "AsyncDomainIQClientProtocol",
+    "AsyncLimitsProtocol",
     "AsyncMonitorProtocol",
     "AsyncQueueProtocol",
     "AsyncReportProtocol",

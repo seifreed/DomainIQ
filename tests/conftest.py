@@ -145,6 +145,9 @@ class StubClient:
     def check_queue(self, *args: object, **kwargs: object) -> object:
         return self._record("check_queue", args, kwargs)
 
+    def account_limits(self, *args: object, **kwargs: object) -> object:
+        return self._record("account_limits", args, kwargs)
+
     def close(self) -> None:
         self._record("close", (), {})
 

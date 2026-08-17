@@ -262,6 +262,15 @@ def _add_monitor_management_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_limits_args(parser: argparse.ArgumentParser) -> None:
+    """Add account-limits arguments."""
+    parser.add_argument(
+        "--limits",
+        action="store_true",
+        help="Show the account's API usage limits and remaining credits",
+    )
+
+
 def _add_queue_args(parser: argparse.ArgumentParser) -> None:
     """Add queued-request management arguments."""
     parser.add_argument("--queue-hash", help="Hash of a queued API request to poll")
@@ -298,5 +307,6 @@ Examples:
     _add_monitor_args(parser)
     _add_monitor_management_args(parser)
     _add_queue_args(parser)
+    _add_limits_args(parser)
 
     return parser
