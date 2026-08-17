@@ -5,9 +5,10 @@ Not part of the public API — do not import from outside this package.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Unpack
+from typing import TYPE_CHECKING, Any, Unpack
 
 from ._request_pipeline import RequestPolicy
 from .config import Config, ConfigKwargs
@@ -16,7 +17,30 @@ from .exceptions import DomainIQAPIError, DomainIQConfigurationError
 from .formatters import format_api_params, sanitize_params_for_log
 from .utils import assert_json_dict, truncate_repr
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 logger = logging.getLogger(__name__)
+
+
+def _warn_if_unclosed(
+    transport: object | None,
+    close: Callable[[], None],
+    message: str,
+    warn: Callable[..., None] | None,
+) -> None:
+    """Best-effort close and ResourceWarning for a GC'd, still-open client.
+
+    Shared by both clients' ``__del__``. ``warn`` is passed in (rather than
+    read from the ``warnings`` module) so it can be ``None`` during interpreter
+    shutdown and so the branch is directly testable.
+    """
+    if transport is None or not getattr(transport, "is_open", False):
+        return
+    with contextlib.suppress(Exception):
+        close()
+    if warn is not None:
+        warn(message, ResourceWarning, stacklevel=3)
 
 
 class _BaseDomainIQClient:

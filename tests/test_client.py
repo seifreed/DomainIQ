@@ -22,6 +22,7 @@ from domainiq import (
     DomainIQError,
     DomainIQValidationError,
 )
+from domainiq._base_client import _warn_if_unclosed
 from domainiq.cli import create_parser
 from domainiq.config import Config
 
@@ -92,19 +93,44 @@ class TestDomainIQClientUnit:
 
         client._transport.close()
 
-    def test_del_safe_during_interpreter_shutdown_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Regression: __del__ raised AttributeError when warnings module was None."""
-        client = DomainIQClient.__new__(DomainIQClient)
-        client._transport = RequestsTransport()
-        # Simulate interpreter shutdown: the warnings machinery is torn down,
-        # so warnings.warn resolves to None inside __del__.
-        monkeypatch.setattr(warnings, "warn", None)
+    def test_warn_if_unclosed_is_safe_when_warn_is_none_regression(self) -> None:
+        """Regression: __del__ raised AttributeError when warnings.warn was None.
 
-        client.__del__()  # must not raise even though warnings.warn is None
+        During interpreter shutdown ``warnings.warn`` resolves to ``None``.
+        The extracted helper takes ``warn`` explicitly, so the shutdown branch
+        is exercised by passing ``None`` directly (no patching required).
+        """
+        transport = RequestsTransport()
 
-        assert client._transport.is_open is False
+        _warn_if_unclosed(transport, transport.close, "unclosed", warn=None)
+
+        assert transport.is_open is False
+
+    def test_warn_if_unclosed_emits_resource_warning(self) -> None:
+        """The helper closes the transport and forwards a ResourceWarning."""
+        transport = RequestsTransport()
+        recorded: list[tuple[str, type[Warning]]] = []
+
+        def _warn(message: str, category: type[Warning], **_: object) -> None:
+            recorded.append((message, category))
+
+        _warn_if_unclosed(transport, transport.close, "unclosed msg", warn=_warn)
+
+        assert transport.is_open is False
+        assert recorded == [("unclosed msg", ResourceWarning)]
+
+    def test_warn_if_unclosed_skips_closed_transport(self) -> None:
+        """An already-closed transport produces no warning."""
+        transport = RequestsTransport()
+        transport.close()
+        recorded: list[object] = []
+
+        def _warn(*args: object, **_kwargs: object) -> None:
+            recorded.append(args)
+
+        _warn_if_unclosed(transport, transport.close, "unclosed", warn=_warn)
+
+        assert recorded == []
 
 
 class TestConfigUnit:

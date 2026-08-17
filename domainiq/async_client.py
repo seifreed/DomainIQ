@@ -1,7 +1,6 @@
 """Asynchronous client for the DomainIQ API."""
 
 import asyncio
-import contextlib
 import logging
 import warnings
 from typing import TYPE_CHECKING, Any, Self, TypeVar, Unpack
@@ -12,6 +11,7 @@ from ._base_client import (
     _assert_json_dict,
     _assert_json_dict_or_list,
     _BaseDomainIQClient,
+    _warn_if_unclosed,
 )
 from ._mixins import (
     _AsyncBulkMixin,
@@ -48,6 +48,13 @@ logger = logging.getLogger(__name__)
 
 _HTTP_SERVER_ERROR_MIN = 500
 _LT = TypeVar("_LT")
+
+
+def _try_sync_close(transport: AsyncTransport) -> None:
+    """Invoke the transport's best-effort synchronous teardown, if it has one."""
+    sync_close = getattr(transport, "try_sync_close", None)
+    if sync_close is not None:
+        sync_close()
 
 
 def _make_default_async_transport(config: Config) -> AsyncTransport:
@@ -277,18 +284,15 @@ class AsyncDomainIQClient(
     def __del__(self) -> None:
         """Warn if transport was not properly closed."""
         transport = getattr(self, "_transport", None)
-        if transport is None:
-            return
-        if getattr(transport, "is_open", False):
-            sync_close = getattr(transport, "try_sync_close", None)
-            if sync_close is not None:
-                with contextlib.suppress(Exception):
-                    sync_close()
-            warn = getattr(warnings, "warn", None)
-            if warn is not None:
-                warn(
-                    f"Unclosed {self.__class__.__name__}. "
-                    "Use 'async with' or call 'await client.close()' explicitly.",
-                    ResourceWarning,
-                    stacklevel=2,
-                )
+
+        def _close() -> None:
+            if transport is not None:
+                _try_sync_close(transport)
+
+        _warn_if_unclosed(
+            transport,
+            _close,
+            f"Unclosed {self.__class__.__name__}. "
+            "Use 'async with' or call 'await client.close()' explicitly.",
+            getattr(warnings, "warn", None),
+        )

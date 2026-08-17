@@ -1,6 +1,5 @@
 """Main client for the DomainIQ API."""
 
-import contextlib
 import logging
 import warnings
 from typing import TYPE_CHECKING, Any, Self, Unpack
@@ -10,6 +9,7 @@ from ._base_client import (
     _assert_json_dict,
     _assert_json_dict_or_list,
     _BaseDomainIQClient,
+    _warn_if_unclosed,
 )
 from ._mixins import (
     _BulkMixin,
@@ -128,19 +128,18 @@ class DomainIQClient(
     def __del__(self) -> None:
         """Warn if transport was not properly closed."""
         transport = getattr(self, "_transport", None)
-        if transport is None:
-            return
-        if getattr(transport, "is_open", False):
-            with contextlib.suppress(Exception):
+
+        def _close() -> None:
+            if transport is not None:
                 transport.close()
-            warn = getattr(warnings, "warn", None)
-            if warn is not None:
-                warn(
-                    f"Unclosed {self.__class__.__name__}. "
-                    "Use 'with' or call 'client.close()' explicitly.",
-                    ResourceWarning,
-                    stacklevel=2,
-                )
+
+        _warn_if_unclosed(
+            transport,
+            _close,
+            f"Unclosed {self.__class__.__name__}. "
+            "Use 'with' or call 'client.close()' explicitly.",
+            getattr(warnings, "warn", None),
+        )
 
     def close(self) -> None:
         """Close the HTTP session."""
