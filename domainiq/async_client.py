@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar, Unpack
 from ._async_concurrency import _LookupFailure, _run_with_critical_cancel
 from ._base_client import (
     _assert_csv_str,
-    _assert_json_dict,
     _assert_json_dict_or_list,
     _BaseDomainIQClient,
     _warn_if_unclosed,
@@ -38,6 +37,7 @@ from .exceptions import (
     DomainIQValidationError,
 )
 from .http import AiohttpTransport, AsyncTransport
+from .utils import assert_json_dict
 from .validators import ensure_positive_int, is_ip_address
 
 if TYPE_CHECKING:
@@ -113,6 +113,8 @@ class AsyncDomainIQClient(
         Bulk ops:         domainiq.protocols.AsyncBulkProtocol
         Monitoring:       domainiq.protocols.AsyncMonitorProtocol
         Domain analysis:  domainiq.protocols.AsyncDomainAnalysisProtocol
+        Queued requests:  domainiq.protocols.AsyncQueueProtocol
+        Account limits:   domainiq.protocols.AsyncLimitsProtocol
 
     This decouples callers from the concrete class and enables lightweight
     test fakes that implement only the required protocol.
@@ -168,7 +170,7 @@ class AsyncDomainIQClient(
 
     async def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Make async API request expecting JSON response."""
-        return _assert_json_dict(
+        return assert_json_dict(
             await self._make_request(params, output_format=API_FORMAT_JSON)
         )
 

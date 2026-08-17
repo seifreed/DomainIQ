@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Self, Unpack
 
 from ._base_client import (
     _assert_csv_str,
-    _assert_json_dict,
     _assert_json_dict_or_list,
     _BaseDomainIQClient,
     _warn_if_unclosed,
@@ -25,6 +24,7 @@ from ._mixins import (
 from ._request_pipeline import _sync_sleep, execute_sync_request
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .http import RequestsTransport, SyncTransport
+from .utils import assert_json_dict
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -66,6 +66,8 @@ class DomainIQClient(
         Bulk ops:         domainiq.protocols.BulkProtocol
         Monitoring:       domainiq.protocols.MonitorProtocol
         Domain analysis:  domainiq.protocols.DomainAnalysisProtocol
+        Queued requests:  domainiq.protocols.QueueProtocol
+        Account limits:   domainiq.protocols.LimitsProtocol
 
     This decouples callers from the concrete class and enables lightweight
     test fakes that implement only the required protocol.
@@ -113,7 +115,7 @@ class DomainIQClient(
 
     def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:
         """Make an API request expecting a JSON dict response."""
-        return _assert_json_dict(
+        return assert_json_dict(
             self._make_request(params, output_format=API_FORMAT_JSON)
         )
 

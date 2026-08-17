@@ -15,7 +15,7 @@ from .config import Config, ConfigKwargs
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .exceptions import DomainIQAPIError, DomainIQConfigurationError
 from .formatters import format_api_params, sanitize_params_for_log
-from .utils import assert_json_dict, truncate_repr
+from .utils import truncate_repr
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -97,9 +97,6 @@ class _BaseDomainIQClient:
             max_retries=self.config.max_retries,
             retry_delay=self.config.retry_delay,
         )
-
-
-_assert_json_dict = assert_json_dict
 
 
 def _assert_json_dict_or_list(
