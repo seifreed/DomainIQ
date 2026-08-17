@@ -32,6 +32,14 @@ class TestTryParseDateEdgeCases:
         parsed = try_parse_date("1704067200.5")
         assert isinstance(parsed, datetime)
 
+    def test_successful_non_iso_parse_emits_no_warning_regression(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Regression: non-ISO dates that parse fine spammed a WARNING log."""
+        with caplog.at_level("WARNING", logger="domainiq.parsers"):
+            assert try_parse_date("01-Jan-2023") is not None
+        assert caplog.records == []
+
     def test_rejects_short_float_timestamp_regression(self) -> None:
         """Regression: 9-digit float like '12345678.9' passed the >=10 guard."""
         assert try_parse_date("12345678.9") is None

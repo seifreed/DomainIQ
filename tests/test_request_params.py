@@ -110,6 +110,18 @@ class TestDnsParams:
         result = build_dns_params("  example.com  ", None)
         assert result["q"] == "example.com"
 
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "_dmarc.example.com",
+            "selector._domainkey.example.com",
+            "_sip._tcp.example.com",
+        ],
+    )
+    def test_dns_accepts_underscore_labels_regression(self, query: str) -> None:
+        """Regression: DMARC/DKIM/SRV underscore names were rejected."""
+        assert build_dns_params(query, ["TXT"])["q"] == query
+
     @pytest.mark.parametrize("record_types", [[""], ["  "], ["A", ""]])
     def test_dns_rejects_empty_record_types(
         self, record_types: list[str | DNSRecordType]

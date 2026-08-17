@@ -57,7 +57,7 @@ def _parse_date_string(date_str: str) -> datetime | None:
     try:
         return _normalize_datetime(datetime.fromisoformat(stripped))
     except ValueError:
-        logger.warning("try_parse_date: fromisoformat failed for %r", date_str[:80])
+        logger.debug("try_parse_date: fromisoformat failed for %r", date_str[:80])
 
     digits = stripped.lstrip("-")
     is_numeric_timestamp = False

@@ -7,6 +7,7 @@ import pytest
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.validators import (
     ensure_positive_int,
+    validate_dns_name,
     validate_domain,
     validate_whois_target,
 )
@@ -25,6 +26,30 @@ class TestValidateDomain:
     def test_accepts_all_numeric_non_ipv4_labels_regression(self) -> None:
         """Regression: valid DNS names like 123.456 were rejected."""
         assert validate_domain("123.456") is True
+
+    def test_rejects_underscore_labels(self) -> None:
+        """Registrable hostnames must not contain underscore labels."""
+        assert validate_domain("_dmarc.example.com") is False
+
+
+class TestValidateDnsName:
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "_dmarc.example.com",
+            "selector._domainkey.example.com",
+            "_sip._tcp.example.com",
+            "example.com",
+        ],
+    )
+    def test_accepts_underscore_labels_regression(self, name: str) -> None:
+        """Regression: DMARC/DKIM/SRV underscore names were rejected for DNS."""
+        assert validate_dns_name(name) is True
+
+    def test_rejects_malformed_names(self) -> None:
+        assert validate_dns_name("example..com") is False
+        assert validate_dns_name("-bad.example.com") is False
+        assert validate_dns_name("192.168.1.1") is False
 
 
 class TestValidateWhoisTarget:

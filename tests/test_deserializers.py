@@ -45,6 +45,16 @@ class TestDomainSnapshotDeserializer:
         assert result.raw_data == b"image-bytes"
         assert result.width == 640
 
+    def test_decodes_line_wrapped_raw_snapshot_data_regression(self) -> None:
+        """Regression: MIME 76-column-wrapped base64 was dropped by validate=True."""
+        payload = b"image-bytes" * 20
+        wrapped = base64.encodebytes(payload).decode("ascii")
+        assert "\n" in wrapped
+
+        result = parse_domain_snapshot({"domain": "example.com", "raw_data": wrapped})
+
+        assert result.raw_data == payload
+
     def test_invalid_raw_snapshot_data_is_ignored(self) -> None:
         result = parse_domain_snapshot(
             {"domain": "example.com", "raw": "not-valid-base64!!!"}
@@ -66,6 +76,15 @@ class TestDomainSnapshotDeserializer:
 
 
 class TestDomainReportDeserializer:
+    def test_coerces_string_risk_score_regression(self) -> None:
+        """Regression: string risk_score was stored raw, violating float|None."""
+        result = parse_domain_report(
+            {"result": {"domain": "example.com", "risk_score": "7.5"}}
+        )
+
+        assert result.risk_score == 7.5
+        assert isinstance(result.risk_score, float)
+
     def test_parses_nested_whois_dns_and_optional_fields(self) -> None:
         result = parse_domain_report(
             {

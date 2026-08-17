@@ -67,6 +67,12 @@ class TestRetryableServerErrors:
         assert delay1 is not None
         assert delay1 >= delay0
 
+    @pytest.mark.parametrize("status", [500, 502, 503, 504])
+    def test_5xx_honours_retry_after_header_regression(self, status: int) -> None:
+        """Regression: 5xx responses ignored Retry-After and used backoff."""
+        delay = classify_http_response(status, "error", _RETRY_HEADERS, 0, _POLICY)
+        assert delay == 5.0
+
 
 class TestAuthenticationError:
     def test_401_raises_authentication_error(self) -> None:

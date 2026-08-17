@@ -19,6 +19,9 @@ IPV6_VERSION = 6
 IPV4_OCTET_COUNT = 4
 
 _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
+# DNS query names may carry underscore labels (DMARC/DKIM/SRV: _dmarc,
+# _domainkey, _sip._tcp), which are illegal in registrable hostnames.
+_DNS_LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
 _EMAIL_LOCAL_PATTERN = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
 
 
@@ -31,7 +34,7 @@ def _is_ip_like_domain(value: str) -> bool:
     return True
 
 
-def _validate_label(label: str) -> bool:
+def _validate_label(label: str, pattern: re.Pattern[str] = _LABEL_PATTERN) -> bool:
     """Validate a single DNS label (handles IDN and ASCII labels)."""
     try:
         # Intentional rebind: normalize IDN label before length/char validation.
@@ -42,7 +45,28 @@ def _validate_label(label: str) -> bool:
         return False
     if label.startswith("-") or label.endswith("-"):
         return False
-    return bool(_LABEL_PATTERN.fullmatch(label))
+    return bool(pattern.fullmatch(label))
+
+
+def _validate_hostname(name: str, label_pattern: re.Pattern[str]) -> bool:
+    """Validate a dotted hostname using the given per-label character pattern."""
+    if (
+        not name
+        or not isinstance(name, str)
+        or len(name) > MAX_DOMAIN_LENGTH
+        or _is_ip_like_domain(name)
+        or name.startswith(".")
+        or name.endswith(".")
+        or ".." in name
+    ):
+        return False
+    labels = name.split(".")
+    # Reject strings that look like IPv4 addresses (4 numeric octets).
+    if len(labels) == IPV4_OCTET_COUNT and all(part.isdigit() for part in labels):
+        return False
+    if len(labels) < MIN_DOMAIN_LABELS:
+        return False
+    return all(_validate_label(label, label_pattern) for label in labels)
 
 
 def validate_domain(domain: str) -> bool:
@@ -54,23 +78,22 @@ def validate_domain(domain: str) -> bool:
     Returns:
         True if domain appears valid, False otherwise
     """
-    if (
-        not domain
-        or not isinstance(domain, str)
-        or len(domain) > MAX_DOMAIN_LENGTH
-        or _is_ip_like_domain(domain)
-        or domain.startswith(".")
-        or domain.endswith(".")
-        or ".." in domain
-    ):
-        return False
-    labels = domain.split(".")
-    # Reject strings that look like IPv4 addresses (4 numeric octets).
-    if len(labels) == IPV4_OCTET_COUNT and all(part.isdigit() for part in labels):
-        return False
-    if len(labels) < MIN_DOMAIN_LABELS:
-        return False
-    return all(_validate_label(label) for label in labels)
+    return _validate_hostname(domain, _LABEL_PATTERN)
+
+
+def validate_dns_name(name: str) -> bool:
+    """Validate a DNS query name, permitting underscore labels.
+
+    Accepts DMARC/DKIM/SRV names such as ``_dmarc.example.com`` and
+    ``selector._domainkey.example.com`` that :func:`validate_domain` rejects.
+
+    Args:
+        name: DNS name to validate
+
+    Returns:
+        True if the name is a valid DNS query name, False otherwise
+    """
+    return _validate_hostname(name, _DNS_LABEL_PATTERN)
 
 
 def validate_ipv4(ip: str) -> bool:

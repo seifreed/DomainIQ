@@ -158,6 +158,18 @@ class TestAiohttpTransport:
 
         assert fake_module.sessions[0] is session
 
+    async def test_unicode_decode_error_propagates_regression(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: decode errors were remapped to OSError and retried."""
+        _patch_aiohttp(monkeypatch)
+        transport = AiohttpTransport(timeout=10)
+        session = await transport._get_session()
+        session.error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")
+
+        with pytest.raises(UnicodeDecodeError):
+            await transport.get("https://api.example.test", {}, 3)
+
     async def test_timeout_error_is_preserved(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

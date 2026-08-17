@@ -219,7 +219,7 @@ def parse_domain_snapshot(envelope: dict[str, Any]) -> DomainSnapshot:
     raw_bytes: bytes | None = None
     if isinstance(raw_str, str) and raw_str:
         try:
-            raw_bytes = base64.b64decode(raw_str, validate=True)
+            raw_bytes = base64.b64decode("".join(raw_str.split()), validate=True)
         except binascii.Error:
             logger.warning("Failed to base64-decode raw_data field: %r", raw_str[:50])
     return DomainSnapshot(
@@ -249,7 +249,7 @@ def parse_domain_report(envelope: dict[str, Any]) -> DomainReport:
         dns_data=parse_dns_result(inner["dns"]) if inner.get("dns") else None,
         categories=categories,
         related_domains=related_domains,
-        risk_score=inner.get("risk_score"),
+        risk_score=_to_float(inner.get("risk_score")),
     )
 
 

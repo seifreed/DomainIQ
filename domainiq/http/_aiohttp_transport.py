@@ -86,8 +86,6 @@ class AiohttpTransport:
             raise
         except self._aiohttp.ClientError as e:
             raise OSError(str(e)) from e
-        except UnicodeDecodeError as e:
-            raise OSError(str(e)) from e
 
     async def close(self) -> None:
         async with self._lock:

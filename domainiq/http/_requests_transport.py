@@ -39,8 +39,6 @@ class RequestsTransport:
             raise TimeoutError(str(e)) from e
         except self._requests_request_exc as e:
             raise OSError(str(e)) from e
-        except UnicodeDecodeError as e:
-            raise OSError(str(e)) from e
 
     @property
     def is_open(self) -> bool:

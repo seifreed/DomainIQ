@@ -26,7 +26,10 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
-        "--timeout", type=float, default=30, help="Request timeout in seconds"
+        "--timeout",
+        type=float,
+        default=None,
+        help="Request timeout in seconds (defaults to DOMAINIQ_TIMEOUT or 30)",
     )
 
 

@@ -216,10 +216,10 @@ class AsyncDomainIQClient(
         """Perform multiple WHOIS lookups concurrently.
 
         On a critical error (auth, config, rate-limit) in any lookup,
-        in-flight tasks are cancelled and the exception is re-raised with
-        a ``partial_results`` attribute holding the results (or ``None``)
-        already completed before the failure, aligned by task submission
-        order.
+        in-flight tasks are cancelled and a ``DomainIQPartialResultsError``
+        is raised (with the triggering exception as its ``__cause__``). Its
+        ``partial_results`` attribute holds the results (or ``None``) already
+        completed before the failure, aligned by task submission order.
         """
 
         async def _do(target: str) -> WhoisResult:

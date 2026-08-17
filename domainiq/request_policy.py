@@ -47,12 +47,10 @@ def _compute_retry_delay(
     attempt: int,
     policy: RequestPolicy,
 ) -> float | None:
-    if status_code in _RETRYABLE_STATUSES:
-        if attempt < policy.max_retries:
-            return compute_backoff(policy.retry_delay, attempt)
-        return None
-
-    if status_code == HTTP_TOO_MANY_REQUESTS and attempt < policy.max_retries:
+    is_retryable = (
+        status_code in _RETRYABLE_STATUSES or status_code == HTTP_TOO_MANY_REQUESTS
+    )
+    if is_retryable and attempt < policy.max_retries:
         if retry_after_secs is not None:
             return max(1.0, float(retry_after_secs))
         return compute_backoff(policy.retry_delay, attempt)

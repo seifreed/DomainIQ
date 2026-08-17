@@ -198,6 +198,11 @@ class TestArgParsing:
         args = self.parser.parse_args(["--timeout", "30.5"])
         assert args.timeout == 30.5
 
+    def test_timeout_defaults_to_none_regression(self) -> None:
+        """Regression: --timeout defaulted to 30, shadowing DOMAINIQ_TIMEOUT."""
+        args = self.parser.parse_args([])
+        assert args.timeout is None
+
 
 class TestValidateArgs:
     def test_no_errors_when_args_valid(self) -> None:
