@@ -72,18 +72,11 @@ def _parse_date_string(date_str: str) -> datetime | None:
             is_numeric_timestamp = True
 
     if is_numeric_timestamp:
-        try:
-            timestamp = float(stripped)
-        except ValueError:
-            logger.warning(
-                "try_parse_date: timestamp parse failed for %r",
-                date_str[:80],
-            )
-            return None
-        else:
-            parsed = _parse_numeric_timestamp(timestamp, date_str)
-            if parsed is not None:
-                return parsed
+        # ``stripped`` is all digits (optionally signed, one dot), so float()
+        # cannot raise here.
+        parsed = _parse_numeric_timestamp(float(stripped), date_str)
+        if parsed is not None:
+            return parsed
 
     for fmt in _DATE_FORMATS:
         try:

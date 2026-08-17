@@ -64,6 +64,15 @@ class TestParserBranches:
     def test_parse_bool_nonzero_int_is_true(self) -> None:
         assert parse_bool(5) is True
 
+    def test_parse_bool_passes_through_real_bool(self) -> None:
+        assert parse_bool(True) is True
+        assert parse_bool(False) is False
+
+    def test_numeric_string_overflow_falls_through_to_none(self) -> None:
+        # A huge all-digit string is treated as an epoch, overflows to None,
+        # then fails every strptime format.
+        assert try_parse_date("9" * 400) is None
+
     def test_nameserver_key_with_nondigit_suffix_is_ignored(self) -> None:
         assert parse_nameservers({"ns_x": "a.example"}) == []
 
@@ -120,6 +129,15 @@ class TestUtilsBranches:
 
     def test_retry_after_garbage_returns_none(self) -> None:
         assert parse_retry_after({"Retry-After": "not-a-date"}) is None
+
+    def test_retry_after_naive_http_date_is_treated_as_utc(self) -> None:
+        seconds = parse_retry_after({"Retry-After": "Wed, 21 Oct 2099 07:28:00"})
+        assert seconds is not None
+        assert seconds > 0
+
+    def test_csv_non_string_input_raises(self) -> None:
+        with pytest.raises(DomainIQError, match="Expected CSV content as string"):
+            csv_to_dict_list(123)
 
     def test_csv_parse_error_raises(self) -> None:
         old_limit = csv.field_size_limit()

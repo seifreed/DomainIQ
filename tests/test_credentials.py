@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import signal
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,10 +11,14 @@ import pytest
 
 from domainiq.cli._credentials import (
     _default_config_path,
+    _is_interactive,
     _prompt_with_timeout,
+    _SignalAlarmController,
     prompt_for_api_key,
 )
 from domainiq.exceptions import DomainIQConfigurationError
+
+_HAS_SIGALRM = hasattr(signal, "SIGALRM")
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -213,3 +218,62 @@ class TestPromptWithTimeout:
         )
         assert result == "api-key"
         assert alarm.alarm_calls == []
+
+    def test_timeout_handler_raises_timeout_error(self) -> None:
+        class _InstantTimeoutAlarm:
+            def supported(self) -> bool:
+                return True
+
+            def set_handler(self, on_timeout: Callable[[], None]) -> object:
+                on_timeout()
+                return None
+
+            def restore_handler(self, previous: object) -> None:
+                del previous
+
+            def set_alarm(self, seconds: int) -> int:
+                del seconds
+                return 0
+
+        with pytest.raises(TimeoutError, match="Prompt timed out"):
+            _prompt_with_timeout(
+                "prompt: ", 5, read_line=_returns("x"), alarm=_InstantTimeoutAlarm()
+            )
+
+
+class TestSignalAlarmController:
+    def test_supported_reflects_sigalrm_availability(self) -> None:
+        assert _SignalAlarmController().supported() == _HAS_SIGALRM
+
+    @pytest.mark.skipif(not _HAS_SIGALRM, reason="SIGALRM not available")
+    def test_handler_alarm_roundtrip_restores_state(self) -> None:
+        controller = _SignalAlarmController()
+        fired: list[bool] = []
+        previous = controller.set_handler(lambda: fired.append(True))
+        try:
+            # Invoke the installed signal handler directly instead of racing a
+            # real SIGALRM; it must forward to the on_timeout callback.
+            installed = signal.getsignal(signal.SIGALRM)
+            assert callable(installed)
+            installed(signal.SIGALRM, None)
+            assert fired == [True]
+            prior = controller.set_alarm(0)
+            assert isinstance(prior, int)
+        finally:
+            controller.set_alarm(0)
+            controller.restore_handler(previous)
+
+    def test_restore_handler_ignores_none_previous(self) -> None:
+        # None means no prior handler was captured; restore is a no-op.
+        _SignalAlarmController().restore_handler(None)
+
+
+class TestIsInteractive:
+    def test_tty_on_both_streams_is_interactive(self) -> None:
+        assert _is_interactive(lambda _fd: True) is True
+
+    def test_oserror_from_isatty_is_not_interactive(self) -> None:
+        def _isatty(_fd: int) -> bool:
+            raise OSError
+
+        assert _is_interactive(_isatty) is False
