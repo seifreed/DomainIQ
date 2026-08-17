@@ -51,6 +51,18 @@ class LifecycleAsyncTransport:
         self.is_open = False
 
 
+class SyncClosableAsyncTransport(LifecycleAsyncTransport):
+    """Async transport exposing the optional best-effort sync teardown hook."""
+
+    def __init__(self, is_open: bool = False) -> None:
+        super().__init__(is_open=is_open)
+        self.sync_closed = False
+
+    def try_sync_close(self) -> None:
+        self.sync_closed = True
+        self.is_open = False
+
+
 class TestAsyncClientUnit:
     """Unit tests that do not require real API access."""
 
@@ -141,6 +153,16 @@ class TestAsyncClientUnit:
 
         transport.is_open = False
 
+    def test_del_invokes_transport_try_sync_close(self) -> None:
+        client = AsyncDomainIQClient.__new__(AsyncDomainIQClient)
+        transport = SyncClosableAsyncTransport(is_open=True)
+        client._transport = transport
+
+        with pytest.warns(ResourceWarning):
+            client.__del__()
+
+        assert transport.sync_closed is True
+
 
 @pytest.mark.skipif(not AIOHTTP_AVAILABLE, reason="aiohttp not available")
 @pytest.mark.asyncio
@@ -223,6 +245,21 @@ class TestConcurrentLookupCriticalCancel:
 @pytest.mark.asyncio
 class TestAsyncClientConcurrentLookup:
     """Unit tests for AsyncDomainIQClient concurrent lookup orchestration."""
+
+    async def test_concurrent_whois_reraises_server_error_as_critical(
+        self,
+        mock_async_client: AsyncDomainIQClient,
+        mock_async_transport: MockAsyncTransport,
+    ) -> None:
+        # max_retries=3 → 4 attempts, all 5xx, so the lookup raises a
+        # DomainIQAPIError(status_code=500), which is treated as critical.
+        for _ in range(4):
+            mock_async_transport.enqueue(make_async_response(500, "{}"))
+
+        with pytest.raises(DomainIQPartialResultsError):
+            await mock_async_client.concurrent_whois_lookup(
+                ["example.com"], max_concurrent=1
+            )
 
     async def test_concurrent_lookup_accepts_empty_targets(
         self,

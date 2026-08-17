@@ -9,14 +9,17 @@ from __future__ import annotations
 import csv
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from domainiq._base_client import _assert_csv_str, _assert_json_dict_or_list
 from domainiq._key_sources import _ApiKeyLoader, _FileKeySource, _ParamKeySource
+from domainiq._params.bulk import build_bulk_whois_ip_params
+from domainiq._params.search import build_reverse_search_params
 from domainiq.client import DomainIQClient
 from domainiq.config import Config
+from domainiq.constants import API_FORMAT_JSON
 from domainiq.deserializers import (
     _normalize_string_list,
     _to_float,
@@ -27,14 +30,21 @@ from domainiq.exceptions import (
     DomainIQAPIError,
     DomainIQConfigurationError,
     DomainIQError,
+    DomainIQValidationError,
 )
+from domainiq.formatters import format_api_params, sanitize_params_for_log
+from domainiq.models import ReverseMatchType, ReverseSearchType
 from domainiq.parsers import (
     parse_bool,
     parse_nameservers,
     parse_statuses,
     try_parse_date,
 )
+from domainiq.request_policy import parse_response_body
 from domainiq.utils import csv_to_dict_list, parse_retry_after, setup_logging
+from domainiq.validators import validate_domain, validate_email, validate_ipv6
+
+from .conftest import make_sync_response
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -172,3 +182,61 @@ class TestKeySourceBranches:
             tmp_path / ".domainiq", sources=[_ParamKeySource("injected-key")]
         )
         assert loader.load(None) == "injected-key"
+
+
+class TestValidatorBranches:
+    def test_validate_ipv6_rejects_non_string(self) -> None:
+        assert validate_ipv6(cast("str", 123)) is False
+
+    def test_validate_email_rejects_multiple_at_signs(self) -> None:
+        assert validate_email("a@b@c.com") is False
+
+    def test_label_over_max_length_is_rejected(self) -> None:
+        assert validate_domain("a" * 64 + ".com") is False
+
+
+class TestConfigValidationBranches:
+    def test_negative_max_retries_is_rejected(self) -> None:
+        with pytest.raises(
+            DomainIQConfigurationError, match="Max retries cannot be negative"
+        ):
+            Config(api_key="k", max_retries=-1)
+
+    def test_negative_retry_delay_is_rejected(self) -> None:
+        with pytest.raises(
+            DomainIQConfigurationError, match="Retry delay cannot be negative"
+        ):
+            Config(api_key="k", retry_delay=-1)
+
+
+class TestRequestPolicyBodyBranches:
+    def test_parse_response_body_invalid_json_raises(self) -> None:
+        response = make_sync_response(200, "not-json")
+        with pytest.raises(DomainIQAPIError, match="Failed to parse JSON"):
+            parse_response_body(response, API_FORMAT_JSON)
+
+
+class TestParamBuilderBranches:
+    def test_bulk_whois_ip_rejects_invalid_entry(self) -> None:
+        with pytest.raises(DomainIQValidationError, match="Invalid domain or IP"):
+            build_bulk_whois_ip_params(["not a domain!!"])
+
+    def test_reverse_search_rejects_malformed_email(self) -> None:
+        with pytest.raises(DomainIQValidationError, match="Invalid email"):
+            build_reverse_search_params(
+                ReverseSearchType.EMAIL, "bad@", ReverseMatchType.CONTAINS
+            )
+
+
+class TestFormatterBranches:
+    def test_sanitize_recurses_into_lists(self) -> None:
+        sanitized = sanitize_params_for_log({"items": [{"key": "secret"}]})
+        assert sanitized["items"] == [{"key": "********"}]
+
+    def test_format_api_params_decodes_nested_bytes(self) -> None:
+        formatted = format_api_params({"payload": {"blob": b"hi"}})
+        assert formatted["payload"] == '{"blob": "hi"}'
+
+    def test_format_list_param_sorts_mixed_set_by_str(self) -> None:
+        formatted = format_api_params({"tags": {1, "a"}})
+        assert set(formatted["tags"].split(",")) == {"1", "a"}

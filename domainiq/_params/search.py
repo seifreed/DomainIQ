@@ -53,12 +53,10 @@ def _validate_domain_value(value: str, param_name: str) -> None:
 
 
 def _validate_email_value(value: str, param_name: str) -> None:
+    # Callers validate the term is non-empty via _validate_search_term first.
     value = value.strip()
     if "@" in value and not validate_email(value):
         msg = f"Invalid email: {value}"
-        raise DomainIQValidationError(msg, param_name=param_name)
-    if not value:
-        msg = f"Invalid email search term: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
 
 

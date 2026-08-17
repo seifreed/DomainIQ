@@ -11,7 +11,6 @@ from .exceptions import DomainIQValidationError
 logger = logging.getLogger(__name__)
 
 MAX_DOMAIN_LENGTH = 255
-MAX_LABEL_LENGTH = 63
 MIN_DOMAIN_LABELS = 2
 MAX_EMAIL_PARTS = 2
 IPV4_VERSION = 4
@@ -35,13 +34,16 @@ def _is_ip_like_domain(value: str) -> bool:
 
 
 def _validate_label(label: str, pattern: re.Pattern[str] = _LABEL_PATTERN) -> bool:
-    """Validate a single DNS label (handles IDN and ASCII labels)."""
+    """Validate a single DNS label (handles IDN and ASCII labels).
+
+    ``str.encode("idna")`` already rejects empty labels and labels longer than
+    the 63-octet DNS limit by raising ``UnicodeError``, so no explicit length
+    guard is needed here.
+    """
     try:
-        # Intentional rebind: normalize IDN label before length/char validation.
+        # Intentional rebind: normalize IDN label before char validation.
         label = label.encode("idna").decode("ascii")
     except UnicodeError:
-        return False
-    if not (0 < len(label) <= MAX_LABEL_LENGTH):
         return False
     if label.startswith("-") or label.endswith("-"):
         return False
