@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 MAX_DOMAIN_LENGTH = 255
 MIN_DOMAIN_LABELS = 2
 MAX_EMAIL_PARTS = 2
-IPV4_VERSION = 4
-IPV6_VERSION = 6
 IPV4_OCTET_COUNT = 4
 
 _LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9-]+$")
@@ -106,30 +104,6 @@ def _ip_version(value: object) -> int | None:
         return ipaddress.ip_address(value).version
     except ValueError:
         return None
-
-
-def validate_ipv4(ip: str) -> bool:
-    """Validate an IPv4 address.
-
-    Args:
-        ip: IP address to validate
-
-    Returns:
-        True if IP appears valid, False otherwise
-    """
-    return _ip_version(ip) == IPV4_VERSION
-
-
-def validate_ipv6(ip: str) -> bool:
-    """Validate an IPv6 address.
-
-    Args:
-        ip: IP address string to validate
-
-    Returns:
-        True if ip is a valid IPv6 address, False otherwise
-    """
-    return _ip_version(ip) == IPV6_VERSION
 
 
 def is_ip_address(value: str) -> bool:

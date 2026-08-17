@@ -54,7 +54,7 @@ from domainiq.parsers import (
 )
 from domainiq.request_policy import parse_response_body
 from domainiq.utils import csv_to_dict_list, parse_retry_after, setup_logging
-from domainiq.validators import validate_domain, validate_email, validate_ipv6
+from domainiq.validators import is_ip_address, validate_domain, validate_email
 
 from .conftest import make_async_response, make_sync_response
 
@@ -237,8 +237,8 @@ class TestReprs:
 
 
 class TestValidatorBranches:
-    def test_validate_ipv6_rejects_non_string(self) -> None:
-        assert validate_ipv6(cast("str", 123)) is False
+    def test_is_ip_address_rejects_non_string(self) -> None:
+        assert is_ip_address(cast("str", 123)) is False
 
     def test_validate_email_rejects_multiple_at_signs(self) -> None:
         assert validate_email("a@b@c.com") is False

@@ -36,10 +36,10 @@ from domainiq.validators import (
     _is_ip_like_domain,
     _validate_label,
     ensure_positive_int,
+    is_ip_address,
     validate_date_string,
     validate_domain,
     validate_email,
-    validate_ipv4,
 )
 
 
@@ -370,16 +370,16 @@ class TestUtilsUnit:
         assert not validate_domain("192.0.2.1")
         assert not validate_domain("a" * 64 + ".com")
 
-    def test_validate_ipv4_valid(self) -> None:
-        assert validate_ipv4("192.168.1.1")
-        assert validate_ipv4("8.8.8.8")
-        assert validate_ipv4("127.0.0.1")
+    def test_is_ip_address_valid(self) -> None:
+        assert is_ip_address("192.168.1.1")
+        assert is_ip_address("8.8.8.8")
+        assert is_ip_address("::1")
 
-    def test_validate_ipv4_invalid(self) -> None:
-        assert not validate_ipv4("")
-        assert not validate_ipv4("192.168.1")
-        assert not validate_ipv4("192.168.1.256")
-        assert not validate_ipv4("not.an.ip.address")
+    def test_is_ip_address_invalid(self) -> None:
+        assert not is_ip_address("")
+        assert not is_ip_address("192.168.1")
+        assert not is_ip_address("192.168.1.256")
+        assert not is_ip_address("not.an.ip.address")
 
     def test_validate_email_valid(self) -> None:
         assert validate_email("user@example.com")
@@ -763,15 +763,15 @@ class TestLogicBugRegressions:
         result = parse_whois_result(data)
         assert result.nameservers == []
 
-    def test_validate_ipv4_rejects_signed_octets(self) -> None:
-        assert not validate_ipv4("-0.0.0.0")
-        assert not validate_ipv4("+1.2.3.4")
-        assert not validate_ipv4("1.-1.0.0")
-        assert not validate_ipv4("1.+1.0.0")
+    def test_is_ip_address_rejects_signed_octets(self) -> None:
+        assert not is_ip_address("-0.0.0.0")
+        assert not is_ip_address("+1.2.3.4")
+        assert not is_ip_address("1.-1.0.0")
+        assert not is_ip_address("1.+1.0.0")
 
-    def test_validate_ipv4_rejects_empty_octet(self) -> None:
-        assert not validate_ipv4("1..2.3")
-        assert not validate_ipv4(".1.2.3")
+    def test_is_ip_address_rejects_empty_octet(self) -> None:
+        assert not is_ip_address("1..2.3")
+        assert not is_ip_address(".1.2.3")
 
     def test_is_ip_like_domain_rejects_invalid_dotted_quad(self) -> None:
         assert not _is_ip_like_domain("999.999.999.999")
