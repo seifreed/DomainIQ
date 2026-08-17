@@ -27,25 +27,50 @@ class _AlarmController(Protocol):
     def set_alarm(self, seconds: int) -> int: ...
 
 
+class _SignalModule(Protocol):
+    """Subset of the ``signal`` module the alarm controller drives."""
+
+    SIGALRM: int
+
+    def signal(
+        self,
+        signalnum: int,
+        handler: Callable[[int, object], None] | int | None,
+    ) -> Callable[[int, object], None] | int | None: ...
+
+    def alarm(self, seconds: int) -> int: ...
+
+
 class _SignalAlarmController:
-    """Default POSIX SIGALRM-based timeout controller."""
+    """Default POSIX SIGALRM-based timeout controller.
+
+    The signal module is injectable so the controller logic stays testable
+    on platforms without SIGALRM support.
+    """
+
+    def __init__(self, signal_module: _SignalModule | None = None) -> None:
+        self._signal: _SignalModule = (
+            signal_module
+            if signal_module is not None
+            else cast("_SignalModule", signal)
+        )
 
     def supported(self) -> bool:
-        return hasattr(signal, "SIGALRM")
+        return hasattr(self._signal, "SIGALRM")
 
     def set_handler(self, on_timeout: Callable[[], None]) -> object:
         def _handler(*_args: object) -> None:
             on_timeout()
 
-        return signal.signal(signal.SIGALRM, _handler)
+        return self._signal.signal(self._signal.SIGALRM, _handler)
 
     def restore_handler(self, previous: object) -> None:
         if previous is not None:
-            handler = cast("int | Callable[[int, object], object] | None", previous)
-            signal.signal(signal.SIGALRM, handler)
+            handler = cast("Callable[[int, object], None] | int | None", previous)
+            self._signal.signal(self._signal.SIGALRM, handler)
 
     def set_alarm(self, seconds: int) -> int:
-        return signal.alarm(seconds)
+        return self._signal.alarm(seconds)
 
 
 def _default_config_path(config_file: str | None) -> Path:

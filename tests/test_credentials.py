@@ -252,9 +252,52 @@ class TestPromptWithTimeout:
             )
 
 
+class FakeSignalModule:
+    """In-memory stand-in for the ``signal`` module (no real signals involved)."""
+
+    SIGALRM = 14
+
+    def __init__(self) -> None:
+        self.handlers: dict[int, Callable[[int, object], None] | int | None] = {}
+        self.alarms: list[int] = []
+
+    def signal(
+        self,
+        signalnum: int,
+        handler: Callable[[int, object], None] | int | None,
+    ) -> Callable[[int, object], None] | int | None:
+        previous = self.handlers.get(signalnum)
+        self.handlers[signalnum] = handler
+        return previous
+
+    def alarm(self, seconds: int) -> int:
+        self.alarms.append(seconds)
+        return 0
+
+
 class TestSignalAlarmController:
     def test_supported_reflects_sigalrm_availability(self) -> None:
         assert _SignalAlarmController().supported() == _HAS_SIGALRM
+
+    def test_controller_drives_injected_signal_module(self) -> None:
+        recorded = FakeSignalModule()
+        controller = _SignalAlarmController(recorded)
+        fired: list[bool] = []
+
+        assert controller.supported() is True
+        previous = controller.set_handler(lambda: fired.append(True))
+        assert previous is None
+
+        installed = recorded.handlers[FakeSignalModule.SIGALRM]
+        assert callable(installed)
+        installed(FakeSignalModule.SIGALRM, None)
+        assert fired == [True]
+
+        assert controller.set_alarm(5) == 0
+        controller.restore_handler(installed)
+        controller.restore_handler(None)
+        assert recorded.handlers[FakeSignalModule.SIGALRM] is installed
+        assert recorded.alarms == [5]
 
     @pytest.mark.skipif(not _HAS_SIGALRM, reason="SIGALRM not available")
     def test_handler_alarm_roundtrip_restores_state(self) -> None:
