@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from typing import Unpack
 
 from ._key_sources import _ApiKeyLoader
@@ -28,34 +28,36 @@ logger = logging.getLogger(__name__)
 _DEFAULT_BASE_URL = os.getenv("DOMAINIQ_BASE_URL", "https://www.domainiq.com/api")
 
 
+def _env_setting[N: (int, float)](
+    name: str,
+    default: N,
+    caster: Callable[[str], N],
+    expected: str,
+    env: Mapping[str, str] | None,
+) -> N:
+    """Read a numeric environment setting, raising a config error if invalid."""
+    source = env if env is not None else os.environ
+    raw_value = source.get(name)
+    if raw_value is None:
+        return default
+
+    try:
+        return caster(raw_value)
+    except ValueError as exc:
+        msg = f"Invalid {name}: expected {expected}"
+        raise DomainIQConfigurationError(msg) from exc
+
+
 def _env_float(
     name: str, default: float, env: Mapping[str, str] | None = None
 ) -> float:
     """Read a float environment setting, raising a config error if invalid."""
-    source = env if env is not None else os.environ
-    raw_value = source.get(name)
-    if raw_value is None:
-        return default
-
-    try:
-        return float(raw_value)
-    except ValueError as exc:
-        msg = f"Invalid {name}: expected a number"
-        raise DomainIQConfigurationError(msg) from exc
+    return _env_setting(name, default, float, "a number", env)
 
 
 def _env_int(name: str, default: int, env: Mapping[str, str] | None = None) -> int:
     """Read an integer environment setting, raising a config error if invalid."""
-    source = env if env is not None else os.environ
-    raw_value = source.get(name)
-    if raw_value is None:
-        return default
-
-    try:
-        return int(raw_value)
-    except ValueError as exc:
-        msg = f"Invalid {name}: expected an integer"
-        raise DomainIQConfigurationError(msg) from exc
+    return _env_setting(name, default, int, "an integer", env)
 
 
 def _ensure_finite_number(field_name: str, value: object) -> float | int:

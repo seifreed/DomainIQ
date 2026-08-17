@@ -98,6 +98,16 @@ def validate_dns_name(name: str) -> bool:
     return _validate_hostname(name, _DNS_LABEL_PATTERN)
 
 
+def _ip_version(value: object) -> int | None:
+    """Return the IP version of a string address, or None if invalid."""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return ipaddress.ip_address(value).version
+    except ValueError:
+        return None
+
+
 def validate_ipv4(ip: str) -> bool:
     """Validate an IPv4 address.
 
@@ -107,12 +117,7 @@ def validate_ipv4(ip: str) -> bool:
     Returns:
         True if IP appears valid, False otherwise
     """
-    if not ip or not isinstance(ip, str):
-        return False
-    try:
-        return ipaddress.ip_address(ip).version == IPV4_VERSION
-    except ValueError:
-        return False
+    return _ip_version(ip) == IPV4_VERSION
 
 
 def validate_ipv6(ip: str) -> bool:
@@ -124,14 +129,7 @@ def validate_ipv6(ip: str) -> bool:
     Returns:
         True if ip is a valid IPv6 address, False otherwise
     """
-    if not ip or not isinstance(ip, str):
-        return False
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-    else:
-        return addr.version == IPV6_VERSION
+    return _ip_version(ip) == IPV6_VERSION
 
 
 def is_ip_address(value: str) -> bool:
@@ -143,7 +141,7 @@ def is_ip_address(value: str) -> bool:
     Returns:
         True if value is a valid IPv4 or IPv6 address
     """
-    return validate_ipv4(value) or validate_ipv6(value)
+    return _ip_version(value) is not None
 
 
 def validate_email(email: str) -> bool:
