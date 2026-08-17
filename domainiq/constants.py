@@ -6,13 +6,10 @@ API_FORMAT_CSV = "csv"
 
 # Integer flag value to enable an optional API feature
 API_FLAG_ENABLED = 1
-API_FLAG_DISABLED = 0
 
 # String-encoded booleans used by the monitor endpoint
 API_BOOL_TRUE = "1"
 API_BOOL_FALSE = "0"
-
-RETRY_EXHAUSTED_MSG = "API request failed after all retries"
 
 # Pattern for indexed API parameters (e.g. keyword[1], condition[1])
 API_INDEXED_PARAM = "{name}[{idx}]"
