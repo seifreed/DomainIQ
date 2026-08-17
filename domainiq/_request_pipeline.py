@@ -17,19 +17,24 @@ from .request_policy import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from .http import AsyncTransport, SyncTransport
     from .http._responses import AsyncResponse, SyncResponse
+
+    SyncSleeper = Callable[[float], None]
+    AsyncSleeper = Callable[[float], Awaitable[None]]
 
 logger = logging.getLogger(__name__)
 
 
 def _sync_sleep(delay: float) -> None:
-    """Indirection point so tests can stub retries without patching stdlib time."""
+    """Sleep between synchronous retries (injectable via ``execute_sync_request``)."""
     time.sleep(delay)
 
 
 async def _async_sleep(delay: float) -> None:
-    """Indirection point so tests can stub retries without patching asyncio globally."""
+    """Sleep between async retries (injectable via ``execute_async_request``)."""
     await asyncio.sleep(delay)
 
 
@@ -72,6 +77,7 @@ def execute_sync_request(
     request_params: dict[str, str],
     output_format: str,
     policy: RequestPolicy,
+    sleeper: SyncSleeper = _sync_sleep,
 ) -> dict[str, Any] | list[Any] | str:
     """Execute a synchronous request using the shared retry policy."""
     for attempt in range(policy.max_retries + 1):
@@ -82,7 +88,7 @@ def execute_sync_request(
                 policy.timeout,
             )
         except (TimeoutError, OSError) as exc:
-            _sync_sleep(_handle_request_error(exc, attempt, policy))
+            sleeper(_handle_request_error(exc, attempt, policy))
             continue
         except UnicodeDecodeError as exc:
             msg = f"Response decoding failed: {exc}"
@@ -93,13 +99,13 @@ def execute_sync_request(
                 logger.warning("Transport closed on attempt %s: %s", attempt, exc)
                 _os_error = OSError(f"Transport closed: {exc}")
                 _os_error.__cause__ = exc
-                _sync_sleep(_handle_request_error(_os_error, attempt, policy))
+                sleeper(_handle_request_error(_os_error, attempt, policy))
                 continue
             raise
 
         decision = _process_response(response, attempt, policy, output_format)
         if decision[0] == "retry":
-            _sync_sleep(decision[1])
+            sleeper(decision[1])
             continue
         return decision[1]
 
@@ -112,6 +118,7 @@ async def execute_async_request(
     request_params: dict[str, str],
     output_format: str,
     policy: RequestPolicy,
+    sleeper: AsyncSleeper = _async_sleep,
 ) -> dict[str, Any] | list[Any] | str:
     """Execute an asynchronous request using the shared retry policy."""
     for attempt in range(policy.max_retries + 1):
@@ -122,7 +129,7 @@ async def execute_async_request(
                 policy.timeout,
             )
         except (TimeoutError, OSError) as exc:
-            await _async_sleep(_handle_request_error(exc, attempt, policy))
+            await sleeper(_handle_request_error(exc, attempt, policy))
             continue
         except UnicodeDecodeError as exc:
             msg = f"Response decoding failed: {exc}"
@@ -133,13 +140,13 @@ async def execute_async_request(
                 logger.warning("Transport closed on attempt %s: %s", attempt, exc)
                 _os_error = OSError(f"Transport closed: {exc}")
                 _os_error.__cause__ = exc
-                await _async_sleep(_handle_request_error(_os_error, attempt, policy))
+                await sleeper(_handle_request_error(_os_error, attempt, policy))
                 continue
             raise
 
         decision = _process_response(response, attempt, policy, output_format)
         if decision[0] == "retry":
-            await _async_sleep(decision[1])
+            await sleeper(decision[1])
             continue
         return decision[1]
 

@@ -23,7 +23,7 @@ from ._mixins import (
     _AsyncWhoisMixin,
 )
 from ._models import DNSRecordType, DNSResult, WhoisResult
-from ._request_pipeline import execute_async_request
+from ._request_pipeline import _async_sleep, execute_async_request
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .exceptions import (
     DomainIQAPIError,
@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
     from types import TracebackType
 
+    from ._request_pipeline import AsyncSleeper
     from .config import Config, ConfigKwargs
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,8 @@ class AsyncDomainIQClient(
         self,
         config: Config | None = None,
         transport: AsyncTransport | None = None,
+        *,
+        sleeper: AsyncSleeper = _async_sleep,
         **kwargs: Unpack[ConfigKwargs],
     ) -> None:
         """Initialize the async DomainIQ client.
@@ -113,6 +116,8 @@ class AsyncDomainIQClient(
         Args:
             config: Configuration object. If None, will create default config.
             transport: Async HTTP transport. Defaults to AiohttpTransport.
+            sleeper: Coroutine called to pause between retries. Defaults to
+                ``asyncio.sleep``; inject a no-op to make retries instant in tests.
             **kwargs: Additional arguments passed to Config
 
         Raises:
@@ -124,6 +129,7 @@ class AsyncDomainIQClient(
             if transport is not None
             else _make_default_async_transport(self.config)
         )
+        self._sleeper: AsyncSleeper = sleeper
 
         logger.debug(
             "Initialized async DomainIQ client with config: %s",
@@ -142,6 +148,7 @@ class AsyncDomainIQClient(
             request_params,
             output_format,
             self._request_policy(),
+            self._sleeper,
         )
 
     async def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:

@@ -20,13 +20,14 @@ from ._mixins import (
     _SearchMixin,
     _WhoisMixin,
 )
-from ._request_pipeline import execute_sync_request
+from ._request_pipeline import _sync_sleep, execute_sync_request
 from .constants import API_FORMAT_CSV, API_FORMAT_JSON
 from .http import RequestsTransport, SyncTransport
 
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from ._request_pipeline import SyncSleeper
     from .config import Config, ConfigKwargs
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,8 @@ class DomainIQClient(
         self,
         config: Config | None = None,
         transport: SyncTransport | None = None,
+        *,
+        sleeper: SyncSleeper = _sync_sleep,
         **kwargs: Unpack[ConfigKwargs],
     ) -> None:
         """Initialize the DomainIQ client.
@@ -77,12 +80,15 @@ class DomainIQClient(
         Args:
             config: Configuration object. If None, will create default config.
             transport: HTTP transport to use. Defaults to RequestsTransport.
+            sleeper: Function called to pause between retries. Defaults to
+                ``time.sleep``; inject a no-op to make retries instant in tests.
             **kwargs: Additional arguments passed to Config if config is None
         """
         super().__init__(config=config, **kwargs)
         self._transport: SyncTransport = (
             transport if transport is not None else RequestsTransport()
         )
+        self._sleeper: SyncSleeper = sleeper
 
         logger.debug("Initialized DomainIQ client with config: %s", self.config)
 
@@ -98,6 +104,7 @@ class DomainIQClient(
             request_params,
             output_format,
             self._request_policy(),
+            self._sleeper,
         )
 
     def _make_json_request(self, params: dict[str, Any]) -> dict[str, Any]:

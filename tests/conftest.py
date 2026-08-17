@@ -247,6 +247,18 @@ def make_async_response(
 # ---------------------------------------------------------------------------
 # Pytest fixtures
 # ---------------------------------------------------------------------------
+#
+# Retry tests stay fast without patching stdlib sleep: the clients accept an
+# injectable ``sleeper``, so fixtures pass real no-op sleep functions instead
+# of monkeypatching ``time.sleep`` / ``asyncio.sleep``.
+
+
+def _noop_sleep(_: float) -> None:
+    return None
+
+
+async def _async_noop_sleep(_: float) -> None:
+    return None
 
 
 @pytest.fixture
@@ -257,7 +269,7 @@ def mock_transport() -> MockSyncTransport:
 @pytest.fixture
 def mock_client(mock_transport: MockSyncTransport) -> DomainIQClient:
     config = Config(api_key="test-key-fixture", timeout=5, max_retries=3, retry_delay=0)
-    return DomainIQClient(config=config, transport=mock_transport)
+    return DomainIQClient(config=config, transport=mock_transport, sleeper=_noop_sleep)
 
 
 @pytest.fixture
@@ -268,15 +280,6 @@ def mock_async_transport() -> MockAsyncTransport:
 @pytest.fixture
 def mock_async_client(mock_async_transport: MockAsyncTransport) -> AsyncDomainIQClient:
     config = Config(api_key="test-key-fixture", timeout=5, max_retries=3, retry_delay=0)
-    return AsyncDomainIQClient(config=config, transport=mock_async_transport)
-
-
-@pytest.fixture(autouse=True)
-def _disable_request_pipeline_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep retry tests deterministic by removing real sleep delays."""
-
-    async def _async_noop_sleep(_: float) -> None:
-        return None
-
-    monkeypatch.setattr("domainiq._request_pipeline._sync_sleep", lambda _: None)
-    monkeypatch.setattr("domainiq._request_pipeline._async_sleep", _async_noop_sleep)
+    return AsyncDomainIQClient(
+        config=config, transport=mock_async_transport, sleeper=_async_noop_sleep
+    )

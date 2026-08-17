@@ -57,7 +57,7 @@ def _policy(max_retries: int = 2) -> RequestPolicy:
         base_url="https://api.example.test",
         timeout=5.0,
         max_retries=max_retries,
-        retry_delay=1,
+        retry_delay=0,
     )
 
 
