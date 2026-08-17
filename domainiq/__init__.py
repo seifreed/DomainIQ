@@ -68,7 +68,7 @@ from .protocols import (
     WhoisProtocol,
 )
 
-__version__ = "3.0.0"
+__version__ = "3.1.0"
 __author__ = "seifreed"
 __email__ = "mriverolopez@gmail.com"
 __license__ = "MIT"

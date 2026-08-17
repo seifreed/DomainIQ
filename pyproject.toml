@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "domainiq-cli"
-version = "3.0.0"
+version = "3.1.0"
 description = "A modern Python client for the DomainIQ API - Domain Intelligence and Security Research"
 readme = "README.md"
 license = {file = "LICENSE.md"}
