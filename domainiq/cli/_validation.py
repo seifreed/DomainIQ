@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Callable
 
 # (namespace attribute, CLI flag name)
 _EMPTY_STRING_FLAGS: tuple[tuple[str, str], ...] = (
@@ -68,34 +69,68 @@ def _check_empty_strings(args: argparse.Namespace) -> list[str]:
     return errors
 
 
+def _provided_truthy(value: object) -> bool:
+    return bool(value)
+
+
+def _provided_not_none(value: object) -> bool:
+    return value is not None
+
+
+# Flag pairs that must be provided together. Each entry holds the two
+# (namespace attribute, CLI flag) sides and the predicate deciding whether
+# a value counts as provided (empty strings differ from explicit None here).
+_MUTUAL_FLAG_PAIRS: tuple[
+    tuple[tuple[str, str], tuple[str, str], Callable[[object], bool]], ...
+] = (
+    (
+        ("reverse_search", "--reverse-search"),
+        ("reverse_search_type", "--reverse-search-type"),
+        _provided_truthy,
+    ),
+    (
+        ("reverse_ip_type", "--reverse-ip-type"),
+        ("reverse_ip_data", "--reverse-ip-data"),
+        _provided_truthy,
+    ),
+    (
+        ("reverse_mx_type", "--reverse-mx-type"),
+        ("reverse_mx_data", "--reverse-mx-data"),
+        _provided_truthy,
+    ),
+    (
+        ("monitor_report_changes", "--monitor-report-changes"),
+        ("monitor_change", "--monitor-change"),
+        _provided_not_none,
+    ),
+    (
+        ("queue_hash", "--queue-hash"),
+        ("queue_action", "--queue-action"),
+        _provided_not_none,
+    ),
+)
+
+
+def _check_mutual_flag_pairs(args: argparse.Namespace) -> list[str]:
+    """Collect errors for flags that require their counterpart flag."""
+    errors: list[str] = []
+    for (attr_a, flag_a), (attr_b, flag_b), provided in _MUTUAL_FLAG_PAIRS:
+        has_a = provided(getattr(args, attr_a))
+        has_b = provided(getattr(args, attr_b))
+        if has_a and not has_b:
+            errors.append(f"{flag_b} is required with {flag_a}")
+        if has_b and not has_a:
+            errors.append(f"{flag_a} is required with {flag_b}")
+    return errors
+
+
 def validate_args(args: argparse.Namespace) -> list[str]:
     """Validate paired and dependent arguments before dispatching."""
     errors = _check_empty_strings(args)
-
-    if args.reverse_search and not args.reverse_search_type:
-        errors.append("--reverse-search-type is required with --reverse-search")
-    if args.reverse_search_type and not args.reverse_search:
-        errors.append("--reverse-search is required with --reverse-search-type")
-    if args.reverse_ip_type and not args.reverse_ip_data:
-        errors.append("--reverse-ip-data is required with --reverse-ip-type")
-    if args.reverse_ip_data and not args.reverse_ip_type:
-        errors.append("--reverse-ip-type is required with --reverse-ip-data")
-    if args.reverse_mx_type and not args.reverse_mx_data:
-        errors.append("--reverse-mx-data is required with --reverse-mx-type")
-    if args.reverse_mx_data and not args.reverse_mx_type:
-        errors.append("--reverse-mx-type is required with --reverse-mx-data")
-    if args.monitor_report_changes is not None and args.monitor_change is None:
-        errors.append("--monitor-change is required with --monitor-report-changes")
-    if args.monitor_change is not None and args.monitor_report_changes is None:
-        errors.append("--monitor-report-changes is required with --monitor-change")
-    if args.queue_hash is not None and args.queue_action is None:
-        errors.append("--queue-action is required with --queue-hash")
-    if args.queue_action is not None and args.queue_hash is None:
-        errors.append("--queue-hash is required with --queue-action")
+    errors.extend(_check_mutual_flag_pairs(args))
     if args.queued_param and args.submit_queued is None:
         errors.append("--submit-queued is required with --queued-param")
     errors.extend(_check_queued_params(args))
-
     return errors
 
 
