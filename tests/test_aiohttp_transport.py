@@ -9,6 +9,7 @@ import pytest
 from domainiq.http import AiohttpTransport
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
 
@@ -99,26 +100,20 @@ class FakeAiohttpModule:
     ClientSession = _open_session
 
 
-def _patch_aiohttp(monkeypatch: pytest.MonkeyPatch) -> FakeAiohttpModule:
-    fake_module = FakeAiohttpModule()
-
-    def _import_fake_aiohttp(_name: str) -> FakeAiohttpModule:
+def _importer(fake_module: FakeAiohttpModule) -> Callable[[str], object]:
+    def _import(_name: str) -> object:
         return fake_module
 
-    monkeypatch.setattr(
-        "domainiq.http._aiohttp_transport.importlib.import_module",
-        _import_fake_aiohttp,
-    )
-    return fake_module
+    return _import
 
 
 @pytest.mark.asyncio
 class TestAiohttpTransport:
-    async def test_get_creates_session_and_returns_response(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        fake_module = _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10, connector_limit=5)
+    async def test_get_creates_session_and_returns_response(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(
+            timeout=10, connector_limit=5, importer=_importer(fake_module)
+        )
 
         response = await transport.get(
             "https://api.example.test",
@@ -133,11 +128,9 @@ class TestAiohttpTransport:
         assert fake_module.sessions[0].connector.limit == 5
         assert fake_module.sessions[0].calls[0]["timeout"].total == 3
 
-    async def test_close_closes_open_session(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        fake_module = _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+    async def test_close_closes_open_session(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
 
         await transport.close()
@@ -145,11 +138,9 @@ class TestAiohttpTransport:
         assert fake_module.sessions[0].closed is True
         assert transport.is_open is False
 
-    async def test_client_error_is_translated_to_os_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        fake_module = _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+    async def test_client_error_is_translated_to_os_error(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         session = cast("FakeSession", await transport._get_session())
         session.error = FakeClientError("boom")
 
@@ -158,34 +149,28 @@ class TestAiohttpTransport:
 
         assert fake_module.sessions[0] is session
 
-    async def test_unicode_decode_error_propagates_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_unicode_decode_error_propagates_regression(self) -> None:
         """Regression: decode errors were remapped to OSError and retried."""
-        _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")
 
         with pytest.raises(UnicodeDecodeError):
             await transport.get("https://api.example.test", {}, 3)
 
-    async def test_timeout_error_is_preserved(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+    async def test_timeout_error_is_preserved(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = TimeoutError("slow")
 
         with pytest.raises(TimeoutError):
             await transport.get("https://api.example.test", {}, 3)
 
-    async def test_close_prevents_subsequent_get_calls(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+    async def test_close_prevents_subsequent_get_calls(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
 
         await transport.close()
@@ -193,45 +178,37 @@ class TestAiohttpTransport:
         with pytest.raises(RuntimeError, match="Transport is closed"):
             await transport.get("https://api.example.test", {}, 3)
 
-    async def test_close_closes_connector_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        fake_module = _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+    async def test_close_closes_connector_regression(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
 
         await transport.close()
 
         assert fake_module.sessions[0].connector.closed is True
 
-    async def test_get_session_after_close_raises_runtime_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+    async def test_get_session_after_close_raises_runtime_error(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         await transport.close()
 
         with pytest.raises(RuntimeError, match="Transport is closed"):
             await transport._get_session()
 
-    async def test_close_prevents_get_via_get_session_race_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_close_prevents_get_via_get_session_race_regression(self) -> None:
         """Regression: redundant _closed check outside lock caused TOCTOU race."""
-        _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
 
         await transport.close()
 
         with pytest.raises(RuntimeError, match="Transport is closed"):
             await transport.get("https://api.example.test", {}, 3)
 
-    async def test_connector_closed_on_session_recreation_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_connector_closed_on_session_recreation_regression(self) -> None:
         """Regression: old connector was never closed when session was recreated."""
-        fake_module = _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
         first_connector = fake_module.sessions[0].connector
 
@@ -243,24 +220,22 @@ class TestAiohttpTransport:
         assert second_connector.closed is False
 
     async def test_runtime_error_closed_session_translated_to_os_error_regression(
-        self, monkeypatch: pytest.MonkeyPatch
+        self,
     ) -> None:
         """Regression: RuntimeError from aiohttp closed session escaped retry loop."""
-        _patch_aiohttp(monkeypatch)
-        transport = AiohttpTransport(timeout=10)
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = RuntimeError("Session is closed")
 
         with pytest.raises(OSError, match="Session is closed"):
             await transport.get("https://api.example.test", {}, 3)
 
-    async def test_connector_closed_on_session_init_failure_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_connector_closed_on_session_init_failure_regression(self) -> None:
         """Regression: TCPConnector leaked when ClientSession raised."""
-        fake_module = _patch_aiohttp(monkeypatch)
+        fake_module = FakeAiohttpModule()
         fake_module.session_error = RuntimeError("boom")
-        transport = AiohttpTransport(timeout=10)
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
 
         with pytest.raises(RuntimeError, match="boom"):
             await transport._get_session()
@@ -269,12 +244,12 @@ class TestAiohttpTransport:
         assert fake_module.sessions == []
 
     async def test_connector_closed_on_base_exception_during_session_init_regression(
-        self, monkeypatch: pytest.MonkeyPatch
+        self,
     ) -> None:
         """Regression: BaseException subclasses leaked the TCPConnector."""
-        fake_module = _patch_aiohttp(monkeypatch)
+        fake_module = FakeAiohttpModule()
         fake_module.session_error = KeyboardInterrupt()
-        transport = AiohttpTransport(timeout=10)
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
 
         with pytest.raises(KeyboardInterrupt):
             await transport._get_session()
@@ -283,15 +258,10 @@ class TestAiohttpTransport:
         assert transport._connector is None or transport._connector.closed is True
 
 
-def test_missing_aiohttp_raises_import_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_aiohttp_raises_import_error() -> None:
     def _raise_import_error(name: str) -> NoReturn:
         msg = f"No module named {name}"
         raise ImportError(msg)
 
-    monkeypatch.setattr(
-        "domainiq.http._aiohttp_transport.importlib.import_module",
-        _raise_import_error,
-    )
-
     with pytest.raises(ImportError, match="aiohttp is required"):
-        AiohttpTransport(timeout=10)
+        AiohttpTransport(timeout=10, importer=_raise_import_error)

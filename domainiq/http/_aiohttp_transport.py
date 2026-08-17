@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 from ._responses import AsyncResponse
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from aiohttp import ClientSession
 
 
@@ -21,9 +23,10 @@ class AiohttpTransport:
         timeout: float,
         connector_limit: int = 100,
         connector_limit_per_host: int = 30,
+        importer: Callable[[str], object] = importlib.import_module,
     ) -> None:
         try:
-            self._aiohttp: Any = importlib.import_module("aiohttp")
+            self._aiohttp: Any = importer("aiohttp")
         except ImportError as e:
             msg = (
                 "aiohttp is required for AsyncDomainIQClient. "
