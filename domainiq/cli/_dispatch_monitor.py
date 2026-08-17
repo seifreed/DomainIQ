@@ -3,7 +3,6 @@
 from functools import partial
 from typing import TYPE_CHECKING
 
-from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.models import MonitorItemOptions
 from domainiq.utils import split_csv
@@ -119,9 +118,6 @@ def _modify_typo_strength(
 ) -> object:
     report_id, item_id = _parse_report_item_ids(args.modify_typo_strength)
     strength = _parse_int_arg(args.modify_typo_strength[2], "strength")
-    if not TYPO_STRENGTH_MIN <= strength <= TYPO_STRENGTH_MAX:
-        msg = f"strength must be between {TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}"
-        raise DomainIQValidationError(msg, param_name="strength")
     return client.modify_typo_strength(report_id, item_id, strength)
 
 

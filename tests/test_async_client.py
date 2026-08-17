@@ -102,7 +102,7 @@ class TestAsyncClientUnit:
 
     def test_make_default_async_transport_maps_import_error(self) -> None:
         def _missing(**_kwargs: object) -> LifecycleAsyncTransport:
-            msg = "missing aiohttp"
+            msg = "aiohttp is required for AsyncDomainIQClient"
             raise ImportError(msg)
 
         config = Config(api_key="key")

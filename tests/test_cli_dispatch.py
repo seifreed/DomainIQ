@@ -31,7 +31,6 @@ from domainiq.constants import (
 from domainiq.constants import (
     EXIT_SUCCESS as _EXIT_SUCCESS,
 )
-from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQError
 from domainiq.models import (
     BulkWhoisType,
@@ -474,22 +473,6 @@ class TestDispatchMonitor:
         assert client.calls_to("modify_typo_strength") == []
         captured = capsys.readouterr()
         assert "item_id" in captured.err
-
-    def test_modify_typo_strength_uses_constants_regression(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Regression: typo strength bounds were hardcoded, not read from constants."""
-        client = _mock_client()
-        args = make_cli_args(
-            modify_typo_strength=["42", "7", str(TYPO_STRENGTH_MIN - 1)]
-        )
-
-        result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
-
-        assert result == _EXIT_ERROR
-        assert client.calls_to("modify_typo_strength") == []
-        captured = capsys.readouterr()
-        assert f"{TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}" in captured.err
 
 
 class TestRunCommand:

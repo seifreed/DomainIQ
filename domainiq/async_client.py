@@ -72,11 +72,7 @@ def _make_default_async_transport(
             connector_limit_per_host=config.connector_limit_per_host,
         )
     except ImportError as e:
-        msg = (
-            "aiohttp is required for AsyncDomainIQClient. "
-            "Install it with: pip install aiohttp"
-        )
-        raise DomainIQError(msg) from e
+        raise DomainIQError(str(e)) from e
 
 
 class AsyncDomainIQClient(

@@ -7,6 +7,11 @@ import contextlib
 import importlib
 from typing import TYPE_CHECKING, Any
 
+from domainiq.constants import (
+    DEFAULT_CONNECTOR_LIMIT,
+    DEFAULT_CONNECTOR_LIMIT_PER_HOST,
+)
+
 from ._responses import AsyncResponse
 
 if TYPE_CHECKING:
@@ -21,8 +26,8 @@ class AiohttpTransport:
     def __init__(
         self,
         timeout: float,
-        connector_limit: int = 100,
-        connector_limit_per_host: int = 30,
+        connector_limit: int = DEFAULT_CONNECTOR_LIMIT,
+        connector_limit_per_host: int = DEFAULT_CONNECTOR_LIMIT_PER_HOST,
         importer: Callable[[str], object] = importlib.import_module,
     ) -> None:
         try:
