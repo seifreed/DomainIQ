@@ -16,6 +16,7 @@ from domainiq.cli._credentials import (
     _SignalAlarmController,
     prompt_for_api_key,
 )
+from domainiq.config import Config
 from domainiq.exceptions import DomainIQConfigurationError
 
 _HAS_SIGALRM = hasattr(signal, "SIGALRM")
@@ -100,6 +101,16 @@ def _prompt_raising(exc: type[BaseException]) -> Callable[[str, int], str]:
         raise exc
 
     return _prompt
+
+
+class TestFileKeyDiscovery:
+    def test_config_loads_api_key_from_config_file(self, tmp_path: Path) -> None:
+        key_file = tmp_path / "config"
+        key_file.write_text("file_key_xyz\n")
+
+        config = Config(config_file=str(key_file), env={})
+
+        assert config.api_key == "file_key_xyz"
 
 
 class TestCredentialPrompting:
