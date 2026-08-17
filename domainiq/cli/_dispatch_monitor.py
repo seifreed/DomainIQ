@@ -98,24 +98,26 @@ def _add_monitor_item(client: MonitorProtocol, args: argparse.Namespace) -> obje
     )
 
 
+def _parse_report_item_ids(values: list[str]) -> tuple[int, int]:
+    return (
+        _parse_int_arg(values[0], "report_id"),
+        _parse_int_arg(values[1], "item_id"),
+    )
+
+
 def _enable_typos(client: MonitorProtocol, args: argparse.Namespace) -> object:
-    report_id = _parse_int_arg(args.enable_typos[0], "report_id")
-    item_id = _parse_int_arg(args.enable_typos[1], "item_id")
-    return client.enable_typos(report_id, item_id)
+    return client.enable_typos(*_parse_report_item_ids(args.enable_typos))
 
 
 def _disable_typos(client: MonitorProtocol, args: argparse.Namespace) -> object:
-    report_id = _parse_int_arg(args.disable_typos[0], "report_id")
-    item_id = _parse_int_arg(args.disable_typos[1], "item_id")
-    return client.disable_typos(report_id, item_id)
+    return client.disable_typos(*_parse_report_item_ids(args.disable_typos))
 
 
 def _modify_typo_strength(
     client: MonitorProtocol,
     args: argparse.Namespace,
 ) -> object:
-    report_id = _parse_int_arg(args.modify_typo_strength[0], "report_id")
-    item_id = _parse_int_arg(args.modify_typo_strength[1], "item_id")
+    report_id, item_id = _parse_report_item_ids(args.modify_typo_strength)
     strength = _parse_int_arg(args.modify_typo_strength[2], "strength")
     if not TYPO_STRENGTH_MIN <= strength <= TYPO_STRENGTH_MAX:
         msg = f"strength must be between {TYPO_STRENGTH_MIN} and {TYPO_STRENGTH_MAX}"

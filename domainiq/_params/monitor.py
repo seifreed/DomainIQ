@@ -153,30 +153,34 @@ def build_add_monitor_item_params(
     return params
 
 
+def _typo_action_params(
+    action: str,
+    report_id: int,
+    item_id: int,
+    strength: int | None,
+) -> dict[str, Any]:
+    _validate_positive_ids(report_id=report_id, item_id=item_id)
+    params: dict[str, Any] = {
+        "service": "monitor",
+        "action": action,
+        "report_id": report_id,
+        "item_id": item_id,
+    }
+    if strength is not None:
+        params["strength"] = _validate_typo_strength(strength)
+    return params
+
+
 def build_enable_typos_params(
     report_id: int,
     item_id: int,
     strength: int,
 ) -> dict[str, Any]:
-    _validate_positive_ids(report_id=report_id, item_id=item_id)
-    strength = _validate_typo_strength(strength)
-    return {
-        "service": "monitor",
-        "action": "enable_typos",
-        "report_id": report_id,
-        "item_id": item_id,
-        "strength": strength,
-    }
+    return _typo_action_params("enable_typos", report_id, item_id, strength)
 
 
 def build_disable_typos_params(report_id: int, item_id: int) -> dict[str, Any]:
-    _validate_positive_ids(report_id=report_id, item_id=item_id)
-    return {
-        "service": "monitor",
-        "action": "disable_typos",
-        "report_id": report_id,
-        "item_id": item_id,
-    }
+    return _typo_action_params("disable_typos", report_id, item_id, None)
 
 
 def build_modify_typo_strength_params(
@@ -184,15 +188,7 @@ def build_modify_typo_strength_params(
     item_id: int,
     strength: int,
 ) -> dict[str, Any]:
-    _validate_positive_ids(report_id=report_id, item_id=item_id)
-    strength = _validate_typo_strength(strength)
-    return {
-        "service": "monitor",
-        "action": "modify_typo_strength",
-        "report_id": report_id,
-        "item_id": item_id,
-        "strength": strength,
-    }
+    return _typo_action_params("modify_typo_strength", report_id, item_id, strength)
 
 
 def build_delete_monitor_item_params(item_id: int) -> dict[str, Any]:
