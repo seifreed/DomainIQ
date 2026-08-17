@@ -47,7 +47,8 @@ def _to_int(value: object) -> int | None:
     if isinstance(value, (str, float)):
         try:
             return int(value)
-        except ValueError:
+        except ValueError, OverflowError:
+            # OverflowError: int(float("inf")) from JSON Infinity literals.
             return None
     return None
 

@@ -337,6 +337,19 @@ class TestWhoisDeserializer:
 
 
 class TestDnsRecordValueExtraction:
+    def test_infinite_ttl_degrades_to_none_regression(self) -> None:
+        """Regression: int(float('inf')) raised OverflowError instead of None."""
+        result = parse_dns_result(
+            {
+                "domain": "example.com",
+                "records": [
+                    {"host": "example.com", "type": "A", "ip": "1.2.3.4", "ttl": 1e999}
+                ],
+            }
+        )
+
+        assert result.records[0].ttl is None
+
     def test_falsy_value_zero_is_preserved_not_discarded(self) -> None:
         """Regression for truthiness bug: value=0 was discarded as falsy.
 
