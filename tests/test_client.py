@@ -318,7 +318,7 @@ class TestConfigUnit:
         initial.write_text("initial_key")
         target.write_text("file_key_xyz")
 
-        config = Config(config_file=str(initial))
+        config = Config(config_file=str(initial), env={})
         config.set_config_path(str(target), api_key=None)
 
         assert config.config_file_path == target
