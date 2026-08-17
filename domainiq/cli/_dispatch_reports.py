@@ -18,6 +18,11 @@ _REPORT_COMMANDS: tuple[str, ...] = (
     "ip_report",
 )
 
+# Per-command keyword options sourced from extra CLI flags.
+_REPORT_OPTION_FLAGS: dict[str, tuple[str, ...]] = {
+    "domain_report": ("cached",),
+}
+
 
 def _run_report_command(
     client: ReportProtocol,
@@ -26,9 +31,10 @@ def _run_report_command(
 ) -> _CommandResult:
     method = getattr(client, command)
     value = getattr(args, command)
-    if command == "domain_report":
-        return _run_command(lambda: print_result(method(value, cached=args.cached)))
-    return _run_command(lambda: print_result(method(value)))
+    options = {
+        flag: getattr(args, flag) for flag in _REPORT_OPTION_FLAGS.get(command, ())
+    }
+    return _run_command(lambda: print_result(method(value, **options)))
 
 
 def _dispatch_reports(
