@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/domainiq/"><img src="https://img.shields.io/pypi/v/domainiq?style=flat-square&logo=pypi&logoColor=white" alt="PyPI Version"></a>
-  <a href="https://pypi.org/project/domainiq/"><img src="https://img.shields.io/pypi/pyversions/domainiq?style=flat-square&logo=python&logoColor=white" alt="Python Versions"></a>
+  <a href="https://pypi.org/project/domainiq-cli/"><img src="https://img.shields.io/pypi/v/domainiq-cli?style=flat-square&logo=pypi&logoColor=white" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/domainiq-cli/"><img src="https://img.shields.io/pypi/pyversions/domainiq-cli?style=flat-square&logo=python&logoColor=white" alt="Python Versions"></a>
   <a href="https://github.com/seifreed/DomainIQ/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://github.com/seifreed/DomainIQ/actions"><img src="https://img.shields.io/github/actions/workflow/status/seifreed/DomainIQ/quality.yml?style=flat-square&logo=github&label=CI" alt="CI Status"></a>
   <a href="https://codecov.io/gh/seifreed/DomainIQ"><img src="https://img.shields.io/codecov/c/github/seifreed/DomainIQ?style=flat-square&logo=codecov&label=coverage" alt="Coverage"></a>
@@ -58,13 +58,13 @@ Monitoring      Create/List/Delete Reports, Typosquatting, Change Tracking
 ### From PyPI (Recommended)
 
 ```bash
-pip install domainiq
+pip install domainiq-cli
 ```
 
 ### With Async Support
 
 ```bash
-pip install domainiq[async]
+pip install 'domainiq-cli[async]'
 ```
 
 ### From Source
