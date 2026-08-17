@@ -108,6 +108,8 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "monitor_range": None,
         "monitor_report_changes": None,
         "monitor_change": None,
+        "queue_hash": None,
+        "queue_action": None,
         "create_monitor_report": None,
         "email_alert": True,
         "add_monitor_item": None,

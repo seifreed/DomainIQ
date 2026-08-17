@@ -36,6 +36,8 @@ _EMPTY_STRING_FLAGS: tuple[tuple[str, str], ...] = (
     ("min_create_date", "--min-create-date"),
     ("max_create_date", "--max-create-date"),
     ("modify_typo_strength", "--modify-typo-strength"),
+    ("queue_hash", "--queue-hash"),
+    ("queue_action", "--queue-action"),
 )
 
 
@@ -75,6 +77,10 @@ def validate_args(args: argparse.Namespace) -> list[str]:
         errors.append("--monitor-change is required with --monitor-report-changes")
     if args.monitor_change is not None and args.monitor_report_changes is None:
         errors.append("--monitor-report-changes is required with --monitor-change")
+    if args.queue_hash is not None and args.queue_action is None:
+        errors.append("--queue-action is required with --queue-hash")
+    if args.queue_action is not None and args.queue_hash is None:
+        errors.append("--queue-hash is required with --queue-action")
 
     return errors
 

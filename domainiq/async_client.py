@@ -19,6 +19,7 @@ from ._mixins import (
     _AsyncDNSMixin,
     _AsyncDomainAnalysisMixin,
     _AsyncMonitorMixin,
+    _AsyncQueueMixin,
     _AsyncReportMixin,
     _AsyncSearchMixin,
     _AsyncWhoisMixin,
@@ -85,6 +86,7 @@ class AsyncDomainIQClient(
     _AsyncSearchMixin,
     _AsyncBulkMixin,
     _AsyncMonitorMixin,
+    _AsyncQueueMixin,
     _BaseDomainIQClient,
 ):
     """Asynchronous client for the DomainIQ API.

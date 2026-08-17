@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         MonitorReportType,
         NameReportResult,
         OrganizationReportResult,
+        QueueResult,
         ReverseIpSearchType,
         ReverseMxSearchType,
         ReverseSearchResult,
@@ -190,6 +191,11 @@ class MonitorProtocol(Protocol):
 
 
 @runtime_checkable
+class QueueProtocol(Protocol):
+    def check_queue(self, request_hash: str, action: str) -> QueueResult: ...
+
+
+@runtime_checkable
 class DomainIQClientProtocol(
     WhoisProtocol,
     DNSProtocol,
@@ -198,6 +204,7 @@ class DomainIQClientProtocol(
     SearchProtocol,
     BulkProtocol,
     MonitorProtocol,
+    QueueProtocol,
     Protocol,
 ):
     """Structural interface for the synchronous DomainIQ client."""
@@ -211,6 +218,7 @@ __all__ = [
     "DomainAnalysisProtocol",
     "DomainIQClientProtocol",
     "MonitorProtocol",
+    "QueueProtocol",
     "ReportProtocol",
     "SearchProtocol",
     "WhoisProtocol",

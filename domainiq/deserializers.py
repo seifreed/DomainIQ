@@ -22,6 +22,7 @@ from ._models import (
     MonitorActionResult,
     MonitorItem,
     MonitorReport,
+    QueueResult,
     ReverseSearchResult,
     SearchResult,
     WhoisResult,
@@ -309,4 +310,15 @@ def parse_ip_report_result(raw: dict[str, Any] | list[Any] | str) -> IpReportRes
     return cast(
         "IpReportResult",
         validate_api_dict(assert_json_dict(raw), "IpReportResult"),
+    )
+
+
+def parse_queue_result(envelope: dict[str, Any]) -> QueueResult:
+    """Parse a queued-request status/result response into a QueueResult."""
+    inner = unwrap_api_envelope(envelope, ("status", "hash"))
+    payload = inner.get("result")
+    return QueueResult(
+        request_hash=inner.get("hash"),
+        status=inner.get("status"),
+        data=payload if isinstance(payload, (dict, list)) else None,
     )

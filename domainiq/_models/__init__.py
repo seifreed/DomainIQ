@@ -21,6 +21,7 @@ from .results import (
     DomainSnapshot,
     MonitorItem,
     MonitorReport,
+    QueueResult,
     SnapshotOptions,
     WhoisResult,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "MonitorReportType",
     "NameReportResult",
     "OrganizationReportResult",
+    "QueueResult",
     "ReverseIpSearchType",
     "ReverseMatchType",
     "ReverseMxSearchType",

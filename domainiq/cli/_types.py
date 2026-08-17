@@ -36,6 +36,16 @@ class DnsArgs:
 
 
 @dataclass(frozen=True)
+class QueueArgs:
+    request_hash: str
+    action: str
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace) -> QueueArgs:
+        return cls(request_hash=args.queue_hash, action=args.queue_action)
+
+
+@dataclass(frozen=True)
 class DomainSearchArgs:
     keywords: list[str]
     conditions: list[str] | None

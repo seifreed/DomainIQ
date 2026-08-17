@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         MonitorReportType,
         NameReportResult,
         OrganizationReportResult,
+        QueueResult,
         ReverseIpSearchType,
         ReverseMxSearchType,
         ReverseSearchResult,
@@ -197,6 +198,11 @@ class AsyncMonitorProtocol(Protocol):
 
 
 @runtime_checkable
+class AsyncQueueProtocol(Protocol):
+    async def check_queue(self, request_hash: str, action: str) -> QueueResult: ...
+
+
+@runtime_checkable
 class AsyncDomainIQClientProtocol(
     AsyncWhoisProtocol,
     AsyncDNSProtocol,
@@ -205,6 +211,7 @@ class AsyncDomainIQClientProtocol(
     AsyncSearchProtocol,
     AsyncBulkProtocol,
     AsyncMonitorProtocol,
+    AsyncQueueProtocol,
     Protocol,
 ):
     """Structural interface for the asynchronous DomainIQ client."""
@@ -218,6 +225,7 @@ __all__ = [
     "AsyncDomainAnalysisProtocol",
     "AsyncDomainIQClientProtocol",
     "AsyncMonitorProtocol",
+    "AsyncQueueProtocol",
     "AsyncReportProtocol",
     "AsyncSearchProtocol",
     "AsyncWhoisProtocol",

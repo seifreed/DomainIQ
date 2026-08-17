@@ -19,6 +19,13 @@ def require_non_empty(name: str, items: list[Any]) -> None:
         raise DomainIQValidationError(msg, param_name=name)
 
 
+def require_non_empty_string(value: str, name: str) -> None:
+    """Raise when a required string argument is empty or whitespace-only."""
+    if not isinstance(value, str) or not value.strip():
+        msg = f"{name} must not be empty or whitespace-only"
+        raise DomainIQValidationError(msg, param_name=name)
+
+
 def simple_service_params(service: str, key: str, value: str) -> dict[str, Any]:
     """Build a trivial {'service': ..., key: value} payload."""
     return {"service": service, key: value}

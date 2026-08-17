@@ -17,9 +17,14 @@ from ._dispatch_common import _aggregate, _CommandResult, _DispatchFn, _run_comm
 from ._dispatch_monitor import _dispatch_monitor, _dispatch_monitor_management
 from ._dispatch_reports import _dispatch_reports
 from ._dispatch_search import _dispatch_search
-from ._handlers import build_snapshot_options, handle_dns_lookup, handle_whois_lookup
+from ._handlers import (
+    build_snapshot_options,
+    handle_dns_lookup,
+    handle_queue,
+    handle_whois_lookup,
+)
 from ._serialization import print_result
-from ._types import DnsArgs, SnapshotArgs, WhoisArgs
+from ._types import DnsArgs, QueueArgs, SnapshotArgs, WhoisArgs
 from ._validation import validate_args
 
 if TYPE_CHECKING:
@@ -29,6 +34,7 @@ if TYPE_CHECKING:
         DNSProtocol,
         DomainAnalysisProtocol,
         DomainIQClientProtocol,
+        QueueProtocol,
         WhoisProtocol,
     )
 
@@ -92,6 +98,15 @@ def _dispatch_domain_analysis(
     return _aggregate(results)
 
 
+def _dispatch_queue(client: QueueProtocol, args: argparse.Namespace) -> _CommandResult:
+    """Dispatch the queued-request command. Returns (executed, had_errors)."""
+    if args.queue_hash is not None and args.queue_action is not None:
+        return _run_command(
+            partial(handle_queue, client, QueueArgs.from_namespace(args))
+        )
+    return _CommandResult(executed=False, errored=False)
+
+
 _DISPATCHERS: tuple[_DispatchFn, ...] = (
     _dispatch_whois,
     _dispatch_dns,
@@ -101,6 +116,7 @@ _DISPATCHERS: tuple[_DispatchFn, ...] = (
     _dispatch_bulk,
     _dispatch_monitor,
     _dispatch_monitor_management,
+    _dispatch_queue,
 )
 
 
@@ -148,6 +164,7 @@ __all__ = [
     "_dispatch_dns",
     "_dispatch_monitor",
     "_dispatch_monitor_management",
+    "_dispatch_queue",
     "_dispatch_reports",
     "_dispatch_search",
     "_dispatch_whois",

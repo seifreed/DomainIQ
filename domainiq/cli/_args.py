@@ -230,6 +230,14 @@ def _add_monitor_management_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_queue_args(parser: argparse.ArgumentParser) -> None:
+    """Add queued-request management arguments."""
+    parser.add_argument("--queue-hash", help="Hash of a queued API request to poll")
+    parser.add_argument(
+        "--queue-action", help="Queue action to perform (e.g. status, result)"
+    )
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser."""
     parser = argparse.ArgumentParser(
@@ -257,5 +265,6 @@ Examples:
     _add_bulk_args(parser)
     _add_monitor_args(parser)
     _add_monitor_management_args(parser)
+    _add_queue_args(parser)
 
     return parser

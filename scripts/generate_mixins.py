@@ -43,6 +43,7 @@ MIXIN_FILES = [
     "_search_mixin.py",
     "_bulk_mixin.py",
     "_monitor_mixin.py",
+    "_queue_mixin.py",
 ]
 
 _BEGIN_MARKER = "# --- BEGIN GENERATED ---\n"

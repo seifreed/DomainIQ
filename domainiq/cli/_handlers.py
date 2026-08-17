@@ -10,9 +10,14 @@ from domainiq.validators import ensure_positive_int, is_ip_address
 from ._serialization import print_result
 
 if TYPE_CHECKING:
-    from domainiq.protocols import DNSProtocol, SearchProtocol, WhoisProtocol
+    from domainiq.protocols import (
+        DNSProtocol,
+        QueueProtocol,
+        SearchProtocol,
+        WhoisProtocol,
+    )
 
-    from ._types import DnsArgs, DomainSearchArgs, SnapshotArgs, WhoisArgs
+    from ._types import DnsArgs, DomainSearchArgs, QueueArgs, SnapshotArgs, WhoisArgs
 
 
 def build_snapshot_options(args: SnapshotArgs) -> SnapshotOptions:
@@ -49,6 +54,12 @@ def handle_whois_lookup(client: WhoisProtocol, args: WhoisArgs) -> None:
 def handle_dns_lookup(client: DNSProtocol, args: DnsArgs) -> None:
     """Handle DNS lookup command."""
     result = client.dns_lookup(args.query, record_types=args.types)
+    print_result(result)
+
+
+def handle_queue(client: QueueProtocol, args: QueueArgs) -> None:
+    """Handle queued-request polling command."""
+    result = client.check_queue(args.request_hash, args.action)
     print_result(result)
 
 

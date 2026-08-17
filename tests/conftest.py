@@ -142,6 +142,9 @@ class StubClient:
     def delete_monitor_report(self, *args: object, **kwargs: object) -> object:
         return self._record("delete_monitor_report", args, kwargs)
 
+    def check_queue(self, *args: object, **kwargs: object) -> object:
+        return self._record("check_queue", args, kwargs)
+
     def close(self) -> None:
         self._record("close", (), {})
 

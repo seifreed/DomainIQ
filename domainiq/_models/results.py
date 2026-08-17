@@ -1,7 +1,7 @@
 """Dataclass response models for DomainIQ API responses."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from domainiq.constants import SNAPSHOT_DEFAULT_HEIGHT, SNAPSHOT_DEFAULT_WIDTH
 
@@ -113,6 +113,19 @@ class MonitorReport:
 
 
 @dataclass
+class QueueResult:
+    """Result of polling a queued asynchronous API request.
+
+    ``data`` holds the queued service's payload once ready; its shape depends
+    on the originally-queued service, so it is kept as the raw parsed value.
+    """
+
+    request_hash: str | None = None
+    status: str | None = None
+    data: dict[str, Any] | list[Any] | None = None
+
+
+@dataclass
 class SnapshotOptions:
     """Options for domain snapshot requests."""
 
@@ -131,6 +144,7 @@ __all__ = [
     "DomainSnapshot",
     "MonitorItem",
     "MonitorReport",
+    "QueueResult",
     "SnapshotOptions",
     "WhoisResult",
 ]

@@ -16,6 +16,7 @@ from ._mixins import (
     _DNSMixin,
     _DomainAnalysisMixin,
     _MonitorMixin,
+    _QueueMixin,
     _ReportMixin,
     _SearchMixin,
     _WhoisMixin,
@@ -41,6 +42,7 @@ class DomainIQClient(
     _SearchMixin,
     _BulkMixin,
     _MonitorMixin,
+    _QueueMixin,
     _BaseDomainIQClient,
 ):
     """Synchronous client for the DomainIQ API.
