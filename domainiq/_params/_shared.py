@@ -6,7 +6,7 @@ from typing import Any
 
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.utils import enum_value
-from domainiq.validators import validate_domain
+from domainiq.validators import is_ip_address, validate_domain
 
 
 def validate_type_value(
@@ -26,6 +26,13 @@ def require_valid_domain(value: str, param_name: str = "domain") -> None:
     """Raise when a value is not a valid registrable domain name."""
     if not validate_domain(value):
         msg = f"Invalid domain: {value}"
+        raise DomainIQValidationError(msg, param_name=param_name)
+
+
+def require_valid_ip(value: str, param_name: str = "ip") -> None:
+    """Raise when a value is not a valid IPv4 or IPv6 address."""
+    if not is_ip_address(value):
+        msg = f"Invalid IP address: {value}"
         raise DomainIQValidationError(msg, param_name=param_name)
 
 

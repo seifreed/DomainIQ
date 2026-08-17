@@ -5,11 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.validators import is_ip_address, validate_email
+from domainiq.validators import validate_email
 
 from ._shared import (
     require_non_empty_string,
     require_valid_domain,
+    require_valid_ip,
     simple_service_params,
 )
 
@@ -45,7 +46,5 @@ def build_email_report_params(email: str) -> dict[str, Any]:
 
 def build_ip_report_params(ip: str) -> dict[str, Any]:
     ip = ip.strip()
-    if not is_ip_address(ip):
-        msg = f"Invalid IP address: {ip}"
-        raise DomainIQValidationError(msg, param_name="ip")
+    require_valid_ip(ip)
     return simple_service_params("ip_report", "ip", ip)

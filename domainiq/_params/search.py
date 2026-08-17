@@ -14,9 +14,14 @@ from domainiq._models.enums import (
 )
 from domainiq.constants import API_FLAG_ENABLED, API_INDEXED_PARAM
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.validators import is_ip_address, validate_email
+from domainiq.validators import validate_email
 
-from ._shared import require_non_empty, require_valid_domain, validate_type_value
+from ._shared import (
+    require_non_empty,
+    require_valid_domain,
+    require_valid_ip,
+    validate_type_value,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,10 +58,7 @@ def _validate_search_term(value: str, param_name: str) -> None:
 
 
 def _validate_ip_value(value: str, param_name: str) -> None:
-    value = value.strip()
-    if not is_ip_address(value):
-        msg = f"Invalid IP address: {value}"
-        raise DomainIQValidationError(msg, param_name=param_name)
+    require_valid_ip(value.strip(), param_name)
 
 
 def _add_indexed_params(params: dict[str, Any], name: str, values: list[str]) -> None:

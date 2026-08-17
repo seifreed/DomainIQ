@@ -12,12 +12,13 @@ from domainiq.constants import (
     TYPO_STRENGTH_MIN,
 )
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.validators import ensure_positive_int, is_ip_address
+from domainiq.validators import ensure_positive_int
 
 from ._shared import (
     require_non_empty,
     require_non_empty_string,
     require_valid_domains,
+    require_valid_ip,
     validate_type_value,
 )
 
@@ -52,10 +53,7 @@ def _validate_monitor_item_values(
         require_valid_domains([item.strip() for item in items], "items")
     elif item_type_value == "ip":
         for raw_item in items:
-            item = raw_item.strip()
-            if not is_ip_address(item):
-                msg = f"Invalid IP address: {item}"
-                raise DomainIQValidationError(msg, param_name="items")
+            require_valid_ip(raw_item.strip(), "items")
     return item_type_value
 
 
