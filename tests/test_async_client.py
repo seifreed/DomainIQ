@@ -21,7 +21,9 @@ from domainiq.exceptions import (
     DomainIQRateLimitError,
     DomainIQValidationError,
 )
-from domainiq.models import DNSResult, WhoisResult
+from domainiq.models import WhoisResult
+
+from .conftest import MockAsyncTransport, make_async_response
 
 if TYPE_CHECKING:
     from domainiq.http._responses import AsyncResponse
@@ -63,25 +65,13 @@ class TestAsyncClientUnit:
         with pytest.raises(DomainIQError, match="aiohttp is required"):
             AsyncDomainIQClient(api_key="test_key")
 
-    def test_make_default_async_transport_forwards_config(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        class FakeAiohttpTransport:
-            def __init__(
-                self,
-                timeout: float,
-                connector_limit: int,
-                connector_limit_per_host: int,
-            ) -> None:
-                self.timeout = timeout
-                self.connector_limit = connector_limit
-                self.connector_limit_per_host = connector_limit_per_host
+    def test_make_default_async_transport_forwards_config(self) -> None:
+        captured: dict[str, object] = {}
 
-        monkeypatch.setattr(
-            async_client_module,
-            "AiohttpTransport",
-            FakeAiohttpTransport,
-        )
+        def _factory(**kwargs: object) -> LifecycleAsyncTransport:
+            captured.update(kwargs)
+            return LifecycleAsyncTransport()
+
         config = Config(
             api_key="key",
             timeout=7,
@@ -89,30 +79,24 @@ class TestAsyncClientUnit:
             connector_limit_per_host=3,
         )
 
-        transport = async_client_module._make_default_async_transport(config)
+        transport = async_client_module._make_default_async_transport(config, _factory)
 
-        assert isinstance(transport, FakeAiohttpTransport)
-        assert transport.timeout == 7
-        assert transport.connector_limit == 11
-        assert transport.connector_limit_per_host == 3
+        assert isinstance(transport, LifecycleAsyncTransport)
+        assert captured == {
+            "timeout": 7,
+            "connector_limit": 11,
+            "connector_limit_per_host": 3,
+        }
 
-    def test_make_default_async_transport_maps_import_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        class MissingAiohttpTransport:
-            def __init__(self, *_args: object, **_kwargs: object) -> None:
-                msg = "missing aiohttp"
-                raise ImportError(msg)
+    def test_make_default_async_transport_maps_import_error(self) -> None:
+        def _missing(**_kwargs: object) -> LifecycleAsyncTransport:
+            msg = "missing aiohttp"
+            raise ImportError(msg)
 
-        monkeypatch.setattr(
-            async_client_module,
-            "AiohttpTransport",
-            MissingAiohttpTransport,
-        )
         config = Config(api_key="key")
 
         with pytest.raises(DomainIQError, match="aiohttp is required"):
-            async_client_module._make_default_async_transport(config)
+            async_client_module._make_default_async_transport(config, _missing)
 
     @pytest.mark.asyncio
     async def test_close_and_async_context_close_transport(self) -> None:
@@ -392,26 +376,22 @@ class TestAsyncClientConcurrentLookup:
     async def test_concurrent_whois_routes_domains_and_ips(
         self,
         mock_async_client: AsyncDomainIQClient,
-        monkeypatch: pytest.MonkeyPatch,
+        mock_async_transport: MockAsyncTransport,
     ) -> None:
-        calls: list[dict[str, str | None]] = []
-
-        async def whois_lookup(
-            domain: str | None = None, ip: str | None = None, **_: object
-        ) -> WhoisResult:
-            calls.append({"domain": domain, "ip": ip})
-            return WhoisResult(domain=domain, ip=ip)
-
-        monkeypatch.setattr(mock_async_client, "whois_lookup", whois_lookup)
+        mock_async_transport.enqueue(
+            make_async_response(200, '{"domain": "example.com"}')
+        )
+        mock_async_transport.enqueue(make_async_response(200, '{"ip": "8.8.8.8"}'))
 
         results = await mock_async_client.concurrent_whois_lookup(
             ["example.com", "8.8.8.8"], max_concurrent=1
         )
 
-        assert calls == [
-            {"domain": "example.com", "ip": None},
-            {"domain": None, "ip": "8.8.8.8"},
-        ]
+        params = [call["params"] for call in mock_async_transport.calls]
+        assert params[0].get("domain") == "example.com"
+        assert params[0].get("ip") is None
+        assert params[1].get("ip") == "8.8.8.8"
+        assert params[1].get("domain") is None
         assert [result.domain or result.ip for result in results if result] == [
             "example.com",
             "8.8.8.8",
@@ -420,25 +400,27 @@ class TestAsyncClientConcurrentLookup:
     async def test_concurrent_dns_forwards_record_types(
         self,
         mock_async_client: AsyncDomainIQClient,
-        monkeypatch: pytest.MonkeyPatch,
+        mock_async_transport: MockAsyncTransport,
     ) -> None:
-        calls: list[tuple[str, list[str] | None]] = []
-
-        async def dns_lookup(
-            domain: str, record_types: list[str] | None = None
-        ) -> DNSResult:
-            calls.append((domain, record_types))
-            return DNSResult(domain=domain, records=[])
-
-        monkeypatch.setattr(mock_async_client, "dns_lookup", dns_lookup)
+        mock_async_transport.enqueue(
+            make_async_response(200, '{"domain": "example.com", "records": []}')
+        )
+        mock_async_transport.enqueue(
+            make_async_response(200, '{"domain": "example.net", "records": []}')
+        )
 
         results = await mock_async_client.concurrent_dns_lookup(
             ["example.com", "example.net"], record_types=["A", "MX"], max_concurrent=1
         )
 
-        assert calls == [
-            ("example.com", ["A", "MX"]),
-            ("example.net", ["A", "MX"]),
+        params = [call["params"] for call in mock_async_transport.calls]
+        assert params[0].get("q") == "example.com"
+        assert params[0].get("types") == "A,MX"
+        assert params[1].get("q") == "example.net"
+        assert params[1].get("types") == "A,MX"
+        assert [result.domain for result in results if result] == [
+            "example.com",
+            "example.net",
         ]
         assert [result.domain for result in results if result] == [
             "example.com",

@@ -57,10 +57,13 @@ def _try_sync_close(transport: AsyncTransport) -> None:
         sync_close()
 
 
-def _make_default_async_transport(config: Config) -> AsyncTransport:
+def _make_default_async_transport(
+    config: Config,
+    transport_factory: Callable[..., AsyncTransport] = AiohttpTransport,
+) -> AsyncTransport:
     """Create default AiohttpTransport from config. ImportError → DomainIQError."""
     try:
-        return AiohttpTransport(
+        return transport_factory(
             timeout=config.timeout,
             connector_limit=config.connector_limit,
             connector_limit_per_host=config.connector_limit_per_host,

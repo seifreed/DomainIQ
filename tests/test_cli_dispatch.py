@@ -578,9 +578,7 @@ class TestRunCommand:
         with pytest.raises(IndexError, match=msg):
             _run_command(_raise)
 
-    def test_broken_stderr_does_not_crash_regression(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_broken_stderr_does_not_crash_regression(self) -> None:
         """Regression: broken stderr caused unhandled OSError crash."""
 
         class BrokenStderr:
@@ -588,9 +586,10 @@ class TestRunCommand:
                 error = "broken pipe"
                 raise OSError(error)
 
-        monkeypatch.setattr("sys.stderr", BrokenStderr())
-        executed, had_errors = _run_command(
-            lambda: (_ for _ in ()).throw(DomainIQError("fail"))
-        )
+        def _fail() -> None:
+            msg = "fail"
+            raise DomainIQError(msg)
+
+        executed, had_errors = _run_command(_fail, stderr=BrokenStderr())
         assert executed is True
         assert had_errors is True
