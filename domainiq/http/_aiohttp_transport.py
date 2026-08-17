@@ -25,7 +25,6 @@ class AiohttpTransport:
 
     def __init__(
         self,
-        timeout: float,
         connector_limit: int = DEFAULT_CONNECTOR_LIMIT,
         connector_limit_per_host: int = DEFAULT_CONNECTOR_LIMIT_PER_HOST,
         importer: Callable[[str], object] = importlib.import_module,
@@ -39,7 +38,6 @@ class AiohttpTransport:
             )
             raise ImportError(msg) from e
 
-        self._timeout = timeout
         self._connector_limit = connector_limit
         self._connector_limit_per_host = connector_limit_per_host
         self._session: ClientSession | None = None

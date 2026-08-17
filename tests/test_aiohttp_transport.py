@@ -111,9 +111,7 @@ def _importer(fake_module: FakeAiohttpModule) -> Callable[[str], object]:
 class TestAiohttpTransport:
     async def test_get_creates_session_and_returns_response(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(
-            timeout=10, connector_limit=5, importer=_importer(fake_module)
-        )
+        transport = AiohttpTransport(connector_limit=5, importer=_importer(fake_module))
 
         response = await transport.get(
             "https://api.example.test",
@@ -130,7 +128,7 @@ class TestAiohttpTransport:
 
     async def test_close_closes_open_session(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
 
         await transport.close()
@@ -140,7 +138,7 @@ class TestAiohttpTransport:
 
     async def test_client_error_is_translated_to_os_error(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         session = cast("FakeSession", await transport._get_session())
         session.error = FakeClientError("boom")
 
@@ -152,7 +150,7 @@ class TestAiohttpTransport:
     async def test_unicode_decode_error_propagates_regression(self) -> None:
         """Regression: decode errors were remapped to OSError and retried."""
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")
 
@@ -161,7 +159,7 @@ class TestAiohttpTransport:
 
     async def test_timeout_error_is_preserved(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = TimeoutError("slow")
 
@@ -170,7 +168,7 @@ class TestAiohttpTransport:
 
     async def test_close_prevents_subsequent_get_calls(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
 
         await transport.close()
@@ -180,7 +178,7 @@ class TestAiohttpTransport:
 
     async def test_close_closes_connector_regression(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
 
         await transport.close()
@@ -189,7 +187,7 @@ class TestAiohttpTransport:
 
     async def test_get_session_after_close_raises_runtime_error(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         await transport.close()
 
         with pytest.raises(RuntimeError, match="Transport is closed"):
@@ -198,7 +196,7 @@ class TestAiohttpTransport:
     async def test_close_prevents_get_via_get_session_race_regression(self) -> None:
         """Regression: redundant _closed check outside lock caused TOCTOU race."""
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
 
         await transport.close()
 
@@ -208,7 +206,7 @@ class TestAiohttpTransport:
     async def test_connector_closed_on_session_recreation_regression(self) -> None:
         """Regression: old connector was never closed when session was recreated."""
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         await transport.get("https://api.example.test", {}, 3)
         first_connector = fake_module.sessions[0].connector
 
@@ -224,7 +222,7 @@ class TestAiohttpTransport:
     ) -> None:
         """Regression: RuntimeError from aiohttp closed session escaped retry loop."""
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = RuntimeError("Session is closed")
 
@@ -235,7 +233,7 @@ class TestAiohttpTransport:
         """Regression: TCPConnector leaked when ClientSession raised."""
         fake_module = FakeAiohttpModule()
         fake_module.session_error = RuntimeError("boom")
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
 
         with pytest.raises(RuntimeError, match="boom"):
             await transport._get_session()
@@ -249,7 +247,7 @@ class TestAiohttpTransport:
         """Regression: BaseException subclasses leaked the TCPConnector."""
         fake_module = FakeAiohttpModule()
         fake_module.session_error = KeyboardInterrupt()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
 
         with pytest.raises(KeyboardInterrupt):
             await transport._get_session()
@@ -259,7 +257,7 @@ class TestAiohttpTransport:
 
     async def test_non_closed_runtime_error_propagates(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         session = await transport._get_session()
         session.error = RuntimeError("unexpected boom")
 
@@ -268,7 +266,7 @@ class TestAiohttpTransport:
 
     async def test_try_sync_close_closes_connector(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
 
         class _SyncConnector:
             def __init__(self) -> None:
@@ -287,7 +285,7 @@ class TestAiohttpTransport:
 
     async def test_try_sync_close_without_connector_is_safe(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
 
         transport.try_sync_close()
 
@@ -295,7 +293,7 @@ class TestAiohttpTransport:
 
     async def test_try_sync_close_connector_without_close_is_dropped(self) -> None:
         fake_module = FakeAiohttpModule()
-        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport = AiohttpTransport(importer=_importer(fake_module))
         transport._connector = object()  # no close attribute
 
         transport.try_sync_close()
@@ -309,4 +307,4 @@ def test_missing_aiohttp_raises_import_error() -> None:
         raise ImportError(msg)
 
     with pytest.raises(ImportError, match="aiohttp is required"):
-        AiohttpTransport(timeout=10, importer=_raise_import_error)
+        AiohttpTransport(importer=_raise_import_error)

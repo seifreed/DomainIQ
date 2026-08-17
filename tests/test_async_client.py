@@ -95,7 +95,6 @@ class TestAsyncClientUnit:
 
         assert isinstance(transport, LifecycleAsyncTransport)
         assert captured == {
-            "timeout": 7,
             "connector_limit": 11,
             "connector_limit_per_host": 3,
         }

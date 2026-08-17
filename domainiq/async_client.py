@@ -67,7 +67,6 @@ def _make_default_async_transport(
     """Create default AiohttpTransport from config. ImportError → DomainIQError."""
     try:
         return transport_factory(
-            timeout=config.timeout,
             connector_limit=config.connector_limit,
             connector_limit_per_host=config.connector_limit_per_host,
         )
