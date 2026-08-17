@@ -266,7 +266,7 @@ class TestAiohttpTransport:
         with pytest.raises(RuntimeError, match="unexpected boom"):
             await transport.get("https://api.example.test", {}, 3)
 
-    def test_try_sync_close_closes_connector(self) -> None:
+    async def test_try_sync_close_closes_connector(self) -> None:
         fake_module = FakeAiohttpModule()
         transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
 
@@ -285,7 +285,7 @@ class TestAiohttpTransport:
         assert connector.closed is True
         assert transport.is_open is False
 
-    def test_try_sync_close_without_connector_is_safe(self) -> None:
+    async def test_try_sync_close_without_connector_is_safe(self) -> None:
         fake_module = FakeAiohttpModule()
         transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
 
@@ -293,7 +293,7 @@ class TestAiohttpTransport:
 
         assert transport.is_open is False
 
-    def test_try_sync_close_connector_without_close_is_dropped(self) -> None:
+    async def test_try_sync_close_connector_without_close_is_dropped(self) -> None:
         fake_module = FakeAiohttpModule()
         transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
         transport._connector = object()  # no close attribute

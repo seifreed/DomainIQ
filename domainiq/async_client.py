@@ -1,6 +1,7 @@
 """Asynchronous client for the DomainIQ API."""
 
 import asyncio
+import functools
 import logging
 import warnings
 from typing import TYPE_CHECKING, Any, Self, TypeVar, Unpack
@@ -286,15 +287,12 @@ class AsyncDomainIQClient(
 
     def __del__(self) -> None:
         """Warn if transport was not properly closed."""
-        transport = getattr(self, "_transport", None)
-
-        def _close() -> None:
-            if transport is not None:
-                _try_sync_close(transport)
-
+        transport: AsyncTransport | None = getattr(self, "_transport", None)
+        if transport is None:
+            return
         _warn_if_unclosed(
             transport,
-            _close,
+            functools.partial(_try_sync_close, transport),
             f"Unclosed {self.__class__.__name__}. "
             "Use 'async with' or call 'await client.close()' explicitly.",
             getattr(warnings, "warn", None),

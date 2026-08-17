@@ -33,9 +33,10 @@ def _warn_if_unclosed(
 
     Shared by both clients' ``__del__``. ``warn`` is passed in (rather than
     read from the ``warnings`` module) so it can be ``None`` during interpreter
-    shutdown and so the branch is directly testable.
+    shutdown and so the branch is directly testable. A missing or already-closed
+    transport reports no ``is_open`` attribute (or ``False``) and is a no-op.
     """
-    if transport is None or not getattr(transport, "is_open", False):
+    if not getattr(transport, "is_open", False):
         return
     with contextlib.suppress(Exception):
         close()

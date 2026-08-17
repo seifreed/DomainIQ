@@ -127,15 +127,12 @@ class DomainIQClient(
 
     def __del__(self) -> None:
         """Warn if transport was not properly closed."""
-        transport = getattr(self, "_transport", None)
-
-        def _close() -> None:
-            if transport is not None:
-                transport.close()
-
+        transport: SyncTransport | None = getattr(self, "_transport", None)
+        if transport is None:
+            return
         _warn_if_unclosed(
             transport,
-            _close,
+            transport.close,
             f"Unclosed {self.__class__.__name__}. "
             "Use 'with' or call 'client.close()' explicitly.",
             getattr(warnings, "warn", None),

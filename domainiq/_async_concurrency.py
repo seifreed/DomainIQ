@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import TYPE_CHECKING, Any
 
 from .exceptions import DomainIQPartialResultsError
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine, Iterable
-
-logger = logging.getLogger(__name__)
 
 
 class _LookupFailure:
@@ -43,13 +40,15 @@ def _collect_task_results[T](
 def _find_critical_exception(
     tasks: list[asyncio.Task[Any]],
 ) -> BaseException | None:
-    """Return the first non-cancelled exception from done tasks, if any."""
+    """Return the first exception from a completed, non-cancelled task, if any.
+
+    Cancelled tasks are skipped: ``task.cancelled()`` already excludes tasks
+    whose only exception is ``CancelledError``.
+    """
     for task in tasks:
-        if task.done() and not task.cancelled() and task.exception() is not None:
+        if task.done() and not task.cancelled():
             exc = task.exception()
-            if isinstance(exc, asyncio.CancelledError):
-                continue
-            if isinstance(exc, BaseException):
+            if exc is not None:
                 return exc
     return None
 
@@ -82,22 +81,15 @@ async def _run_with_critical_cancel[T](
         await _cancel_and_settle(tasks)
         raise
 
+    # asyncio.wait(FIRST_EXCEPTION) only returns early when a task raises, so a
+    # critical exception here means the rest may still be pending; cancel them.
     critical = _find_critical_exception(tasks)
     if critical is not None:
         await _cancel_and_settle(tasks)
-        for task in tasks:
-            if task.done() and not task.cancelled():
-                exc = task.exception()
-                if exc is not None and exc is not critical:
-                    logger.warning("Additional critical exception discarded: %s", exc)
         partials = _collect_task_results(tasks, expected_type)
         raise DomainIQPartialResultsError(critical, partials) from critical
 
-    await _cancel_and_settle(tasks)
-    missed = _find_critical_exception(tasks)
-    if missed is not None:
-        partials = _collect_task_results(tasks, expected_type)
-        raise DomainIQPartialResultsError(missed, partials) from missed
+    # No critical exception: every task has already completed.
     return _collect_task_results(tasks, expected_type)
 
 

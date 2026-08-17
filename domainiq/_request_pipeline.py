@@ -27,6 +27,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The retry loop always returns on success or raises on the final attempt, so
+# falling through past it is impossible; this guards against a future refactor.
+_UNREACHABLE_LOOP_EXIT = "request pipeline loop exited without returning"
+
 
 def _sync_sleep(delay: float) -> None:
     """Sleep between synchronous retries (injectable via ``execute_sync_request``)."""
@@ -109,8 +113,7 @@ def execute_sync_request(
             continue
         return decision[1]
 
-    _unreachable = "unreachable"
-    raise RuntimeError(_unreachable)  # pragma: no cover
+    raise RuntimeError(_UNREACHABLE_LOOP_EXIT)  # pragma: no cover
 
 
 async def execute_async_request(
@@ -150,8 +153,7 @@ async def execute_async_request(
             continue
         return decision[1]
 
-    _unreachable = "unreachable"
-    raise RuntimeError(_unreachable)  # pragma: no cover
+    raise RuntimeError(_UNREACHABLE_LOOP_EXIT)  # pragma: no cover
 
 
 __all__ = [

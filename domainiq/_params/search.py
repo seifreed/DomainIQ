@@ -20,6 +20,8 @@ from domainiq.validators import is_ip_address, validate_domain, validate_email
 from ._shared import require_non_empty
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from domainiq._models import (
         DomainSearchFilters,
     )
@@ -139,6 +141,19 @@ def build_reverse_dns_params(domain: str) -> dict[str, Any]:
     return {"service": "reverse_dns", "domain": domain}
 
 
+_HOST_DATA_VALIDATORS: dict[str, Callable[[str, str], None]] = {
+    "ip": _validate_ip_value,
+    "domain": _validate_domain_value,
+}
+
+
+def _validate_host_data(search_type_value: str, data: str) -> None:
+    """Validate ``data`` as an IP or domain when the search type demands it."""
+    validator = _HOST_DATA_VALIDATORS.get(search_type_value)
+    if validator is not None:
+        validator(data, "data")
+
+
 def build_reverse_ip_params(
     search_type: ReverseIpSearchType | str,
     data: str,
@@ -146,10 +161,7 @@ def build_reverse_ip_params(
     """Build parameters for the reverse-IP endpoint."""
     search_type_value = _validate_type_value(search_type, _REVERSE_IP_TYPES)
     _validate_search_term(data, "data")
-    if search_type_value == "ip":
-        _validate_ip_value(data, "data")
-    elif search_type_value == "domain":
-        _validate_domain_value(data, "data")
+    _validate_host_data(search_type_value, data)
     return {"service": "reverse_ip", "type": search_type_value, "data": data}
 
 
@@ -161,10 +173,7 @@ def build_reverse_mx_params(
     """Build parameters for the reverse-MX endpoint."""
     search_type_value = _validate_type_value(search_type, _REVERSE_MX_TYPES)
     _validate_search_term(data, "data")
-    if search_type_value == "ip":
-        _validate_ip_value(data, "data")
-    elif search_type_value == "domain":
-        _validate_domain_value(data, "data")
+    _validate_host_data(search_type_value, data)
     params: dict[str, Any] = {
         "service": "reverse_mx",
         "type": search_type_value,

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from domainiq._async_concurrency import _LookupFailure
 from domainiq._base_client import _assert_csv_str, _assert_json_dict_or_list
 from domainiq._key_sources import _ApiKeyLoader, _FileKeySource, _ParamKeySource
 from domainiq._params.bulk import build_bulk_whois_ip_params
@@ -217,6 +218,24 @@ class TestKeySourceBranches:
         assert loader.load(None) == "injected-key"
 
 
+class TestReprs:
+    def test_config_repr_masks_api_key(self) -> None:
+        text = repr(Config(api_key="super-secret"))
+        assert "super-secret" not in text
+        assert "api_key=" in text
+
+    def test_config_repr_without_api_key_shows_none(self) -> None:
+        config = Config(api_key="k")
+        config.api_key = ""
+        assert "api_key=None" in repr(config)
+
+    def test_lookup_failure_repr_includes_target_and_error(self) -> None:
+        failure = _LookupFailure("example.com", ValueError("boom"))
+        text = repr(failure)
+        assert "example.com" in text
+        assert "boom" in text
+
+
 class TestValidatorBranches:
     def test_validate_ipv6_rejects_non_string(self) -> None:
         assert validate_ipv6(cast("str", 123)) is False
@@ -281,6 +300,10 @@ class TestReverseAndMonitorParamBranches:
             ReverseSearchType.NAME, "John Doe", ReverseMatchType.CONTAINS
         )
         assert params["type"] == "name"
+
+    def test_reverse_ip_ip_type_validates_ip(self) -> None:
+        params = build_reverse_ip_params(ReverseIpSearchType.IP, "8.8.8.8")
+        assert params["type"] == "ip"
 
     def test_reverse_ip_domain_type_validates_domain(self) -> None:
         params = build_reverse_ip_params(ReverseIpSearchType.DOMAIN, "example.com")

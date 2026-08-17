@@ -195,11 +195,15 @@ class TestConcurrentLookupCriticalCancel:
         assert any(isinstance(result, WhoisResult) for result in partial)
 
     async def test_multiple_critical_exceptions_keep_first_as_cause(self) -> None:
+        # When several lookups raise critical errors, the first one becomes the
+        # cause of the partial-results error.
         async def fail_first() -> WhoisResult:
+            await asyncio.sleep(0)
             msg = "first"
             raise DomainIQAuthenticationError(msg)
 
         async def fail_second() -> WhoisResult:
+            await asyncio.sleep(0)
             msg = "second"
             raise DomainIQAuthenticationError(msg)
 
@@ -207,6 +211,18 @@ class TestConcurrentLookupCriticalCancel:
             await _run_with_critical_cancel([fail_first(), fail_second()], WhoisResult)
 
         assert isinstance(exc_info.value.__cause__, DomainIQAuthenticationError)
+
+    async def test_outer_cancellation_settles_pending_tasks(self) -> None:
+        async def slow() -> WhoisResult:
+            await asyncio.sleep(10)
+            return WhoisResult(domain="slow.com")
+
+        outer = asyncio.ensure_future(_run_with_critical_cancel([slow()], WhoisResult))
+        await asyncio.sleep(0)
+        outer.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await outer
 
     async def test_all_success_returns_ordered_results(self) -> None:
         async def make(name: str) -> WhoisResult:

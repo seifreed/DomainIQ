@@ -111,19 +111,18 @@ omit = [
 ]
 
 [tool.coverage.report]
+# Only structurally-unreachable lines are excluded: type-checking-only blocks,
+# ellipsis stub bodies of Protocol/abstract methods (type contracts that never
+# execute), the module entry guard, and the two mypy-required unreachable retry
+# sentinels marked with `pragma: no cover`.
 exclude_lines = [
     "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
     "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
     "if TYPE_CHECKING:",
+    "^\\s*\\.\\.\\.\\s*$",
+    ": \\.\\.\\.\\s*$",
 ]
+fail_under = 100
 
 # Ruff = linter only (isort, flake8, pyupgrade, bandit-lint, ...). Black owns formatting.
 [tool.ruff]
