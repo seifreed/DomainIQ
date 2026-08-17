@@ -75,6 +75,8 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "monitor_change": None,
         "queue_hash": None,
         "queue_action": None,
+        "submit_queued": None,
+        "queued_param": None,
         "limits": False,
         "create_monitor_report": None,
         "email_alert": True,

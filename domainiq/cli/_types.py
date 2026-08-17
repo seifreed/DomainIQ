@@ -46,6 +46,18 @@ class QueueArgs:
 
 
 @dataclass(frozen=True)
+class SubmitQueuedArgs:
+    service: str
+    params: dict[str, str]
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace) -> SubmitQueuedArgs:
+        pairs = args.queued_param or []
+        params = dict(pair.split("=", 1) for pair in pairs)
+        return cls(service=args.submit_queued, params=params)
+
+
+@dataclass(frozen=True)
 class DomainSearchArgs:
     keywords: list[str]
     conditions: list[str] | None

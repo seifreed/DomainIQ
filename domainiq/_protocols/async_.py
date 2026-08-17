@@ -208,6 +208,10 @@ class AsyncMonitorProtocol(Protocol):
 class AsyncQueueProtocol(Protocol):
     async def check_queue(self, request_hash: str, action: str) -> QueueResult: ...
 
+    async def submit_queued(
+        self, service: str, **params: str | int | bool
+    ) -> QueueResult: ...
+
 
 @runtime_checkable
 class AsyncLimitsProtocol(Protocol):

@@ -21,10 +21,11 @@ from ._handlers import (
     build_snapshot_options,
     handle_dns_lookup,
     handle_queue,
+    handle_submit_queued,
     handle_whois_lookup,
 )
 from ._serialization import print_result
-from ._types import DnsArgs, QueueArgs, SnapshotArgs, WhoisArgs
+from ._types import DnsArgs, QueueArgs, SnapshotArgs, SubmitQueuedArgs, WhoisArgs
 from ._validation import validate_args
 
 if TYPE_CHECKING:
@@ -100,12 +101,21 @@ def _dispatch_domain_analysis(
 
 
 def _dispatch_queue(client: QueueProtocol, args: argparse.Namespace) -> _CommandResult:
-    """Dispatch the queued-request command. Returns (executed, had_errors)."""
+    """Dispatch the queued-request commands. Returns (executed, had_errors)."""
+    results = []
     if args.queue_hash is not None and args.queue_action is not None:
-        return _run_command(
-            partial(handle_queue, client, QueueArgs.from_namespace(args))
+        results.append(
+            _run_command(partial(handle_queue, client, QueueArgs.from_namespace(args)))
         )
-    return _CommandResult(executed=False, errored=False)
+    if args.submit_queued is not None:
+        results.append(
+            _run_command(
+                partial(
+                    handle_submit_queued, client, SubmitQueuedArgs.from_namespace(args)
+                )
+            )
+        )
+    return _aggregate(results)
 
 
 def _dispatch_limits(

@@ -275,6 +275,17 @@ def _add_queue_args(parser: argparse.ArgumentParser) -> None:
     """Add queued-request management arguments."""
     parser.add_argument("--queue-hash", help="Hash of a queued API request to poll")
     parser.add_argument(
+        "--submit-queued",
+        metavar="SERVICE",
+        help="Submit a service request in queued mode and print its hash",
+    )
+    parser.add_argument(
+        "--queued-param",
+        metavar="KEY=VALUE",
+        action="append",
+        help="Parameter for --submit-queued (repeatable)",
+    )
+    parser.add_argument(
         "--queue-action", help="Queue action to perform (e.g. status, result)"
     )
 

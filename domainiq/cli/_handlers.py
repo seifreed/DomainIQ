@@ -17,7 +17,14 @@ if TYPE_CHECKING:
         WhoisProtocol,
     )
 
-    from ._types import DnsArgs, DomainSearchArgs, QueueArgs, SnapshotArgs, WhoisArgs
+    from ._types import (
+        DnsArgs,
+        DomainSearchArgs,
+        QueueArgs,
+        SnapshotArgs,
+        SubmitQueuedArgs,
+        WhoisArgs,
+    )
 
 
 def build_snapshot_options(args: SnapshotArgs) -> SnapshotOptions:
@@ -60,6 +67,12 @@ def handle_dns_lookup(client: DNSProtocol, args: DnsArgs) -> None:
 def handle_queue(client: QueueProtocol, args: QueueArgs) -> None:
     """Handle queued-request polling command."""
     result = client.check_queue(args.request_hash, args.action)
+    print_result(result)
+
+
+def handle_submit_queued(client: QueueProtocol, args: SubmitQueuedArgs) -> None:
+    """Handle queued-request submission command."""
+    result = client.submit_queued(args.service, **args.params)
     print_result(result)
 
 

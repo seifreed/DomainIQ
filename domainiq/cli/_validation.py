@@ -38,7 +38,18 @@ _EMPTY_STRING_FLAGS: tuple[tuple[str, str], ...] = (
     ("modify_typo_strength", "--modify-typo-strength"),
     ("queue_hash", "--queue-hash"),
     ("queue_action", "--queue-action"),
+    ("submit_queued", "--submit-queued"),
 )
+
+
+def _check_queued_params(args: argparse.Namespace) -> list[str]:
+    """Collect errors for malformed --queued-param values."""
+    errors: list[str] = []
+    for pair in args.queued_param or []:
+        key, sep, _value = pair.partition("=")
+        if not sep or not key.strip():
+            errors.append(f"--queued-param must be KEY=VALUE, got: {pair!r}")
+    return errors
 
 
 def _check_empty_strings(args: argparse.Namespace) -> list[str]:
@@ -81,6 +92,9 @@ def validate_args(args: argparse.Namespace) -> list[str]:
         errors.append("--queue-action is required with --queue-hash")
     if args.queue_action is not None and args.queue_hash is None:
         errors.append("--queue-hash is required with --queue-action")
+    if args.queued_param and args.submit_queued is None:
+        errors.append("--submit-queued is required with --queued-param")
+    errors.extend(_check_queued_params(args))
 
     return errors
 
