@@ -99,3 +99,5 @@ docs/_build/
 
 # Hatch build system
 .hatch/
+# Local Claude tool artifacts
+.claude/
