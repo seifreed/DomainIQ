@@ -171,8 +171,7 @@ class Config:
                 over the config file.
         """
         self.config_file_path = Path(path)
-        if isinstance(self._loader, _ApiKeyLoader):
-            self._loader = _ApiKeyLoader(self.config_file_path, env=self._env)
+        self._loader = _ApiKeyLoader(self.config_file_path, env=self._env)
         self.api_key = self._loader.load(api_key)
         self.validate()
 

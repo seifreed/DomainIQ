@@ -153,6 +153,24 @@ class TestDispatch:
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_NO_COMMAND
 
+    def test_dispatch_domain_categorize(self) -> None:
+        client = _mock_client()
+        args = _make_args(domain_categorize="example.com")
+        _dispatch_command(cast("DomainIQClientProtocol", client), args)
+        assert len(client.calls_to("domain_categorize")) == 1
+
+    def test_dispatch_domain_snapshot_forwards_options(self) -> None:
+        client = _mock_client()
+        args = _make_args(domain_snapshot="example.com", width=800, height=600)
+        _dispatch_command(cast("DomainIQClientProtocol", client), args)
+        assert len(client.calls_to("domain_snapshot")) == 1
+
+    def test_dispatch_domain_snapshot_history_forwards_options(self) -> None:
+        client = _mock_client()
+        args = _make_args(domain_snapshot_history="example.com", raw=True)
+        _dispatch_command(cast("DomainIQClientProtocol", client), args)
+        assert len(client.calls_to("domain_snapshot_history")) == 1
+
     def test_dispatch_command_success(self) -> None:
         client = _mock_client()
         args = _make_args(whois_lookup="example.com")

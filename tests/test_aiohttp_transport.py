@@ -257,6 +257,51 @@ class TestAiohttpTransport:
         # Connector was created but should be closed on failure.
         assert transport._connector is None or transport._connector.closed is True
 
+    async def test_non_closed_runtime_error_propagates(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        session = await transport._get_session()
+        session.error = RuntimeError("unexpected boom")
+
+        with pytest.raises(RuntimeError, match="unexpected boom"):
+            await transport.get("https://api.example.test", {}, 3)
+
+    def test_try_sync_close_closes_connector(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+
+        class _SyncConnector:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        connector = _SyncConnector()
+        transport._connector = connector
+
+        transport.try_sync_close()
+
+        assert connector.closed is True
+        assert transport.is_open is False
+
+    def test_try_sync_close_without_connector_is_safe(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+
+        transport.try_sync_close()
+
+        assert transport.is_open is False
+
+    def test_try_sync_close_connector_without_close_is_dropped(self) -> None:
+        fake_module = FakeAiohttpModule()
+        transport = AiohttpTransport(timeout=10, importer=_importer(fake_module))
+        transport._connector = object()  # no close attribute
+
+        transport.try_sync_close()
+
+        assert transport._connector is None
+
 
 def test_missing_aiohttp_raises_import_error() -> None:
     def _raise_import_error(name: str) -> NoReturn:

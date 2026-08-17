@@ -16,7 +16,12 @@ import pytest
 from domainiq._base_client import _assert_csv_str, _assert_json_dict_or_list
 from domainiq._key_sources import _ApiKeyLoader, _FileKeySource, _ParamKeySource
 from domainiq._params.bulk import build_bulk_whois_ip_params
-from domainiq._params.search import build_reverse_search_params
+from domainiq._params.monitor import build_add_monitor_item_params
+from domainiq._params.search import (
+    build_reverse_ip_params,
+    build_reverse_mx_params,
+    build_reverse_search_params,
+)
 from domainiq.client import DomainIQClient
 from domainiq.config import Config
 from domainiq.constants import API_FORMAT_JSON
@@ -33,7 +38,13 @@ from domainiq.exceptions import (
     DomainIQValidationError,
 )
 from domainiq.formatters import format_api_params, sanitize_params_for_log
-from domainiq.models import ReverseMatchType, ReverseSearchType
+from domainiq.models import (
+    MonitorItemType,
+    ReverseIpSearchType,
+    ReverseMatchType,
+    ReverseMxSearchType,
+    ReverseSearchType,
+)
 from domainiq.parsers import (
     parse_bool,
     parse_nameservers,
@@ -44,7 +55,7 @@ from domainiq.request_policy import parse_response_body
 from domainiq.utils import csv_to_dict_list, parse_retry_after, setup_logging
 from domainiq.validators import validate_domain, validate_email, validate_ipv6
 
-from .conftest import make_sync_response
+from .conftest import make_async_response, make_sync_response
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -129,6 +140,10 @@ class TestUtilsBranches:
 
     def test_retry_after_garbage_returns_none(self) -> None:
         assert parse_retry_after({"Retry-After": "not-a-date"}) is None
+
+    def test_retry_after_skips_unrelated_headers(self) -> None:
+        headers = {"X-Other": "ignored", "Retry-After": "7"}
+        assert parse_retry_after(headers) == 7
 
     def test_retry_after_naive_http_date_is_treated_as_utc(self) -> None:
         seconds = parse_retry_after({"Retry-After": "Wed, 21 Oct 2099 07:28:00"})
@@ -258,3 +273,70 @@ class TestFormatterBranches:
     def test_format_list_param_sorts_mixed_set_by_str(self) -> None:
         formatted = format_api_params({"tags": {1, "a"}})
         assert set(formatted["tags"].split(",")) == {"1", "a"}
+
+
+class TestReverseAndMonitorParamBranches:
+    def test_reverse_search_non_email_skips_email_validation(self) -> None:
+        params = build_reverse_search_params(
+            ReverseSearchType.NAME, "John Doe", ReverseMatchType.CONTAINS
+        )
+        assert params["type"] == "name"
+
+    def test_reverse_ip_domain_type_validates_domain(self) -> None:
+        params = build_reverse_ip_params(ReverseIpSearchType.DOMAIN, "example.com")
+        assert params["type"] == "domain"
+
+    def test_reverse_ip_subnet_type_skips_host_validation(self) -> None:
+        params = build_reverse_ip_params(ReverseIpSearchType.SUBNET, "192.0.2.0/24")
+        assert params["type"] == "subnet"
+
+    def test_reverse_mx_domain_and_ip_types(self) -> None:
+        domain_params = build_reverse_mx_params(
+            ReverseMxSearchType.DOMAIN, "example.com", recursive=False
+        )
+        ip_params = build_reverse_mx_params(
+            ReverseMxSearchType.IP, "8.8.8.8", recursive=True
+        )
+        assert domain_params["type"] == "domain"
+        assert ip_params["type"] == "ip"
+
+    def test_add_monitor_item_validates_per_type(self) -> None:
+        assert (
+            build_add_monitor_item_params(1, MonitorItemType.DOMAIN, ["example.com"])[
+                "type"
+            ]
+            == "domain"
+        )
+        assert (
+            build_add_monitor_item_params(1, MonitorItemType.IP, ["8.8.8.8"])["type"]
+            == "ip"
+        )
+        assert (
+            build_add_monitor_item_params(1, MonitorItemType.NS, ["anything"])["type"]
+            == "ns"
+        )
+
+
+class TestResponseCaching:
+    def test_sync_response_json_is_cached(self) -> None:
+        response = make_sync_response(200, '{"a": 1}')
+        first = response.json()
+        assert response.json() is first
+
+    def test_async_response_json_is_cached(self) -> None:
+        response = make_async_response(200, '{"a": 1}')
+        first = response.json()
+        assert response.json() is first
+
+
+class TestDnsDomainExtractionBranch:
+    def test_soa_with_empty_host_falls_through_to_next_record(self) -> None:
+        result = parse_dns_result(
+            {
+                "records": [
+                    {"type": "SOA", "host": ""},
+                    {"type": "NS", "host": "ns.example"},
+                ]
+            }
+        )
+        assert result.domain == "ns.example"

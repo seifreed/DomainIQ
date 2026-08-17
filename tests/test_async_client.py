@@ -194,6 +194,20 @@ class TestConcurrentLookupCriticalCancel:
         assert partial[2] is None
         assert any(isinstance(result, WhoisResult) for result in partial)
 
+    async def test_multiple_critical_exceptions_keep_first_as_cause(self) -> None:
+        async def fail_first() -> WhoisResult:
+            msg = "first"
+            raise DomainIQAuthenticationError(msg)
+
+        async def fail_second() -> WhoisResult:
+            msg = "second"
+            raise DomainIQAuthenticationError(msg)
+
+        with pytest.raises(DomainIQPartialResultsError) as exc_info:
+            await _run_with_critical_cancel([fail_first(), fail_second()], WhoisResult)
+
+        assert isinstance(exc_info.value.__cause__, DomainIQAuthenticationError)
+
     async def test_all_success_returns_ordered_results(self) -> None:
         async def make(name: str) -> WhoisResult:
             await asyncio.sleep(0)
