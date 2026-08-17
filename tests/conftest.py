@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from typing import Any, NamedTuple, Self
 
 import pytest
@@ -10,6 +11,90 @@ from domainiq import DomainIQClient
 from domainiq.async_client import AsyncDomainIQClient
 from domainiq.config import Config
 from domainiq.http_transport import AsyncResponse, SyncResponse
+
+
+def make_cli_args(**kwargs: Any) -> argparse.Namespace:
+    """Build a Namespace with all CLI attributes defaulted to None/False."""
+    defaults: dict[str, Any] = {
+        "api_key": None,
+        "config_file": None,
+        "verbose": False,
+        "debug": False,
+        "timeout": 30,
+        "whois_lookup": None,
+        "full": False,
+        "current_only": False,
+        "dns_lookup": None,
+        "types": None,
+        "domain_categorize": None,
+        "domain_snapshot": None,
+        "domain_snapshot_history": None,
+        "snapshot_limit": None,
+        "snapshot_full": False,
+        "no_cache": False,
+        "raw": False,
+        "width": None,
+        "height": None,
+        "domain_report": None,
+        "cached": False,
+        "name_report": None,
+        "organization_report": None,
+        "email_report": None,
+        "ip_report": None,
+        "domain_search": None,
+        "conditions": None,
+        "match": "any",
+        "count_only": False,
+        "exclude_dashed": False,
+        "exclude_numbers": False,
+        "exclude_idn": False,
+        "min_length": None,
+        "max_length": None,
+        "min_create_date": None,
+        "max_create_date": None,
+        "search_limit": None,
+        "reverse_search_type": None,
+        "reverse_search": None,
+        "reverse_match": "contains",
+        "reverse_dns": None,
+        "reverse_ip_type": None,
+        "reverse_ip_data": None,
+        "reverse_mx_type": None,
+        "reverse_mx_data": None,
+        "recursive": False,
+        "bulk_dns": None,
+        "bulk_dns_type": None,
+        "bulk_whois": None,
+        "bulk_whois_type": "live",
+        "bulk_whois_ip": None,
+        "monitor_list": False,
+        "monitor_report_items": None,
+        "monitor_report_summary": None,
+        "monitor_item": None,
+        "monitor_range": None,
+        "monitor_report_changes": None,
+        "monitor_change": None,
+        "queue_hash": None,
+        "queue_action": None,
+        "submit_queued": None,
+        "queued_param": None,
+        "limits": False,
+        "create_monitor_report": None,
+        "email_alert": True,
+        "add_monitor_item": None,
+        "monitor_domain_alert": None,
+        "monitor_match_types": None,
+        "monitor_join_types": None,
+        "monitor_use_typos": None,
+        "monitor_typo_strength": None,
+        "enable_typos": None,
+        "disable_typos": None,
+        "modify_typo_strength": None,
+        "delete_monitor_item": None,
+        "delete_monitor_report": None,
+    }
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
 
 
 class RecordedCall(NamedTuple):

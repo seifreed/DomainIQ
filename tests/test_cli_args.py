@@ -2,98 +2,13 @@
 
 from __future__ import annotations
 
-import argparse
-from typing import Any
-
 import pytest
 
 from domainiq.cli._args import create_parser
 from domainiq.cli._types import DnsArgs
 from domainiq.cli._validation import validate_args as _validate_args
 
-
-def _make_args(**kwargs: Any) -> argparse.Namespace:
-    """Build a Namespace with all CLI attributes defaulted to None/False."""
-    defaults: dict[str, Any] = {
-        "api_key": None,
-        "config_file": None,
-        "verbose": False,
-        "debug": False,
-        "timeout": 30,
-        "whois_lookup": None,
-        "full": False,
-        "current_only": False,
-        "dns_lookup": None,
-        "types": None,
-        "domain_categorize": None,
-        "domain_snapshot": None,
-        "domain_snapshot_history": None,
-        "snapshot_limit": None,
-        "snapshot_full": False,
-        "no_cache": False,
-        "raw": False,
-        "width": None,
-        "height": None,
-        "domain_report": None,
-        "cached": False,
-        "name_report": None,
-        "organization_report": None,
-        "email_report": None,
-        "ip_report": None,
-        "domain_search": None,
-        "conditions": None,
-        "match": "any",
-        "count_only": False,
-        "exclude_dashed": False,
-        "exclude_numbers": False,
-        "exclude_idn": False,
-        "min_length": None,
-        "max_length": None,
-        "min_create_date": None,
-        "max_create_date": None,
-        "search_limit": None,
-        "reverse_search_type": None,
-        "reverse_search": None,
-        "reverse_match": "contains",
-        "reverse_dns": None,
-        "reverse_ip_type": None,
-        "reverse_ip_data": None,
-        "reverse_mx_type": None,
-        "reverse_mx_data": None,
-        "recursive": False,
-        "bulk_dns": None,
-        "bulk_dns_type": None,
-        "bulk_whois": None,
-        "bulk_whois_type": "live",
-        "bulk_whois_ip": None,
-        "monitor_list": False,
-        "monitor_report_items": None,
-        "monitor_report_summary": None,
-        "monitor_item": None,
-        "monitor_range": None,
-        "monitor_report_changes": None,
-        "monitor_change": None,
-        "queue_hash": None,
-        "queue_action": None,
-        "submit_queued": None,
-        "queued_param": None,
-        "limits": False,
-        "create_monitor_report": None,
-        "email_alert": True,
-        "add_monitor_item": None,
-        "monitor_domain_alert": None,
-        "monitor_match_types": None,
-        "monitor_join_types": None,
-        "monitor_use_typos": None,
-        "monitor_typo_strength": None,
-        "enable_typos": None,
-        "disable_typos": None,
-        "modify_typo_strength": None,
-        "delete_monitor_item": None,
-        "delete_monitor_report": None,
-    }
-    defaults.update(kwargs)
-    return argparse.Namespace(**defaults)
+from .conftest import make_cli_args
 
 
 class TestArgParsing:
@@ -218,75 +133,75 @@ class TestArgParsing:
 
 class TestValidateArgs:
     def test_no_errors_when_args_valid(self) -> None:
-        args = _make_args(whois_lookup="example.com")
+        args = make_cli_args(whois_lookup="example.com")
         assert _validate_args(args) == []
 
     def test_reverse_search_requires_type(self) -> None:
-        args = _make_args(reverse_search="foo")
+        args = make_cli_args(reverse_search="foo")
         errors = _validate_args(args)
         assert any("reverse-search-type" in e for e in errors)
 
     def test_reverse_search_type_requires_term(self) -> None:
-        args = _make_args(reverse_search_type="email")
+        args = make_cli_args(reverse_search_type="email")
         errors = _validate_args(args)
         assert any("reverse-search is required" in e for e in errors)
 
     def test_reverse_ip_type_requires_data(self) -> None:
-        args = _make_args(reverse_ip_type="ip")
+        args = make_cli_args(reverse_ip_type="ip")
         errors = _validate_args(args)
         assert any("reverse-ip-data" in e for e in errors)
 
     def test_reverse_ip_data_requires_type(self) -> None:
-        args = _make_args(reverse_ip_data="192.0.2.1")
+        args = make_cli_args(reverse_ip_data="192.0.2.1")
         errors = _validate_args(args)
         assert any("reverse-ip-type" in e for e in errors)
 
     def test_reverse_mx_type_requires_data(self) -> None:
-        args = _make_args(reverse_mx_type="domain")
+        args = make_cli_args(reverse_mx_type="domain")
         errors = _validate_args(args)
         assert any("reverse-mx-data" in e for e in errors)
 
     def test_reverse_mx_data_requires_type(self) -> None:
-        args = _make_args(reverse_mx_data="example.com")
+        args = make_cli_args(reverse_mx_data="example.com")
         errors = _validate_args(args)
         assert any("reverse-mx-type" in e for e in errors)
 
     def test_monitor_changes_requires_change_id(self) -> None:
-        args = _make_args(monitor_report_changes=5)
+        args = make_cli_args(monitor_report_changes=5)
         errors = _validate_args(args)
         assert any("monitor-change" in e for e in errors)
 
     def test_monitor_change_requires_report_id(self) -> None:
-        args = _make_args(monitor_change=9)
+        args = make_cli_args(monitor_change=9)
         errors = _validate_args(args)
         assert any("monitor-report-changes" in e for e in errors)
 
     def test_empty_string_in_list_arg_is_caught_regression(self) -> None:
         """Regression: empty strings inside nargs='+' args bypassed validation."""
-        args = _make_args(domain_search=["ok", ""])
+        args = make_cli_args(domain_search=["ok", ""])
         errors = _validate_args(args)
         assert any("--domain-search cannot be empty" in e for e in errors)
 
     def test_empty_reverse_dns_is_caught_regression(self) -> None:
         """Regression: --reverse-dns was missing from empty-string checks."""
-        args = _make_args(reverse_dns="")
+        args = make_cli_args(reverse_dns="")
         errors = _validate_args(args)
         assert any("--reverse-dns cannot be empty" in e for e in errors)
 
     def test_empty_types_is_caught_regression(self) -> None:
         """Regression: --types was missing from empty-string checks."""
-        args = _make_args(types="")
+        args = make_cli_args(types="")
         errors = _validate_args(args)
         assert any("--types cannot be empty" in e for e in errors)
 
     def test_empty_min_create_date_is_caught_regression(self) -> None:
         """Regression: --min-create-date was missing from empty-string checks."""
-        args = _make_args(min_create_date="")
+        args = make_cli_args(min_create_date="")
         errors = _validate_args(args)
         assert any("--min-create-date cannot be empty" in e for e in errors)
 
     def test_empty_max_create_date_is_caught_regression(self) -> None:
         """Regression: --max-create-date was missing from empty-string checks."""
-        args = _make_args(max_create_date="")
+        args = make_cli_args(max_create_date="")
         errors = _validate_args(args)
         assert any("--max-create-date cannot be empty" in e for e in errors)

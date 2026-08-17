@@ -878,14 +878,24 @@ class TestLogicBugRegressions:
         result = parse_dns_result(data)
         assert result.domain == "example.com"
 
-    def test_dns_result_maps_soa_mname_field(self) -> None:
+    @pytest.mark.parametrize(
+        ("record_type", "field", "value"),
+        [
+            ("SOA", "mname", "ns1.example.com"),
+            ("PTR", "ptrdname", "host.example.com"),
+            ("NS", "nameserver", "ns1.example.com"),
+        ],
+    )
+    def test_dns_result_maps_type_specific_value_fields(
+        self, record_type: str, field: str, value: str
+    ) -> None:
         data = {
             "domain": "example.com",
             "records": [
                 {
                     "name": "example.com",
-                    "type": "SOA",
-                    "mname": "ns1.example.com",
+                    "type": record_type,
+                    field: value,
                 }
             ],
         }
@@ -893,44 +903,8 @@ class TestLogicBugRegressions:
         result = parse_dns_result(data)
 
         assert len(result.records) == 1
-        assert result.records[0].type == "SOA"
-        assert result.records[0].value == "ns1.example.com"
-
-    def test_dns_result_maps_ptr_ptrdname_field(self) -> None:
-        data = {
-            "domain": "example.com",
-            "records": [
-                {
-                    "name": "1.2.0.192.in-addr.arpa",
-                    "type": "PTR",
-                    "ptrdname": "host.example.com",
-                }
-            ],
-        }
-
-        result = parse_dns_result(data)
-
-        assert len(result.records) == 1
-        assert result.records[0].type == "PTR"
-        assert result.records[0].value == "host.example.com"
-
-    def test_dns_result_maps_ns_nameserver_field(self) -> None:
-        data = {
-            "domain": "example.com",
-            "records": [
-                {
-                    "name": "example.com",
-                    "type": "NS",
-                    "nameserver": "ns1.example.com",
-                }
-            ],
-        }
-
-        result = parse_dns_result(data)
-
-        assert len(result.records) == 1
-        assert result.records[0].type == "NS"
-        assert result.records[0].value == "ns1.example.com"
+        assert result.records[0].type == record_type
+        assert result.records[0].value == value
 
     def test_dns_result_maps_mx_exchange_field(self) -> None:
         data = {

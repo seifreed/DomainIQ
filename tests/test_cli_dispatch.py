@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import argparse
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -40,7 +39,7 @@ from domainiq.models import (
     MonitorItemOptions,
     ReverseMatchType,
 )
-from tests.conftest import StubClient
+from tests.conftest import StubClient, make_cli_args
 
 if TYPE_CHECKING:
     from domainiq.protocols import (
@@ -54,90 +53,6 @@ if TYPE_CHECKING:
     )
 
 
-def _make_args(**kwargs: Any) -> argparse.Namespace:
-    """Build a Namespace with all CLI attributes defaulted to None/False."""
-    defaults: dict[str, Any] = {
-        "api_key": None,
-        "config_file": None,
-        "verbose": False,
-        "debug": False,
-        "timeout": 30,
-        "whois_lookup": None,
-        "full": False,
-        "current_only": False,
-        "dns_lookup": None,
-        "types": None,
-        "domain_categorize": None,
-        "domain_snapshot": None,
-        "domain_snapshot_history": None,
-        "snapshot_limit": None,
-        "snapshot_full": False,
-        "no_cache": False,
-        "raw": False,
-        "width": None,
-        "height": None,
-        "domain_report": None,
-        "cached": False,
-        "name_report": None,
-        "organization_report": None,
-        "email_report": None,
-        "ip_report": None,
-        "domain_search": None,
-        "conditions": None,
-        "match": "any",
-        "count_only": False,
-        "exclude_dashed": False,
-        "exclude_numbers": False,
-        "exclude_idn": False,
-        "min_length": None,
-        "max_length": None,
-        "min_create_date": None,
-        "max_create_date": None,
-        "search_limit": None,
-        "reverse_search_type": None,
-        "reverse_search": None,
-        "reverse_match": "contains",
-        "reverse_dns": None,
-        "reverse_ip_type": None,
-        "reverse_ip_data": None,
-        "reverse_mx_type": None,
-        "reverse_mx_data": None,
-        "recursive": False,
-        "bulk_dns": None,
-        "bulk_dns_type": None,
-        "bulk_whois": None,
-        "bulk_whois_type": "live",
-        "bulk_whois_ip": None,
-        "monitor_list": False,
-        "monitor_report_items": None,
-        "monitor_report_summary": None,
-        "monitor_item": None,
-        "monitor_range": None,
-        "monitor_report_changes": None,
-        "monitor_change": None,
-        "queue_hash": None,
-        "queue_action": None,
-        "submit_queued": None,
-        "queued_param": None,
-        "limits": False,
-        "create_monitor_report": None,
-        "email_alert": True,
-        "add_monitor_item": None,
-        "monitor_domain_alert": None,
-        "monitor_match_types": None,
-        "monitor_join_types": None,
-        "monitor_use_typos": None,
-        "monitor_typo_strength": None,
-        "enable_typos": None,
-        "disable_typos": None,
-        "modify_typo_strength": None,
-        "delete_monitor_item": None,
-        "delete_monitor_report": None,
-    }
-    defaults.update(kwargs)
-    return argparse.Namespace(**defaults)
-
-
 def _mock_client() -> StubClient:
     return StubClient()
 
@@ -146,71 +61,71 @@ class TestDispatch:
     def test_dispatch_whois_returns_executed_true(self) -> None:
         client = _mock_client()
         client.set_result("whois_lookup", {"domain": "example.com"})
-        args = _make_args(whois_lookup="example.com")
+        args = make_cli_args(whois_lookup="example.com")
         executed, had_errors = _dispatch_whois(cast("WhoisProtocol", client), args)
         assert executed is True
         assert had_errors is False
 
     def test_dispatch_whois_not_triggered_when_absent(self) -> None:
         client = _mock_client()
-        args = _make_args()
+        args = make_cli_args()
         executed, had_errors = _dispatch_whois(cast("WhoisProtocol", client), args)
         assert executed is False
         assert had_errors is False
 
     def test_dispatch_dns_returns_executed_true(self) -> None:
         client = _mock_client()
-        args = _make_args(dns_lookup="example.com")
+        args = make_cli_args(dns_lookup="example.com")
         executed, _had_errors = _dispatch_dns(cast("DNSProtocol", client), args)
         assert executed is True
 
     def test_dispatch_command_no_command_returns_exit_no_command(self) -> None:
         client = _mock_client()
-        args = _make_args()
+        args = make_cli_args()
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_NO_COMMAND
 
     def test_dispatch_domain_categorize(self) -> None:
         client = _mock_client()
-        args = _make_args(domain_categorize="example.com")
+        args = make_cli_args(domain_categorize="example.com")
         _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert len(client.calls_to("domain_categorize")) == 1
 
     def test_dispatch_domain_snapshot_forwards_options(self) -> None:
         client = _mock_client()
-        args = _make_args(domain_snapshot="example.com", width=800, height=600)
+        args = make_cli_args(domain_snapshot="example.com", width=800, height=600)
         _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert len(client.calls_to("domain_snapshot")) == 1
 
     def test_dispatch_domain_snapshot_history_forwards_options(self) -> None:
         client = _mock_client()
-        args = _make_args(domain_snapshot_history="example.com", raw=True)
+        args = make_cli_args(domain_snapshot_history="example.com", raw=True)
         _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert len(client.calls_to("domain_snapshot_history")) == 1
 
     def test_dispatch_command_success(self) -> None:
         client = _mock_client()
-        args = _make_args(whois_lookup="example.com")
+        args = make_cli_args(whois_lookup="example.com")
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_SUCCESS
 
     def test_dispatch_command_error_on_domainiq_error(self) -> None:
         client = _mock_client()
         client.set_error("whois_lookup", DomainIQError("API failure"))
-        args = _make_args(whois_lookup="example.com")
+        args = make_cli_args(whois_lookup="example.com")
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_ERROR
 
     def test_dispatch_command_partial_on_mixed_results(self) -> None:
         client = _mock_client()
         client.set_error("dns_lookup", DomainIQError("DNS failure"))
-        args = _make_args(whois_lookup="example.com", dns_lookup="example.com")
+        args = make_cli_args(whois_lookup="example.com", dns_lookup="example.com")
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_PARTIAL
 
     def test_dispatch_validation_error_returns_exit_error(self) -> None:
         client = _mock_client()
-        args = _make_args(reverse_search="foo")  # missing reverse_search_type
+        args = make_cli_args(reverse_search="foo")  # missing reverse_search_type
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_ERROR
 
@@ -219,7 +134,7 @@ class TestDispatch:
     ) -> None:
         """Regression: whitespace-only values bypassed empty-string check."""
         client = _mock_client()
-        args = _make_args(whois_lookup="   ")
+        args = make_cli_args(whois_lookup="   ")
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
         assert result == _EXIT_ERROR
 
@@ -227,7 +142,7 @@ class TestDispatch:
 class TestDispatchSearch:
     def test_dispatch_domain_search_forwards_namespace_args(self) -> None:
         client = _mock_client()
-        args = _make_args(
+        args = make_cli_args(
             domain_search=["brand"],
             match="all",
             exclude_idn=True,
@@ -245,7 +160,7 @@ class TestDispatchSearch:
 
     def test_dispatch_reverse_search_commands(self) -> None:
         client = _mock_client()
-        args = _make_args(
+        args = make_cli_args(
             reverse_search_type="email",
             reverse_search="admin@example.com",
             reverse_match="begins",
@@ -282,7 +197,7 @@ class TestDispatchSearch:
 class TestDispatchBulk:
     def test_dispatch_bulk_commands(self) -> None:
         client = _mock_client()
-        args = _make_args(
+        args = make_cli_args(
             bulk_dns=["example.com", "example.net"],
             bulk_whois=["example.org"],
             bulk_whois_type="cached",
@@ -308,7 +223,7 @@ class TestDispatchBulk:
 
     def test_dispatch_bulk_dns_forwards_record_type(self) -> None:
         client = _mock_client()
-        args = _make_args(bulk_dns=["example.com"], bulk_dns_type="MX")
+        args = make_cli_args(bulk_dns=["example.com"], bulk_dns_type="MX")
         _dispatch_bulk(cast("BulkProtocol", client), args)
         assert client.calls_to("bulk_dns")[0].kwargs == {"record_type": "MX"}
 
@@ -321,7 +236,7 @@ class TestDispatchReports:
         client.set_result("organization_report", {"organization": "Example Org"})
         client.set_result("email_report", {"email": "admin@example.com"})
         client.set_result("ip_report", {"ip": "192.0.2.1"})
-        args = _make_args(
+        args = make_cli_args(
             domain_report="example.com",
             name_report="Alice",
             organization_report="Example Org",
@@ -360,7 +275,7 @@ class TestDispatchReports:
     ) -> None:
         client = _mock_client()
         client.set_result("domain_report", {"domain": "example.com"})
-        args = _make_args(domain_report="example.com", cached=True)
+        args = make_cli_args(domain_report="example.com", cached=True)
 
         result = _dispatch_reports(cast("ReportProtocol", client), args)
 
@@ -371,7 +286,7 @@ class TestDispatchReports:
 
     def test_dispatch_reports_skips_when_no_report_args(self) -> None:
         client = _mock_client()
-        args = _make_args()
+        args = make_cli_args()
 
         result = _dispatch_reports(cast("ReportProtocol", client), args)
 
@@ -385,7 +300,7 @@ class TestDispatchReports:
         client = _mock_client()
         client.set_result("domain_report", {"domain": "example.com"})
         client.set_error("name_report", DomainIQError("report failed"))
-        args = _make_args(domain_report="example.com", name_report="Alice")
+        args = make_cli_args(domain_report="example.com", name_report="Alice")
 
         result = _dispatch_reports(cast("ReportProtocol", client), args)
 
@@ -399,7 +314,7 @@ class TestDispatchReports:
 class TestDispatchMonitor:
     def test_dispatch_monitor_read_commands(self) -> None:
         client = _mock_client()
-        args = _make_args(
+        args = make_cli_args(
             monitor_list=True,
             monitor_report_items=42,
             monitor_report_summary=42,
@@ -432,7 +347,7 @@ class TestDispatchMonitor:
 
     def test_dispatch_monitor_management_commands(self) -> None:
         client = _mock_client()
-        args = _make_args(
+        args = make_cli_args(
             create_monitor_report=["domain", "brand-watch"],
             email_alert=False,
             add_monitor_item=["42", "domain", "example.com, example.net"],
@@ -485,7 +400,7 @@ class TestDispatchMonitor:
         self,
     ) -> None:
         client = _mock_client()
-        args = _make_args(add_monitor_item=["42", "domain", "example.com,"])
+        args = make_cli_args(add_monitor_item=["42", "domain", "example.com,"])
 
         result = _dispatch_monitor_management(cast("MonitorProtocol", client), args)
 
@@ -502,7 +417,7 @@ class TestDispatchMonitor:
 
     def test_dispatch_add_monitor_item_forwards_optional_flags(self) -> None:
         client = _mock_client()
-        args = _make_args(
+        args = make_cli_args(
             add_monitor_item=["42", "domain", "example.com"],
             monitor_domain_alert=True,
             monitor_match_types="exact, fuzzy",
@@ -525,7 +440,7 @@ class TestDispatchMonitor:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         client = _mock_client()
-        args = _make_args(add_monitor_item=["abc", "domain", "example.com"])
+        args = make_cli_args(add_monitor_item=["abc", "domain", "example.com"])
 
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
@@ -538,7 +453,7 @@ class TestDispatchMonitor:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         client = _mock_client()
-        args = _make_args(enable_typos=["abc", "7"])
+        args = make_cli_args(enable_typos=["abc", "7"])
 
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
@@ -551,7 +466,7 @@ class TestDispatchMonitor:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         client = _mock_client()
-        args = _make_args(modify_typo_strength=["42", "x", "10"])
+        args = make_cli_args(modify_typo_strength=["42", "x", "10"])
 
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
@@ -565,7 +480,9 @@ class TestDispatchMonitor:
     ) -> None:
         """Regression: typo strength bounds were hardcoded, not read from constants."""
         client = _mock_client()
-        args = _make_args(modify_typo_strength=["42", "7", str(TYPO_STRENGTH_MIN - 1)])
+        args = make_cli_args(
+            modify_typo_strength=["42", "7", str(TYPO_STRENGTH_MIN - 1)]
+        )
 
         result = _dispatch_command(cast("DomainIQClientProtocol", client), args)
 
@@ -595,15 +512,6 @@ class TestRunCommand:
         captured = capsys.readouterr()
         assert msg in captured.err
 
-    def test_value_error_propagates_instead_of_being_caught(self) -> None:
-        msg = "bad value"
-
-        def _raise() -> None:
-            raise ValueError(msg)
-
-        with pytest.raises(ValueError, match=msg):
-            _run_command(_raise)
-
     def test_returns_had_errors_on_oserror(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -618,49 +526,19 @@ class TestRunCommand:
         captured = capsys.readouterr()
         assert msg in captured.err
 
-    def test_type_error_propagates(self) -> None:
-        msg = "unexpected type mismatch"
+    @pytest.mark.parametrize(
+        "exc_type",
+        [ValueError, TypeError, RuntimeError, AttributeError, KeyError, IndexError],
+    )
+    def test_unexpected_errors_propagate_instead_of_being_caught(
+        self, exc_type: type[Exception]
+    ) -> None:
+        msg = "boom"
 
         def _raise() -> None:
-            raise TypeError(msg)
+            raise exc_type(msg)
 
-        with pytest.raises(TypeError, match=msg):
-            _run_command(_raise)
-
-    def test_runtime_error_propagates(self) -> None:
-        msg = "internal failure"
-
-        def _raise() -> None:
-            raise RuntimeError(msg)
-
-        with pytest.raises(RuntimeError, match=msg):
-            _run_command(_raise)
-
-    def test_attribute_error_propagates(self) -> None:
-        msg = "missing attribute"
-
-        def _raise() -> None:
-            raise AttributeError(msg)
-
-        with pytest.raises(AttributeError, match=msg):
-            _run_command(_raise)
-
-    def test_key_error_propagates(self) -> None:
-        msg = "missing key"
-
-        def _raise() -> None:
-            raise KeyError(msg)
-
-        with pytest.raises(KeyError, match=msg):
-            _run_command(_raise)
-
-    def test_index_error_propagates(self) -> None:
-        msg = "index out of range"
-
-        def _raise() -> None:
-            raise IndexError(msg)
-
-        with pytest.raises(IndexError, match=msg):
+        with pytest.raises(exc_type, match=msg):
             _run_command(_raise)
 
     def test_broken_stderr_does_not_crash_regression(self) -> None:
