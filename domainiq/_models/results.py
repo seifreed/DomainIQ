@@ -126,6 +126,18 @@ class QueueResult:
 
 
 @dataclass
+class MonitorItemOptions:
+    """Optional settings when adding an item to a monitor report."""
+
+    enabled: bool | None = None
+    domain_alert: bool | None = None
+    match_types: list[str] | None = None
+    join_types: list[str] | None = None
+    use_typos: bool | None = None
+    typo_strength: int | None = None
+
+
+@dataclass
 class SnapshotOptions:
     """Options for domain snapshot requests."""
 
@@ -143,6 +155,7 @@ __all__ = [
     "DomainReport",
     "DomainSnapshot",
     "MonitorItem",
+    "MonitorItemOptions",
     "MonitorReport",
     "QueueResult",
     "SnapshotOptions",

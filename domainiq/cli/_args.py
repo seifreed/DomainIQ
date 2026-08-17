@@ -211,6 +211,29 @@ def _add_monitor_management_args(parser: argparse.ArgumentParser) -> None:
         help="Add items to monitor (report_id type items)",
     )
     parser.add_argument(
+        "--monitor-domain-alert",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable domain alerts for the added monitor item",
+    )
+    parser.add_argument(
+        "--monitor-match-types", help="Comma-separated match types for the item"
+    )
+    parser.add_argument(
+        "--monitor-join-types", help="Comma-separated join types for the item"
+    )
+    parser.add_argument(
+        "--monitor-use-typos",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable typo detection for the added monitor item",
+    )
+    parser.add_argument(
+        "--monitor-typo-strength",
+        type=_positive_int,
+        help="Typo strength for the added monitor item (5-41)",
+    )
+    parser.add_argument(
         "--enable-typos",
         nargs=2,
         metavar=("REPORT_ID", "ITEM_ID"),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from domainiq._models import MonitorItemType, MonitorReportType
+from domainiq._models import MonitorItemOptions, MonitorItemType, MonitorReportType
 from domainiq.constants import (
     API_BOOL_FALSE,
     API_BOOL_TRUE,
@@ -145,7 +145,7 @@ def build_add_monitor_item_params(
     report_id: int,
     item_type: MonitorItemType | str,
     items: list[str],
-    enabled: bool | None = None,
+    options: MonitorItemOptions | None = None,
 ) -> dict[str, Any]:
     _validate_positive_ids(report_id=report_id)
     require_non_empty("items", items)
@@ -157,8 +157,19 @@ def build_add_monitor_item_params(
         "type": item_type_value,
         "items": items,
     }
-    if enabled is not None:
-        params["enabled"] = enabled
+    opts = options if options is not None else MonitorItemOptions()
+    if opts.enabled is not None:
+        params["enabled"] = opts.enabled
+    if opts.domain_alert is not None:
+        params["domain_alert"] = opts.domain_alert
+    if opts.match_types is not None:
+        params["match_types"] = opts.match_types
+    if opts.join_types is not None:
+        params["join_types"] = opts.join_types
+    if opts.use_typos is not None:
+        params["use_typos"] = opts.use_typos
+    if opts.typo_strength is not None:
+        params["typo_strength"] = _validate_typo_strength(opts.typo_strength)
     return params
 
 

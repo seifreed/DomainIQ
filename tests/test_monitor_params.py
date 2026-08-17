@@ -21,7 +21,7 @@ from domainiq._params.monitor import (
 )
 from domainiq.constants import API_BOOL_FALSE, API_BOOL_TRUE, TYPO_STRENGTH_MAX
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.models import MonitorItemType, MonitorReportType
+from domainiq.models import MonitorItemOptions, MonitorItemType, MonitorReportType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -133,8 +133,41 @@ class TestMonitorMutationParams:
             "items": ["example.com", "example.net"],
         }
 
+    def test_add_monitor_item_includes_optional_params(self) -> None:
+        params = build_add_monitor_item_params(
+            42,
+            MonitorItemType.DOMAIN,
+            ["example.com"],
+            MonitorItemOptions(
+                enabled=True,
+                domain_alert=True,
+                match_types=["exact"],
+                join_types=["and"],
+                use_typos=True,
+                typo_strength=10,
+            ),
+        )
+
+        assert params["enabled"] is True
+        assert params["domain_alert"] is True
+        assert params["match_types"] == ["exact"]
+        assert params["join_types"] == ["and"]
+        assert params["use_typos"] is True
+        assert params["typo_strength"] == 10
+
+    def test_add_monitor_item_rejects_invalid_typo_strength(self) -> None:
+        with pytest.raises(DomainIQValidationError, match="strength must be between"):
+            build_add_monitor_item_params(
+                42,
+                MonitorItemType.DOMAIN,
+                ["example.com"],
+                MonitorItemOptions(typo_strength=999),
+            )
+
     def test_add_monitor_item_includes_enabled_when_specified(self) -> None:
-        params = build_add_monitor_item_params(42, "domain", ["example.com"], False)
+        params = build_add_monitor_item_params(
+            42, "domain", ["example.com"], MonitorItemOptions(enabled=False)
+        )
 
         assert params["enabled"] is False
 

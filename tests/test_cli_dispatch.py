@@ -34,7 +34,12 @@ from domainiq.constants import (
 )
 from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQError
-from domainiq.models import BulkWhoisType, KeywordMatchType, ReverseMatchType
+from domainiq.models import (
+    BulkWhoisType,
+    KeywordMatchType,
+    MonitorItemOptions,
+    ReverseMatchType,
+)
 from tests.conftest import StubClient
 
 if TYPE_CHECKING:
@@ -114,6 +119,11 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "create_monitor_report": None,
         "email_alert": True,
         "add_monitor_item": None,
+        "monitor_domain_alert": None,
+        "monitor_match_types": None,
+        "monitor_join_types": None,
+        "monitor_use_typos": None,
+        "monitor_typo_strength": None,
         "enable_typos": None,
         "disable_typos": None,
         "modify_typo_strength": None,
@@ -425,7 +435,12 @@ class TestDispatchMonitor:
         assert create_calls[0].kwargs == {"email_alert": False}
         add_calls = client.calls_to("add_monitor_item")
         assert len(add_calls) == 1
-        assert add_calls[0].args == (42, "domain", ["example.com", "example.net"])
+        assert add_calls[0].args == (
+            42,
+            "domain",
+            ["example.com", "example.net"],
+            MonitorItemOptions(),
+        )
         assert add_calls[0].kwargs == {}
         enable_calls = client.calls_to("enable_typos")
         assert len(enable_calls) == 1
@@ -460,8 +475,33 @@ class TestDispatchMonitor:
         assert result.errored is False
         add_calls = client.calls_to("add_monitor_item")
         assert len(add_calls) == 1
-        assert add_calls[0].args == (42, "domain", ["example.com"])
-        assert add_calls[0].kwargs == {}
+        assert add_calls[0].args == (
+            42,
+            "domain",
+            ["example.com"],
+            MonitorItemOptions(),
+        )
+
+    def test_dispatch_add_monitor_item_forwards_optional_flags(self) -> None:
+        client = _mock_client()
+        args = _make_args(
+            add_monitor_item=["42", "domain", "example.com"],
+            monitor_domain_alert=True,
+            monitor_match_types="exact, fuzzy",
+            monitor_join_types="and",
+            monitor_use_typos=True,
+            monitor_typo_strength=10,
+        )
+
+        _dispatch_monitor_management(cast("MonitorProtocol", client), args)
+
+        assert client.calls_to("add_monitor_item")[0].args[3] == MonitorItemOptions(
+            domain_alert=True,
+            match_types=["exact", "fuzzy"],
+            join_types=["and"],
+            use_typos=True,
+            typo_strength=10,
+        )
 
     def test_dispatch_command_reports_invalid_add_monitor_item_report_id(
         self, capsys: pytest.CaptureFixture[str]

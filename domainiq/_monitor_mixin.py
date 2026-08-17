@@ -32,6 +32,7 @@ from .utils import ensure_list_of_models
 if TYPE_CHECKING:
     from ._models import (
         MonitorActionResult,
+        MonitorItemOptions,
         MonitorItemType,
         MonitorReport,
         MonitorReportType,
@@ -84,14 +85,12 @@ class _MonitorMixin(_SyncRequestable):
         report_id: int,
         item_type: MonitorItemType | str,
         items: list[str],
-        enabled: bool | None = None,
+        options: MonitorItemOptions | None = None,
     ) -> MonitorActionResult:
         """Add items to a monitor report."""
         return parse_monitor_action_result(
             self._make_json_request(
-                build_add_monitor_item_params(
-                    report_id, item_type, items, enabled=enabled
-                )
+                build_add_monitor_item_params(report_id, item_type, items, options)
             )
         )
 
@@ -183,14 +182,12 @@ class _AsyncMonitorMixin(_AsyncRequestable):
         report_id: int,
         item_type: MonitorItemType | str,
         items: list[str],
-        enabled: bool | None = None,
+        options: MonitorItemOptions | None = None,
     ) -> MonitorActionResult:
         """Add items to a monitor report asynchronously."""
         return parse_monitor_action_result(
             await self._make_json_request(
-                build_add_monitor_item_params(
-                    report_id, item_type, items, enabled=enabled
-                )
+                build_add_monitor_item_params(report_id, item_type, items, options)
             )
         )
 

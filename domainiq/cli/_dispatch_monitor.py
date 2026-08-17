@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from domainiq.constants import TYPO_STRENGTH_MAX, TYPO_STRENGTH_MIN
 from domainiq.exceptions import DomainIQValidationError
+from domainiq.models import MonitorItemOptions
 
 from ._dispatch_common import _aggregate, _CommandResult, _run_command
 from ._serialization import print_result
@@ -72,13 +73,27 @@ def _parse_int_arg(value: str, param_name: str) -> int:
         raise DomainIQValidationError(msg, param_name=param_name) from exc
 
 
+def _split_csv(value: str | None) -> list[str] | None:
+    if value is None:
+        return None
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
 def _add_monitor_item(client: MonitorProtocol, args: argparse.Namespace) -> object:
     report_id, item_type, raw_items = args.add_monitor_item
     items = [item.strip() for item in raw_items.split(",") if item.strip()]
+    options = MonitorItemOptions(
+        domain_alert=args.monitor_domain_alert,
+        match_types=_split_csv(args.monitor_match_types),
+        join_types=_split_csv(args.monitor_join_types),
+        use_typos=args.monitor_use_typos,
+        typo_strength=args.monitor_typo_strength,
+    )
     return client.add_monitor_item(
         _parse_int_arg(report_id, "report_id"),
         item_type,
         items,
+        options,
     )
 
 

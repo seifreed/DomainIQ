@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from domainiq._models import BulkWhoisType, DNSRecordType, SnapshotOptions
+from domainiq._models import (
+    BulkWhoisType,
+    DNSRecordType,
+    MonitorItemOptions,
+    SnapshotOptions,
+)
 
 from .conftest import (
     MockAsyncTransport,
@@ -354,7 +359,9 @@ class TestMonitorMixins:
         created = mock_client.create_monitor_report("domain", "new")
         added = cast(
             "dict[str, Any]",
-            mock_client.add_monitor_item(1, "domain", ["example.com"], enabled=True),
+            mock_client.add_monitor_item(
+                1, "domain", ["example.com"], MonitorItemOptions(enabled=True)
+            ),
         )
         enabled = cast("dict[str, Any]", mock_client.enable_typos(1, 2))
         disabled = cast("dict[str, Any]", mock_client.disable_typos(1, 2))

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         EmailReportResult,
         IpReportResult,
         MonitorActionResult,
+        MonitorItemOptions,
         MonitorItemType,
         MonitorReport,
         MonitorReportType,
@@ -173,7 +174,7 @@ class AsyncMonitorProtocol(Protocol):
         report_id: int,
         item_type: MonitorItemType | str,
         items: list[str],
-        enabled: bool | None = None,
+        options: MonitorItemOptions | None = None,
     ) -> MonitorActionResult: ...
 
     async def enable_typos(
