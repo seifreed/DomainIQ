@@ -1,4 +1,3 @@
-# ruff: noqa: INP001
 """Generate async mixin classes from their sync counterparts.
 
 Usage:
@@ -25,9 +24,11 @@ from __future__ import annotations
 
 import difflib
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+import black
+from black.parsing import InvalidInput
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -102,18 +103,12 @@ def _transform_to_async(sync_source: str) -> str:
 
 
 def _format_class_fragment(source: str, path: Path) -> str:
-    """Format generated class source with Ruff before comparing or writing."""
-    result = subprocess.run(  # noqa: S603 - fixed local tool invocation.
-        [sys.executable, "-m", "ruff", "format", "--stdin-filename", str(path), "-"],
-        input=source,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        msg = f"ruff format failed for generated {path.name}:\n{result.stderr}"
-        raise RuntimeError(msg)
-    return result.stdout
+    """Format generated class source with Black before comparing or writing."""
+    try:
+        return black.format_str(source, mode=black.Mode())
+    except InvalidInput as exc:
+        msg = f"black format failed for generated {path.name}: {exc}"
+        raise RuntimeError(msg) from exc
 
 
 def _write_stdout(message: str) -> None:
