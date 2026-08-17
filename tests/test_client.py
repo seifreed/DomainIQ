@@ -338,18 +338,6 @@ class TestConfigUnit:
         with pytest.raises(DomainIQConfigurationError, match=message):
             Config(**cast("ConfigKwargs", {"api_key": "test_key", **kwargs}))
 
-    def test_set_config_path_reloads_key_from_new_file(self, tmp_path: Path) -> None:
-        initial = tmp_path / "initial"
-        target = tmp_path / "new_config"
-        initial.write_text("initial_key")
-        target.write_text("file_key_xyz")
-
-        config = Config(config_file=str(initial), env={})
-        config.set_config_path(str(target), api_key=None)
-
-        assert config.config_file_path == target
-        assert config.api_key == "file_key_xyz"
-
 
 class TestUtilsUnit:
     """Unit tests for utility functions."""

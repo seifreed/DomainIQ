@@ -155,25 +155,11 @@ class Config:
         self.config_file_path: Path = (
             Path(config_file) if config_file else Path.home() / ".domainiq"
         )
-        self._env = env
         self._loader = (
             loader
             if loader is not None
             else _ApiKeyLoader(self.config_file_path, env=env)
         )
-        self.api_key = self._loader.load(api_key)
-        self.validate()
-
-    def set_config_path(self, path: str | Path, api_key: str | None = None) -> None:
-        """Set a custom config file path and reload the API key.
-
-        Args:
-            path: Path to the config file
-            api_key: Explicitly provided API key. If provided, takes priority
-                over the config file.
-        """
-        self.config_file_path = Path(path)
-        self._loader = _ApiKeyLoader(self.config_file_path, env=self._env)
         self.api_key = self._loader.load(api_key)
         self.validate()
 
