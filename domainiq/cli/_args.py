@@ -74,6 +74,11 @@ def _add_domain_analysis_args(parser: argparse.ArgumentParser) -> None:
 def _add_report_args(parser: argparse.ArgumentParser) -> None:
     """Add report arguments."""
     parser.add_argument("--domain-report", help="Get comprehensive domain report")
+    parser.add_argument(
+        "--cached",
+        action="store_true",
+        help="Return cached-only results for --domain-report",
+    )
     parser.add_argument("--name-report", help="Get registrant name report")
     parser.add_argument("--organization-report", help="Get organization report")
     parser.add_argument("--email-report", help="Get email report")

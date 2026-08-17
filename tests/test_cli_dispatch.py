@@ -77,6 +77,7 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "width": None,
         "height": None,
         "domain_report": None,
+        "cached": False,
         "name_report": None,
         "organization_report": None,
         "email_report": None,
@@ -332,7 +333,7 @@ class TestDispatchReports:
         domain_calls = client.calls_to("domain_report")
         assert len(domain_calls) == 1
         assert domain_calls[0].args == ("example.com",)
-        assert domain_calls[0].kwargs == {}
+        assert domain_calls[0].kwargs == {"cached": False}
         name_calls = client.calls_to("name_report")
         assert len(name_calls) == 1
         assert name_calls[0].args == ("Alice",)
@@ -349,6 +350,20 @@ class TestDispatchReports:
         assert len(ip_calls) == 1
         assert ip_calls[0].args == ("192.0.2.1",)
         assert ip_calls[0].kwargs == {}
+        assert "example.com" in capsys.readouterr().out
+
+    def test_dispatch_domain_report_forwards_cached_flag(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        client = _mock_client()
+        client.set_result("domain_report", {"domain": "example.com"})
+        args = _make_args(domain_report="example.com", cached=True)
+
+        result = _dispatch_reports(cast("ReportProtocol", client), args)
+
+        assert result.executed is True
+        assert result.errored is False
+        assert client.calls_to("domain_report")[0].kwargs == {"cached": True}
         assert "example.com" in capsys.readouterr().out
 
     def test_dispatch_reports_skips_when_no_report_args(self) -> None:

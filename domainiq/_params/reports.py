@@ -10,12 +10,15 @@ from domainiq.validators import is_ip_address, validate_domain, validate_email
 from ._shared import require_non_empty_string, simple_service_params
 
 
-def build_domain_report_params(domain: str) -> dict[str, Any]:
+def build_domain_report_params(domain: str, *, cached: bool = False) -> dict[str, Any]:
     domain = domain.strip()
     if not validate_domain(domain):
         msg = f"Invalid domain: {domain}"
         raise DomainIQValidationError(msg, param_name="domain")
-    return simple_service_params("domain_report", "domain", domain)
+    params = simple_service_params("domain_report", "domain", domain)
+    if cached:
+        params["cached"] = 1
+    return params
 
 
 def build_name_report_params(name: str) -> dict[str, Any]:

@@ -153,6 +153,14 @@ class TestReportParams:
             "ip": "192.0.2.1",
         }
 
+    def test_domain_report_params_cached_flag(self) -> None:
+        assert build_domain_report_params("example.com", cached=True) == {
+            "service": "domain_report",
+            "domain": "example.com",
+            "cached": 1,
+        }
+        assert "cached" not in build_domain_report_params("example.com")
+
     def test_report_params_strip_whitespace_regression(self) -> None:
         """Regression: string inputs were not stripped before validation."""
         assert build_domain_report_params("  example.com  ")["domain"] == "example.com"

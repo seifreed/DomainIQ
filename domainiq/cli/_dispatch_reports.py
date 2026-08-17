@@ -26,6 +26,8 @@ def _run_report_command(
 ) -> _CommandResult:
     method = getattr(client, command)
     value = getattr(args, command)
+    if command == "domain_report":
+        return _run_command(lambda: print_result(method(value, cached=args.cached)))
     return _run_command(lambda: print_result(method(value)))
 
 

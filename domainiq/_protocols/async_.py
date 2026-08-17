@@ -78,7 +78,9 @@ class AsyncDomainAnalysisProtocol(Protocol):
 
 @runtime_checkable
 class AsyncReportProtocol(Protocol):
-    async def domain_report(self, domain: str) -> DomainReport: ...
+    async def domain_report(
+        self, domain: str, *, cached: bool = False
+    ) -> DomainReport: ...
 
     async def name_report(self, name: str) -> NameReportResult: ...
 

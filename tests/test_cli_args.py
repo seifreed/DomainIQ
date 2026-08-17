@@ -35,6 +35,7 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
         "width": None,
         "height": None,
         "domain_report": None,
+        "cached": False,
         "name_report": None,
         "organization_report": None,
         "email_report": None,
