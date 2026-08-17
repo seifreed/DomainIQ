@@ -98,20 +98,12 @@ def format_api_params(params: dict[str, Any]) -> dict[str, str]:
         if value is None:
             continue
 
-        if isinstance(value, bool):
-            formatted[key] = API_BOOL_TRUE if value else API_BOOL_FALSE
-        elif isinstance(value, Enum):
-            formatted[key] = str(value.value)
-        elif isinstance(value, dict):
-            formatted[key] = json.dumps(_preprocess_for_json(value), default=str)
-        elif isinstance(value, list | tuple | set):
+        if isinstance(value, list | tuple | set):
             result = _format_list_param(key, value)
             if result is None:
                 continue
             formatted[key] = result
-        elif isinstance(value, bytes):
-            formatted[key] = value.decode("utf-8", errors="replace")
         else:
-            formatted[key] = str(value)
+            formatted[key] = _format_single_value(value)
 
     return formatted
