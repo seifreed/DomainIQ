@@ -14,7 +14,12 @@ from domainiq.constants import (
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.validators import ensure_positive_int, is_ip_address
 
-from ._shared import require_non_empty, require_valid_domains, validate_type_value
+from ._shared import (
+    require_non_empty,
+    require_non_empty_string,
+    require_valid_domains,
+    validate_type_value,
+)
 
 _MONITOR_REPORT_TYPES = {member.value for member in MonitorReportType}
 _MONITOR_ITEM_TYPES = {member.value for member in MonitorItemType}
@@ -32,12 +37,6 @@ def _validate_positive_ids(**ids: int | None) -> None:
     for field_name, value in ids.items():
         if value is not None:
             ensure_positive_int(field_name, value)
-
-
-def _validate_required_string(value: str, param_name: str) -> None:
-    if not isinstance(value, str) or not value.strip():
-        msg = f"{param_name} must not be empty or whitespace-only"
-        raise DomainIQValidationError(msg, param_name=param_name)
 
 
 def _validate_monitor_item_values(
@@ -114,7 +113,7 @@ def build_create_monitor_report_params(
         _MONITOR_REPORT_TYPES,
         "report_type",
     )
-    _validate_required_string(name, "name")
+    require_non_empty_string(name, "name")
     return {
         "service": "monitor",
         "action": "report_create",
