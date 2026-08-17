@@ -27,10 +27,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The retry loop always returns on success or raises on the final attempt, so
-# falling through past it is impossible; this guards against a future refactor.
-_UNREACHABLE_LOOP_EXIT = "request pipeline loop exited without returning"
-
 
 def _sync_sleep(delay: float) -> None:
     """Sleep between synchronous retries (injectable via ``execute_sync_request``)."""
@@ -51,6 +47,20 @@ def _handle_request_error(
     if isinstance(exc, TimeoutError):
         return on_timeout_error(exc, attempt, policy)
     return on_os_error(exc, attempt, policy)
+
+
+def _transport_closed_delay(
+    exc: RuntimeError,
+    attempt: int,
+    policy: RequestPolicy,
+) -> float:
+    """Map a transport-closed RuntimeError to its retry delay; re-raise others."""
+    if not any(k in str(exc).lower() for k in ("closed", "shut", "terminated")):
+        raise exc
+    logger.warning("Transport closed on attempt %s: %s", attempt, exc)
+    os_error = OSError(f"Transport closed: {exc}")
+    os_error.__cause__ = exc
+    return _handle_request_error(os_error, attempt, policy)
 
 
 _RequestResult = dict[str, Any] | list[Any] | str
@@ -83,8 +93,13 @@ def execute_sync_request(
     policy: RequestPolicy,
     sleeper: SyncSleeper = _sync_sleep,
 ) -> dict[str, Any] | list[Any] | str:
-    """Execute a synchronous request using the shared retry policy."""
-    for attempt in range(policy.max_retries + 1):
+    """Execute a synchronous request using the shared retry policy.
+
+    The policy handlers raise once the retry budget is exhausted, so every
+    iteration either returns, raises, or retries with a bumped attempt count.
+    """
+    attempt = 0
+    while True:
         try:
             response = transport.get(
                 policy.base_url,
@@ -93,27 +108,22 @@ def execute_sync_request(
             )
         except (TimeoutError, OSError) as exc:
             sleeper(_handle_request_error(exc, attempt, policy))
+            attempt += 1
             continue
         except UnicodeDecodeError as exc:
             msg = f"Response decoding failed: {exc}"
             raise DomainIQAPIError(msg, status_code=None) from exc
         except RuntimeError as exc:
-            _msg = str(exc).lower()
-            if any(k in _msg for k in ("closed", "shut", "terminated")):
-                logger.warning("Transport closed on attempt %s: %s", attempt, exc)
-                _os_error = OSError(f"Transport closed: {exc}")
-                _os_error.__cause__ = exc
-                sleeper(_handle_request_error(_os_error, attempt, policy))
-                continue
-            raise
+            sleeper(_transport_closed_delay(exc, attempt, policy))
+            attempt += 1
+            continue
 
         decision = _process_response(response, attempt, policy, output_format)
         if decision[0] == "retry":
             sleeper(decision[1])
+            attempt += 1
             continue
         return decision[1]
-
-    raise RuntimeError(_UNREACHABLE_LOOP_EXIT)  # pragma: no cover
 
 
 async def execute_async_request(
@@ -123,8 +133,13 @@ async def execute_async_request(
     policy: RequestPolicy,
     sleeper: AsyncSleeper = _async_sleep,
 ) -> dict[str, Any] | list[Any] | str:
-    """Execute an asynchronous request using the shared retry policy."""
-    for attempt in range(policy.max_retries + 1):
+    """Execute an asynchronous request using the shared retry policy.
+
+    The policy handlers raise once the retry budget is exhausted, so every
+    iteration either returns, raises, or retries with a bumped attempt count.
+    """
+    attempt = 0
+    while True:
         try:
             response = await transport.get(
                 policy.base_url,
@@ -133,27 +148,22 @@ async def execute_async_request(
             )
         except (TimeoutError, OSError) as exc:
             await sleeper(_handle_request_error(exc, attempt, policy))
+            attempt += 1
             continue
         except UnicodeDecodeError as exc:
             msg = f"Response decoding failed: {exc}"
             raise DomainIQAPIError(msg, status_code=None) from exc
         except RuntimeError as exc:
-            _msg = str(exc).lower()
-            if any(k in _msg for k in ("closed", "shut", "terminated")):
-                logger.warning("Transport closed on attempt %s: %s", attempt, exc)
-                _os_error = OSError(f"Transport closed: {exc}")
-                _os_error.__cause__ = exc
-                await sleeper(_handle_request_error(_os_error, attempt, policy))
-                continue
-            raise
+            await sleeper(_transport_closed_delay(exc, attempt, policy))
+            attempt += 1
+            continue
 
         decision = _process_response(response, attempt, policy, output_format)
         if decision[0] == "retry":
             await sleeper(decision[1])
+            attempt += 1
             continue
         return decision[1]
-
-    raise RuntimeError(_UNREACHABLE_LOOP_EXIT)  # pragma: no cover
 
 
 __all__ = [
