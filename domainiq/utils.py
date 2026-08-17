@@ -24,6 +24,7 @@ __all__ = [
     "enum_value",
     "parse_retry_after",
     "setup_logging",
+    "split_csv",
     "truncate_repr",
     "validate_api_dict",
 ]
@@ -32,6 +33,11 @@ __all__ = [
 def enum_value(x: object) -> object:
     """Return x.value if x is an Enum member, otherwise return x unchanged."""
     return x.value if isinstance(x, Enum) else x
+
+
+def split_csv(value: str) -> list[str]:
+    """Split a comma-separated string into stripped, non-empty items."""
+    return [item for item in (part.strip() for part in value.split(",")) if item]
 
 
 def assert_json_dict(raw: dict[str, Any] | list[Any] | str) -> dict[str, Any]:

@@ -35,7 +35,7 @@ from .parsers import (
     try_parse_date,
     unwrap_api_envelope,
 )
-from .utils import assert_json_dict, validate_api_dict
+from .utils import assert_json_dict, split_csv, validate_api_dict
 
 
 def _to_int(value: object) -> int | None:
@@ -193,7 +193,7 @@ def _normalize_string_list(raw: object) -> list[str]:
     if raw is None:
         return []
     if isinstance(raw, str):
-        return [item for item in (part.strip() for part in raw.split(",")) if item]
+        return split_csv(raw)
     if isinstance(raw, list):
         return [
             item

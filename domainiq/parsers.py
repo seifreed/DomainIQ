@@ -4,7 +4,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from domainiq.utils import assert_json_dict
+from domainiq.utils import assert_json_dict, split_csv
 
 logger = logging.getLogger(__name__)
 
@@ -186,38 +186,35 @@ def parse_nameservers(result: dict[str, Any]) -> list[str]:
     return _normalize_nameserver_values(nameservers)
 
 
+def _normalize_scalar_list(values: list[object]) -> list[str]:
+    """Stringify and strip list items, dropping None/False/0 and empty results."""
+    return [
+        s
+        for s in (
+            str(value).strip()
+            for value in values
+            if value is not None and value is not False and value != 0
+        )
+        if s
+    ]
+
+
 def parse_statuses(raw: object) -> list[str]:
     """Normalize status field to a list of strings."""
     status = raw or []
     if isinstance(status, str):
-        return [s for s in (part.strip() for part in status.split(",")) if s]
+        return split_csv(status)
     if isinstance(status, list):
-        return [
-            s
-            for s in (
-                str(part).strip()
-                for part in status
-                if part is not None and part is not False and part != 0
-            )
-            if s
-        ]
+        return _normalize_scalar_list(status)
     parsed = str(status).strip()
     return [parsed] if parsed else []
 
 
 def _normalize_email_values(raw_emails: object) -> list[str] | None:
     if isinstance(raw_emails, list):
-        return [
-            s
-            for s in (
-                str(e).strip()
-                for e in raw_emails
-                if e is not None and e is not False and e != 0
-            )
-            if s
-        ] or None
+        return _normalize_scalar_list(raw_emails) or None
     if isinstance(raw_emails, str):
-        return [e.strip() for e in raw_emails.split(",") if e.strip()] or None
+        return split_csv(raw_emails) or None
     return None
 
 
