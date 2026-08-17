@@ -5,16 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.validators import is_ip_address, validate_domain, validate_email
+from domainiq.validators import is_ip_address, validate_email
 
-from ._shared import require_non_empty_string, simple_service_params
+from ._shared import (
+    require_non_empty_string,
+    require_valid_domain,
+    simple_service_params,
+)
 
 
 def build_domain_report_params(domain: str, *, cached: bool = False) -> dict[str, Any]:
     domain = domain.strip()
-    if not validate_domain(domain):
-        msg = f"Invalid domain: {domain}"
-        raise DomainIQValidationError(msg, param_name="domain")
+    require_valid_domain(domain)
     params = simple_service_params("domain_report", "domain", domain)
     if cached:
         params["cached"] = 1

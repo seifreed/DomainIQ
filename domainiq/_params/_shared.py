@@ -5,6 +5,34 @@ from __future__ import annotations
 from typing import Any
 
 from domainiq.exceptions import DomainIQValidationError
+from domainiq.utils import enum_value
+from domainiq.validators import validate_domain
+
+
+def validate_type_value(
+    value: object,
+    valid_values: set[str] | frozenset[str],
+    param_name: str = "type",
+) -> str:
+    """Validate an enum-or-string choice against its allowed wire values."""
+    wire_value = enum_value(value)
+    if not isinstance(wire_value, str) or wire_value not in valid_values:
+        msg = f"Invalid {param_name}: {wire_value}"
+        raise DomainIQValidationError(msg, param_name=param_name)
+    return wire_value
+
+
+def require_valid_domain(value: str, param_name: str = "domain") -> None:
+    """Raise when a value is not a valid registrable domain name."""
+    if not validate_domain(value):
+        msg = f"Invalid domain: {value}"
+        raise DomainIQValidationError(msg, param_name=param_name)
+
+
+def require_valid_domains(items: list[str], param_name: str) -> None:
+    """Raise when any list item is not a valid registrable domain name."""
+    for item in items:
+        require_valid_domain(item, param_name)
 
 
 def require_non_empty(name: str, items: list[Any]) -> None:

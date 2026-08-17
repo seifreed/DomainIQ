@@ -16,6 +16,9 @@ class DNSRecordType(Enum):
     PTR = "PTR"
 
 
+DNS_RECORD_TYPE_VALUES = frozenset(member.value for member in DNSRecordType)
+
+
 class BulkWhoisType(Enum):
     """Types of bulk WHOIS lookups."""
 

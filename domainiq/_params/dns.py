@@ -5,10 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from domainiq._models import DNSRecordType
+from domainiq._models.enums import DNS_RECORD_TYPE_VALUES
 from domainiq.exceptions import DomainIQValidationError
 from domainiq.validators import validate_dns_name
-
-_DNS_RECORD_TYPES = {record.value for record in DNSRecordType}
 
 
 def _normalize_record_type(record_type: str | DNSRecordType) -> str:
@@ -20,7 +19,7 @@ def _normalize_record_type(record_type: str | DNSRecordType) -> str:
     if not value:
         msg = "record_types must not contain empty values"
         raise DomainIQValidationError(msg, param_name="record_types")
-    if value not in _DNS_RECORD_TYPES:
+    if value not in DNS_RECORD_TYPE_VALUES:
         msg = f"Invalid record type: {value}"
         raise DomainIQValidationError(msg, param_name="record_types")
     return value

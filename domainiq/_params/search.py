@@ -14,10 +14,9 @@ from domainiq._models.enums import (
 )
 from domainiq.constants import API_FLAG_ENABLED, API_INDEXED_PARAM
 from domainiq.exceptions import DomainIQValidationError
-from domainiq.utils import enum_value
-from domainiq.validators import is_ip_address, validate_domain, validate_email
+from domainiq.validators import is_ip_address, validate_email
 
-from ._shared import require_non_empty
+from ._shared import require_non_empty, require_valid_domain, validate_type_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -35,23 +34,8 @@ _REVERSE_IP_TYPES = {member.value for member in ReverseIpSearchType}
 _REVERSE_MX_TYPES = {member.value for member in ReverseMxSearchType}
 
 
-def _validate_type_value(
-    value: object,
-    valid_values: set[str],
-    param_name: str = "type",
-) -> str:
-    wire_value = enum_value(value)
-    if not isinstance(wire_value, str) or wire_value not in valid_values:
-        msg = f"Invalid {param_name}: {wire_value}"
-        raise DomainIQValidationError(msg, param_name=param_name)
-    return wire_value
-
-
 def _validate_domain_value(value: str, param_name: str) -> None:
-    value = value.strip()
-    if not validate_domain(value):
-        msg = f"Invalid domain: {value}"
-        raise DomainIQValidationError(msg, param_name=param_name)
+    require_valid_domain(value.strip(), param_name)
 
 
 def _validate_email_value(value: str, param_name: str) -> None:
@@ -102,7 +86,7 @@ def build_domain_search_params(
 ) -> dict[str, Any]:
     """Build parameters for the keyword search endpoint."""
     require_non_empty("keywords", keywords)
-    match_value = _validate_type_value(match, _KEYWORD_MATCH_TYPES, "match")
+    match_value = validate_type_value(match, _KEYWORD_MATCH_TYPES, "match")
     params: dict[str, Any] = {
         "service": "domain_search",
         "match": match_value,
@@ -122,8 +106,8 @@ def build_reverse_search_params(
     match: ReverseMatchType,
 ) -> dict[str, Any]:
     """Build parameters for the reverse-search endpoint."""
-    search_type_value = _validate_type_value(search_type, _REVERSE_SEARCH_TYPES)
-    match_value = _validate_type_value(match, _REVERSE_MATCH_TYPES, "match")
+    search_type_value = validate_type_value(search_type, _REVERSE_SEARCH_TYPES)
+    match_value = validate_type_value(match, _REVERSE_MATCH_TYPES, "match")
     _validate_search_term(search_term, "search")
     if search_type_value == "email":
         _validate_email_value(search_term, "search")
@@ -159,7 +143,7 @@ def build_reverse_ip_params(
     data: str,
 ) -> dict[str, Any]:
     """Build parameters for the reverse-IP endpoint."""
-    search_type_value = _validate_type_value(search_type, _REVERSE_IP_TYPES)
+    search_type_value = validate_type_value(search_type, _REVERSE_IP_TYPES)
     _validate_search_term(data, "data")
     _validate_host_data(search_type_value, data)
     return {"service": "reverse_ip", "type": search_type_value, "data": data}
@@ -171,7 +155,7 @@ def build_reverse_mx_params(
     recursive: bool,
 ) -> dict[str, Any]:
     """Build parameters for the reverse-MX endpoint."""
-    search_type_value = _validate_type_value(search_type, _REVERSE_MX_TYPES)
+    search_type_value = validate_type_value(search_type, _REVERSE_MX_TYPES)
     _validate_search_term(data, "data")
     _validate_host_data(search_type_value, data)
     params: dict[str, Any] = {

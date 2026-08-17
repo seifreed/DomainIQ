@@ -5,26 +5,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from domainiq.constants import API_FLAG_ENABLED
-from domainiq.exceptions import DomainIQValidationError
-from domainiq.validators import ensure_positive_int, validate_domain
+from domainiq.validators import ensure_positive_int
 
-from ._shared import require_non_empty
+from ._shared import require_non_empty, require_valid_domain, require_valid_domains
 
 if TYPE_CHECKING:
     from domainiq._models import SnapshotOptions
 
 
-def _validate_domain_param(domain: str, param_name: str = "domain") -> None:
-    if not validate_domain(domain):
-        msg = f"Invalid domain: {domain}"
-        raise DomainIQValidationError(msg, param_name=param_name)
-
-
 def build_domain_categorize_params(domains: list[str]) -> dict[str, Any]:
     """Build parameters for the categorize endpoint."""
     require_non_empty("domains", domains)
-    for domain in domains:
-        _validate_domain_param(domain, "domains")
+    require_valid_domains(domains, "domains")
     return {"service": "categorize", "domains": ",".join(domains)}
 
 
@@ -33,7 +25,7 @@ def build_domain_snapshot_params(
     options: SnapshotOptions,
 ) -> dict[str, Any]:
     """Build parameters for the snapshot endpoint."""
-    _validate_domain_param(domain)
+    require_valid_domain(domain)
     ensure_positive_int("SnapshotOptions.width", options.width)
     ensure_positive_int("SnapshotOptions.height", options.height)
     params: dict[str, Any] = {
@@ -58,7 +50,7 @@ def build_domain_snapshot_history_params(
     limit: int,
 ) -> dict[str, Any]:
     """Build parameters for the snapshot-history endpoint."""
-    _validate_domain_param(domain)
+    require_valid_domain(domain)
     ensure_positive_int("width", width)
     ensure_positive_int("height", height)
     ensure_positive_int("limit", limit)
