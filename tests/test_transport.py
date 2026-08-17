@@ -74,21 +74,13 @@ class _FakeRequestsSession:
 
 
 def _requests_transport_with_session(
-    monkeypatch: pytest.MonkeyPatch,
     session: _FakeRequestsSession,
 ) -> RequestsTransport:
-    monkeypatch.setattr(
-        requests,
-        "Session",
-        lambda: session,
-    )
-    return RequestsTransport()
+    return RequestsTransport(session=session)
 
 
 class TestRequestsTransport:
-    def test_successful_response_is_snapshotted(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_successful_response_is_snapshotted(self) -> None:
         session = _FakeRequestsSession(
             _FakeRequestsResponse(
                 status_code=202,
@@ -96,7 +88,7 @@ class TestRequestsTransport:
                 text='{"ok": true}',
             )
         )
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         response = transport.get(
             "https://api.example.test",
@@ -117,36 +109,30 @@ class TestRequestsTransport:
             }
         ]
 
-    def test_timeout_exception_is_normalized(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_timeout_exception_is_normalized(self) -> None:
         timeout_exc = requests.exceptions.Timeout("slow")
         session = _FakeRequestsSession(timeout_exc)
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         with pytest.raises(TimeoutError, match="slow") as exc_info:
             transport.get("https://api.example.test", {}, timeout=1)
 
         assert exc_info.value.__cause__ is timeout_exc
 
-    def test_request_exception_is_normalized(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_request_exception_is_normalized(self) -> None:
         request_exc = requests.exceptions.RequestException("offline")
         session = _FakeRequestsSession(request_exc)
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         with pytest.raises(OSError, match="offline") as exc_info:
             transport.get("https://api.example.test", {}, timeout=1)
 
         assert exc_info.value.__cause__ is request_exc
 
-    def test_http_error_is_mapped_to_oserror(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_http_error_is_mapped_to_oserror(self) -> None:
         http_exc = requests.exceptions.HTTPError("401 Client Error")
         session = _FakeRequestsSession(http_exc)
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         with pytest.raises(OSError, match="401 Client Error") as exc_info:
             transport.get("https://api.example.test", {}, timeout=1)
@@ -156,19 +142,17 @@ class TestRequestsTransport:
             requests.exceptions.HTTPError,
         )
 
-    def test_close_closes_session(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_close_closes_session(self) -> None:
         session = _FakeRequestsSession(_FakeRequestsResponse())
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         transport.close()
 
         assert session.closed is True
 
-    def test_is_open_reflects_session_state(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_is_open_reflects_session_state(self) -> None:
         session = _FakeRequestsSession(_FakeRequestsResponse())
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         assert transport.is_open is True
 
@@ -176,9 +160,7 @@ class TestRequestsTransport:
 
         assert transport.is_open is False
 
-    def test_response_body_error_propagates_as_is(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_response_body_error_propagates_as_is(self) -> None:
         """Regression: resp.text errors propagate without being wrapped in OSError."""
 
         class _BadTextResponse:
@@ -193,7 +175,7 @@ class TestRequestsTransport:
         session = _FakeRequestsSession(
             cast("_FakeRequestsResponse", _BadTextResponse())
         )
-        transport = _requests_transport_with_session(monkeypatch, session)
+        transport = _requests_transport_with_session(session)
 
         with pytest.raises(AttributeError, match="corrupted"):
             transport.get("https://api.example.test", {}, 1)

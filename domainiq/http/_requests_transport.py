@@ -2,18 +2,51 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Protocol
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from ._responses import SyncResponse
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+
+class _HttpResponse(Protocol):
+    """The subset of a requests-style response the transport reads."""
+
+    status_code: int
+    text: str
+
+    @property
+    def headers(self) -> Mapping[str, str]: ...
+
+
+class _HttpSession(Protocol):
+    """The subset of ``requests.Session`` the transport drives.
+
+    Both ``requests.Session`` and in-memory test doubles satisfy this, so the
+    session can be injected without patching ``requests.Session``.
+    """
+
+    def get(
+        self, url: str, *, params: dict[str, str], timeout: float
+    ) -> _HttpResponse: ...
+
+    def mount(self, prefix: str, adapter: object) -> None: ...
+
+    def close(self) -> None: ...
+
 
 class RequestsTransport:
     """SyncTransport backed by the requests library."""
 
-    def __init__(self) -> None:
-        self._session = requests.Session()
+    def __init__(self, session: _HttpSession | None = None) -> None:
+        self._session: requests.Session | _HttpSession = (
+            requests.Session() if session is None else session
+        )
         self._requests_timeout_exc = requests.exceptions.Timeout
         self._requests_request_exc = requests.exceptions.RequestException
         self._closed = False
