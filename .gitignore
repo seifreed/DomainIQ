@@ -101,5 +101,3 @@ docs/_build/
 .hatch/
 # Local Claude tool artifacts
 .claude/
-CLAUDE.md
-**/CLAUDE.md
